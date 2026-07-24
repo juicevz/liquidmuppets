@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="LIQUIDMUPPETS gives permissioned agents a bounded way to manage liquidity and RWA strategies on Robinhood."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://liquidmuppets.io/" />
+    <meta property="og:title" content="LIQUIDMUPPETS | onchain liquidity agents" />
+    <meta
+      property="og:description"
+      content="Permissioned agents for liquidity and RWA strategies, with every mandate, limit and action visible onchain."
+    />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="LIQUIDMUPPETS | onchain liquidity agents" />
+    <meta
+      name="twitter:description"
+      content="Permissioned agents for liquidity and RWA strategies, with every mandate, limit and action visible onchain."
+    />
+    <meta name="theme-color" content="#17201d" />
+    <link rel="icon" href="/favicon.svg?v=20260901" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32x32.png?v=20260901" type="image/png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=20260901" sizes="180x180" />
+    <link rel="manifest" href="/site.webmanifest?v=20260901" />
+    <script>
+      (() => {
+        const url = new URL(window.location.href)
+
+        if (!url.searchParams.has('release')) return
+
+        url.searchParams.delete('release')
+        window.history.replaceState(
+          window.history.state,
+          '',
+          `${url.pathname}${url.search}${url.hash}`,
+        )
+      })()
+    </script>
+    <link
+      rel="preload"
+      as="image"
+      type="image/webp"
+      href="/src/assets/muppets-lucid-meadow-hero-v3-2k.webp"
+      imagesrcset="/src/assets/muppets-lucid-meadow-hero-v3-2k.webp 1920w, /src/assets/muppets-lucid-meadow-hero-v3-4k.webp 3840w"
+      imagesizes="100vw"
+      fetchpriority="high"
+    />
+    <style>
+      html,
+      body,
+      #root {
+        min-width: 320px;
+        min-height: 100%;
+      }
+
+      body {
+        margin: 0;
+      }
+
+      body:not([data-surface]) {
+        min-height: 100svh;
+        background:
+          linear-gradient(180deg, #0d62d2 0%, #5fa7e3 54%, #7aba43 55%, #244d22 100%);
+      }
+    </style>
+    <title>LIQUIDMUPPETS | onchain liquidity agents</title>
+  </head>
+  <body>
+    <noscript>LIQUIDMUPPETS needs JavaScript for the interactive app. The product explanation remains available in the source.</noscript>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
