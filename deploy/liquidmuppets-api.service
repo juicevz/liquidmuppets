@@ -1,0 +1,23 @@
+[Unit]
+Description=LiquidMuppets strategy API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=liquidmuppets
+Group=liquidmuppets
+WorkingDirectory=/opt/liquidmuppets-api/current
+EnvironmentFile=/etc/liquidmuppets/api.env
+EnvironmentFile=-/etc/liquidmuppets/keeper.env
+ExecStart=/opt/liquidmuppets-api/current/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/liquidmuppets
+
+[Install]
+WantedBy=multi-user.target
