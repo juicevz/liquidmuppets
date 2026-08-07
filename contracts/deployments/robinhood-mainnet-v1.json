@@ -1,0 +1,23 @@
+{
+  "USDG": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+  "chainId": 4663,
+  "deployer": "0x30dF6f545FcD732c659626b8C8aFd63Ff8aE3d5f",
+  "deploymentBlock": 51324824,
+  "factory": "0x53665e9A41004F96Be144775076Dd6Bd022f7210",
+  "keyMarketplace": "0xAfae394d8D4fd7a2753501FaE47163270146bac8",
+  "morpho": "0x9D53d5E3bd5E8d4Cbfa6DB1ca238AEA02E651010",
+  "owner": "0x30dF6f545FcD732c659626b8C8aFd63Ff8aE3d5f",
+  "perVaultDepositCap": 10000000000,
+  "policyExecutor": "0xF8632897cB14683E02661B64DEF76f09A5260EFE",
+  "sourceVerification": "sourcify-exact-match",
+  "stableAdapter": "0xaB3C76cdd335334f272ef3C8C0AD7f1b2e07774C",
+  "stableMarketId": "0xc845da65a020ddca5f132efa8fea79676d8edfdea504226a4c01e7a9e34cddd6",
+  "status": "retired-with-zero-agents",
+  "transactions": {
+    "factory": "0x2150ac3071124ebb69ef7945a5a26da35dfd8a8ef1c86ff65b390f55587a293a",
+    "keyMarketplace": "0x685d70d768997afa3bc818ff60be5604b381b4e8bbd39e8cecc3b3a6ebe168cc",
+    "policyExecutor": "0x587687157654563e1e748ee3700baebedc61436857bfdd3982c9197f844793a2",
+    "stableAdapter": "0x4ed8f823e68e014905a686e8d0dcbb0bb61f9b3fbf14b6598a9dedb340e47d92"
+  },
+  "treasury": "0x30dF6f545FcD732c659626b8C8aFd63Ff8aE3d5f"
+}
