@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="LiquidMuppets puppet hand">
+  <defs>
+    <linearGradient id="surface" x1="8" y1="5" x2="56" y2="61" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#111c19"/>
+      <stop offset="1" stop-color="#050a09"/>
+    </linearGradient>
+    <linearGradient id="cord" x1="0" y1="35" x2="0" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#b6ffe8"/>
+      <stop offset="1" stop-color="#55d9ad"/>
+    </linearGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="1.35" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect x="1" y="1" width="62" height="62" rx="15" fill="url(#surface)"/>
+  <rect x="1.5" y="1.5" width="61" height="61" rx="14.5" fill="none" stroke="#85e8c8" stroke-opacity=".34"/>
+
+  <path
+    d="M24.2 6.5h15.6v14.7c0 1.5 1.8 2.3 2.9 1.3l3.8-3.3a4.3 4.3 0 0 1 6.2.6 4.4 4.4 0 0 1-.8 6.1l-10.6 8.5a7.7 7.7 0 0 0-2.9 6v1.1H23.2v-2.4c0-2.1-.9-4.1-2.5-5.5l-7-6.1a4.4 4.4 0 0 1-.5-6.1 4.3 4.3 0 0 1 6.4-.3l4.6 4.7V6.5Z"
+    fill="#f4f6f2"
+  />
+  <path d="M29.3 7v19.2M34.7 7v18.5M40 13.6v10.2" fill="none" stroke="#a8b3ad" stroke-width="1.15" stroke-linecap="round" opacity=".72"/>
+  <path d="M16.9 23.2 25 31.1M48.6 22.6l-8.8 7.2" fill="none" stroke="#a8b3ad" stroke-width="1.05" stroke-linecap="round" opacity=".65"/>
+
+  <g fill="none" stroke="url(#cord)" stroke-width="1.8" stroke-linecap="round" filter="url(#glow)">
+    <path d="M25.5 36.2v12.1"/>
+    <path d="M32 37.1v10"/>
+    <path d="M38.5 36.2v12.1"/>
+  </g>
+  <g fill="#f4f6f2" stroke="#8ce5c7" stroke-width=".8">
+    <rect x="21.8" y="47" width="7.4" height="11.1" rx="2.4"/>
+    <rect x="28.3" y="45.8" width="7.4" height="13" rx="2.4"/>
+    <rect x="34.8" y="47" width="7.4" height="11.1" rx="2.4"/>
+  </g>
+</svg>

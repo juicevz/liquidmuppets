@@ -1,0 +1,32 @@
+{
+  "USDG": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+  "WETH": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+  "chainId": 4663,
+  "deployer": "0x30dF6f545FcD732c659626b8C8aFd63Ff8aE3d5f",
+  "deploymentBlock": 52653314,
+  "ezWrapper": "0x6F81790Ebac25497be379Dc66143fb298663Ae11",
+  "factory": "0x570F0FEBFE8b33F37D01f7153F0F85E59FfcE460",
+  "keyMarketplace": "0x255573d6Cb2F8Ebb73677f6Ab9b3D98c2458B2cb",
+  "launchDepositCap": 250000000000000000,
+  "launchReserveAdapter": "0x956127B0B586B9427182FCd9325efe032E9B5181",
+  "morpho": "0x9D53d5E3bd5E8d4Cbfa6DB1ca238AEA02E651010",
+  "owner": "0x30dF6f545FcD732c659626b8C8aFd63Ff8aE3d5f",
+  "policyExecutor": "0x948c21BAC4eB147a0c5Cd8E722fb49dD7eCc7fAc",
+  "rangeAdapter": "0xc6b531e504Ebb718dCd66Df45c9aC63564a0C96d",
+  "rangeDepositCap": 1000000000000000000,
+  "stableAdapter": "0x169EfD23f67811709C0Db823f7c82fcF2732781d",
+  "stableDepositCap": 10000000000,
+  "stableMarketId": "0xc845da65a020ddca5f132efa8fea79676d8edfdea504226a4c01e7a9e34cddd6",
+  "status": "deployed-live",
+  "swapRouter": "0xCaf681a66D020601342297493863E78C959E5cb2",
+  "transactions": {
+    "factory": "0x4fa1bea5f5c0bf94b02a4653874f124c3882acf3979e1f09e8c415d4ae5126b2",
+    "keyMarketplace": "0x3a342917c03a0dd8be2e1daab0c7810d3db5a3431c041d83995d5da73ed6c84b",
+    "launchReserveAdapter": "0xa0aa709e09e1805cfcba4657d6541099cd8afd48c5d24f30366c34e0fa9021f2",
+    "policyExecutor": "0xfa88bf3b167964212cb8b95113926515d08607b8b56024802f6e2c76c9454ce4",
+    "rangeAdapter": "0xe92dd7ea8a001db9e9f95e73d7950b495f1064856be9dd14d9c8c44995d4a3a3",
+    "stableAdapter": "0x36fc09e04f41099bfad3ef3d97dc42f17856baf5bde867d273aa1263280c5e6b"
+  },
+  "treasury": "0x30dF6f545FcD732c659626b8C8aFd63Ff8aE3d5f",
+  "wethUsdgPool": "0x52e65B17fB6E5BA00Ed806f37Afcd2DaA50271Ca"
+}
