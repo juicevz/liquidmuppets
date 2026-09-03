@@ -63,7 +63,8 @@ await xPickerTrigger.click()
 const xAccountMenu = page.getByRole('menu', { name: 'X accounts' })
 results.xPickerVisible = await xAccountMenu.isVisible()
 results.xAccountHrefs = await xAccountMenu.locator('a').evaluateAll((links) => links.map((link) => link.getAttribute('href')))
-results.xAccountLabels = (await xAccountMenu.locator('a').allTextContents()).map((label) => label.replace(/\s+/g, ' ').trim())
+results.xAccountHandles = await xAccountMenu.locator('strong').allTextContents()
+results.xAccountDescriptions = await xAccountMenu.locator('small').allTextContents()
 results.githubHref = await page.getByRole('link', { name: 'LiquidMuppets on GitHub' }).getAttribute('href')
 await page.keyboard.press('Escape')
 results.xPickerEscapeCloses = await page.locator('.header-social-menu').count() === 0
@@ -265,7 +266,8 @@ const failed =
   || !results.explicitMainnetBoundary
   || !results.xPickerVisible
   || results.xAccountHrefs.join(',') !== 'https://x.com/liquidmuppets,https://x.com/AMBF'
-  || results.xAccountLabels.join(',') !== '@liquidmuppets official,@AMBF juice, founder'
+  || JSON.stringify(results.xAccountHandles) !== JSON.stringify(['@liquidmuppets', '@AMBF'])
+  || JSON.stringify(results.xAccountDescriptions) !== JSON.stringify(['official', 'juice, founder'])
   || results.githubHref !== 'https://github.com/juicevz/liquidmuppets'
   || !results.xPickerEscapeCloses
   || !results.normalMotionChanged
