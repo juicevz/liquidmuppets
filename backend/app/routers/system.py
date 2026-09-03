@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from time import sleep
+import json
+from time import monotonic, sleep
 from typing import Annotated, Any
 
 import httpx
@@ -32,6 +33,7 @@ READ_ONLY_RPC_METHODS = frozenset(
 )
 RPC_RETRY_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
 RPC_RETRY_DELAYS = (0.0, 0.15, 0.4)
+RPC_CACHE_SECONDS = 15
 
 
 @router.get("/health", response_model=HealthResponse)
@@ -88,19 +90,44 @@ def rpc_proxy(request: Request, payload: Annotated[Any, Body()]) -> Response:
     if any(call.get("method") not in READ_ONLY_RPC_METHODS for call in calls):
         raise HTTPException(status_code=403, detail="JSON-RPC method is not allowed")
 
-    last_error: httpx.HTTPError | None = None
-    for attempt, delay in enumerate(RPC_RETRY_DELAYS):
-        if delay:
-            sleep(delay)
-        try:
-            upstream = request.app.state.rpc_client.post(request.app.state.settings.rpc_url, json=payload)
-            if upstream.status_code in RPC_RETRY_STATUS_CODES and attempt < len(RPC_RETRY_DELAYS) - 1:
-                continue
-            upstream.raise_for_status()
-            return Response(content=upstream.content, media_type="application/json")
-        except httpx.HTTPError as error:
-            last_error = error
-            if not isinstance(error, httpx.RequestError) or attempt == len(RPC_RETRY_DELAYS) - 1:
-                break
+    cacheable = all(call.get("method") == "eth_call" for call in calls)
+    cache_key = json.dumps(payload, sort_keys=True, separators=(",", ":")) if cacheable else ""
+    force_fresh = request.headers.get("x-liquidmuppets-fresh") == "1"
+
+    with request.app.state.rpc_cache_lock:
+        now = monotonic()
+        expired = [key for key, (expires_at, _) in request.app.state.rpc_cache.items() if expires_at <= now]
+        for key in expired:
+            request.app.state.rpc_cache.pop(key, None)
+        if cacheable and not force_fresh:
+            cached = request.app.state.rpc_cache.get(cache_key)
+            if cached is not None:
+                return Response(content=cached[1], media_type="application/json")
+
+        last_error: httpx.HTTPError | None = None
+        for attempt, delay in enumerate(RPC_RETRY_DELAYS):
+            if delay:
+                sleep(delay)
+            try:
+                upstream = request.app.state.rpc_client.post(request.app.state.settings.rpc_url, json=payload)
+                if upstream.status_code in RPC_RETRY_STATUS_CODES and attempt < len(RPC_RETRY_DELAYS) - 1:
+                    continue
+                upstream.raise_for_status()
+                if cacheable and _rpc_response_succeeded(upstream):
+                    request.app.state.rpc_cache[cache_key] = (monotonic() + RPC_CACHE_SECONDS, upstream.content)
+                return Response(content=upstream.content, media_type="application/json")
+            except httpx.HTTPError as error:
+                last_error = error
+                if not isinstance(error, httpx.RequestError) or attempt == len(RPC_RETRY_DELAYS) - 1:
+                    break
 
     raise HTTPException(status_code=502, detail="upstream RPC request failed") from last_error
+
+
+def _rpc_response_succeeded(response: httpx.Response) -> bool:
+    try:
+        body = response.json()
+    except ValueError:
+        return False
+    rows = body if isinstance(body, list) else [body]
+    return bool(rows) and all(isinstance(row, dict) and "error" not in row for row in rows)

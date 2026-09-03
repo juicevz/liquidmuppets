@@ -182,7 +182,15 @@ export interface ProtocolSnapshot {
   feeBps: number
 }
 
-export function createProtocolClient(config: ProtocolConfig): PublicClient {
+interface SnapshotCacheEntry {
+  expiresAt: number
+  request: Promise<ProtocolSnapshot>
+}
+
+const SNAPSHOT_CACHE_MS = 15_000
+const snapshotCache = new Map<string, SnapshotCacheEntry>()
+
+export function createProtocolClient(config: ProtocolConfig, options: { fresh?: boolean } = {}): PublicClient {
   const chain = defineChain({
     id: config.chainId,
     name: config.chainName,
@@ -194,15 +202,47 @@ export function createProtocolClient(config: ProtocolConfig): PublicClient {
     chain,
     transport: http(config.rpcUrl, {
       batch: { batchSize: 40, wait: 10 },
+      fetchOptions: options.fresh ? { headers: { 'X-LiquidMuppets-Fresh': '1' } } : undefined,
       retryCount: 1,
       retryDelay: 250,
     }),
   })
 }
 
-export async function loadProtocolSnapshot(config: ProtocolConfig, walletAddress?: string): Promise<ProtocolSnapshot> {
+export async function loadProtocolSnapshot(
+  config: ProtocolConfig,
+  walletAddress?: string,
+  options: { force?: boolean } = {},
+): Promise<ProtocolSnapshot> {
+  const now = Date.now()
+  for (const [key, entry] of snapshotCache) {
+    if (entry.expiresAt <= now) snapshotCache.delete(key)
+  }
+  const cacheKey = [config.chainId, config.factory, config.keyMarketplace, walletAddress?.toLowerCase() ?? 'public'].join(':')
+  const cached = snapshotCache.get(cacheKey)
+  if (!options.force && cached && cached.expiresAt > now) return cached.request
+
+  const request = loadProtocolSnapshotUncached(config, walletAddress, Boolean(options.force))
+  snapshotCache.set(cacheKey, { expiresAt: now + SNAPSHOT_CACHE_MS, request })
+  try {
+    const snapshot = await request
+    if (snapshotCache.get(cacheKey)?.request === request) {
+      snapshotCache.set(cacheKey, { expiresAt: Date.now() + SNAPSHOT_CACHE_MS, request })
+    }
+    return snapshot
+  } catch (reason) {
+    if (snapshotCache.get(cacheKey)?.request === request) snapshotCache.delete(cacheKey)
+    throw reason
+  }
+}
+
+async function loadProtocolSnapshotUncached(
+  config: ProtocolConfig,
+  walletAddress?: string,
+  fresh = false,
+): Promise<ProtocolSnapshot> {
   if (!config.factory || !config.keyMarketplace) return { config, agents: [], feeBps: 300 }
-  const client = createProtocolClient(config)
+  const client = createProtocolClient(config, { fresh })
   const factory = config.factory
   const market = config.keyMarketplace
   const account = walletAddress as Address | undefined

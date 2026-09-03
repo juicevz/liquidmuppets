@@ -78,6 +78,35 @@ def test_rpc_proxy_retries_a_transient_upstream_failure(tmp_path: Path, monkeypa
     assert attempts == 2
 
 
+def test_rpc_proxy_caches_identical_reads_and_allows_a_fresh_read(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    attempts = 0
+
+    def fake_post(url: str, **_kwargs: object) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        request = httpx.Request("POST", url)
+        return httpx.Response(200, json={"jsonrpc": "2.0", "id": 1, "result": "0x01"}, request=request)
+
+    app = create_app(Settings(database_path=tmp_path / "test.sqlite3", rpc_url="https://rpc.invalid"))
+    payload = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "eth_call",
+        "params": [{"to": "0x0000000000000000000000000000000000000000", "data": "0x"}, "latest"],
+    }
+
+    with TestClient(app) as client:
+        monkeypatch.setattr(app.state.rpc_client, "post", fake_post)
+        first = client.post("/api/v1/rpc", json=payload)
+        cached = client.post("/api/v1/rpc", json=payload)
+        fresh = client.post("/api/v1/rpc", json=payload, headers={"X-LiquidMuppets-Fresh": "1"})
+
+    assert first.status_code == cached.status_code == fresh.status_code == 200
+    assert attempts == 2
+
+
 def test_wallet_profile_requires_the_wallet_signature(tmp_path: Path) -> None:
     account = Account.create()
     app = create_app(Settings(database_path=tmp_path / "test.sqlite3", rpc_url="http://127.0.0.1:1"))

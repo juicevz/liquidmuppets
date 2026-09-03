@@ -37,7 +37,7 @@ export function useProtocol(walletAddress?: string): ProtocolState {
         setTasks(nextTasks)
 
         try {
-          const nextSnapshot = await loadProtocolSnapshot(nextConfig, walletAddress)
+          const nextSnapshot = await loadProtocolSnapshot(nextConfig, walletAddress, { force: refreshToken > 0 })
           if (!active) return
           setSnapshot(nextSnapshot)
         } catch {

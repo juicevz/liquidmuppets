@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from threading import Lock
 
 import httpx
 from fastapi import FastAPI
@@ -25,6 +26,8 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
         database.initialize()
         rpc_client = httpx.Client(timeout=8)
         live_app.state.rpc_client = rpc_client
+        live_app.state.rpc_cache = {}
+        live_app.state.rpc_cache_lock = Lock()
         stop = asyncio.Event()
         keeper_task = None
         if app_settings.auto_keeper_enabled and chain.keeper_configured:
@@ -53,7 +56,7 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
         allow_origins=list(app_settings.cors_origins),
         allow_credentials=False,
         allow_methods=["GET", "POST"],
-        allow_headers=["Content-Type"],
+        allow_headers=["Content-Type", "X-LiquidMuppets-Fresh"],
     )
     app.include_router(system.router, prefix="/api/v1")
     app.include_router(strategies.router, prefix="/api/v1")

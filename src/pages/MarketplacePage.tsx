@@ -106,7 +106,7 @@ export function MarketplacePage({ walletAddress, onConnect }: MarketplacePagePro
             <div className="market-empty"><Icon name="search" /><h2>No Muppets onchain yet.</h2><p>Launch the first one, choose its task, and set the first Key ask.</p></div>
           )}
         </div>
-        <ActivityRail explorerUrl={config?.explorerUrl} />
+        <ActivityRail explorerUrl={config?.explorerUrl} enabled={!loading} />
       </div>
 
       {selected && config && <LiveAgentDrawer agent={selected} config={config} feeBps={snapshot?.feeBps ?? 300} tasks={tasks} walletAddress={walletAddress} onConnect={onConnect} onClose={() => setSelectedId(null)} onRefresh={refresh} />}
@@ -114,11 +114,12 @@ export function MarketplacePage({ walletAddress, onConnect }: MarketplacePagePro
   )
 }
 
-function ActivityRail({ explorerUrl }: { explorerUrl?: string }) {
+function ActivityRail({ explorerUrl, enabled }: { explorerUrl?: string; enabled: boolean }) {
   const [activity, setActivity] = useState<ActivityItem[]>([])
   const [failed, setFailed] = useState(false)
 
   useEffect(() => {
+    if (!enabled) return undefined
     let active = true
     const load = () => {
       fetchActivity(40)
@@ -130,12 +131,12 @@ function ActivityRail({ explorerUrl }: { explorerUrl?: string }) {
         .catch(() => { if (active) setFailed(true) })
     }
     load()
-    const timer = window.setInterval(load, 10_000)
+    const timer = window.setInterval(load, 30_000)
     return () => {
       active = false
       window.clearInterval(timer)
     }
-  }, [])
+  }, [enabled])
 
   return (
     <aside className="public-activity-rail" aria-label="Public onchain activity">

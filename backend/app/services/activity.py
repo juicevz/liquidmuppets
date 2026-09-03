@@ -148,7 +148,7 @@ class ActivityService:
     def list_activity(self, limit: int = 40) -> list[dict[str, object]]:
         limit = max(1, min(limit, 100))
         with self._lock:
-            if monotonic() - self._cache_at > 5:
+            if monotonic() - self._cache_at > 20:
                 self._cache = self._read_chain_activity()
                 self._cache_at = monotonic()
             return self._cache[:limit]
