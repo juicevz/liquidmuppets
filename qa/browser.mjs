@@ -194,6 +194,12 @@ results.docsPetCards = await page.locator('.docs-pet-card').count()
 results.docsPetNames = await page.locator('.docs-pet-card strong').allTextContents()
 results.docsPetNamesUnclipped = await page.locator('.docs-pet-card strong').evaluateAll((names) => names.every((name) => name.scrollWidth <= name.clientWidth))
 results.docsMoneyPath = await page.locator('.docs-task-route').count() === 3
+const docsImages = page.locator('.docs-visual img')
+for (let index = 0; index < await docsImages.count(); index += 1) {
+  const docsImage = docsImages.nth(index)
+  await docsImage.scrollIntoViewIfNeeded()
+  await docsImage.evaluate((image) => image instanceof HTMLImageElement && image.decode().catch(() => undefined))
+}
 results.docsImagesReady = await page.locator('.docs-visual img').evaluateAll((images) => images.every((image) => image.complete && image.naturalWidth > 0))
 await page.screenshot({ path: new URL('docs-functional.png', screenshotDir).pathname, fullPage: false })
 await page.locator('#docs-02').scrollIntoViewIfNeeded()
