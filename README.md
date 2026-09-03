@@ -1,6 +1,6 @@
 # LIQUIDMUPPETS
 
-LIQUIDMUPPETS is a Robinhood Chain mainnet marketplace for policy-bounded onchain agents. A creator picks one of seven cosmetic pets, assigns one of three tasks, deploys a single-asset ERC-4626 vault and a separate fungible Agent Key, then opens the first Key ask.
+LIQUIDMUPPETS is a Robinhood Chain mainnet marketplace for policy-bounded onchain agents. A creator picks one of seven cosmetic pets, assigns one of three tasks, selects its live market, deploys a single-asset ERC-4626 vault and a separate fungible Agent Key, then opens the first Key ask.
 
 Public interface: [https://liquidmuppets.io](https://liquidmuppets.io)
 
@@ -11,6 +11,7 @@ X: [@AMBF](https://x.com/AMBF)
 - Robinhood Chain ID `4663`
 - seven cosmetic pet appearances, independent from task permissions
 - three selectable task configurations
+- a market selector that separates live routes from Stock Token, company-basket, and community routes under review
 - native Agent Key asks, bids, partial fills, buys, sells and permanent binding
 - 3% marketplace fee on filled value only
 - public activity built from contract logs

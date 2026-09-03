@@ -5,7 +5,7 @@ LiquidMuppets combines two separate products on Robinhood Chain mainnet:
 1. a task-bound ERC-4626 vault where depositors own transferable shares
 2. a fixed-supply Agent Key market for trading and permanent binding
 
-A creator chooses one of seven cosmetic pets, assigns one of three enabled tasks, sets the Key supply and initial ask, and signs the factory transaction. The selected task fixes the deposit asset, adapter, allocation cap, cooldown, and vault cap. Pet appearance never changes the financial behavior.
+A creator chooses one of seven cosmetic pets, assigns one of three enabled tasks, chooses that task's live market, sets the Key supply and initial ask, and signs the factory transaction. The selected task fixes the deposit asset, adapter, allocation cap, cooldown, and vault cap. Pet appearance never changes the financial behavior.
 
 ## Current deployment
 
@@ -63,17 +63,32 @@ This choice is enabled so creators can launch and fund the full product shape, b
 
 There is no platform-volume threshold hiding the route. The restriction is venue safety. The inspected thin pool did not have enough oracle history to justify automated mainnet allocation.
 
+## Proposed market universe
+
+The launch flow includes a market step after task selection. It distinguishes the current immutable route from markets being evaluated for a future factory version:
+
+- live now: the existing USDG Morpho route, WETH / USDG range, and isolated WETH launch reserve
+- Stock Token range candidates: NVDA / USDG, GME / USDG, SPCX / USDG, and SPY / USDG
+- Stock Token credit candidate: NVDA collateral with USDG
+- company basket candidate: NVDA, MSFT, and GOOGL with independent feeds, weights, drift limits, and caps
+- community candidates: a reviewed token paired with WETH or USDG; DOGE, PEPE, and SHIB are watchlist examples rather than approved pools
+
+Every proposed market is labeled `route review`. A user can inspect it, but cannot continue to the Key step or launch it. The current factory accepts only a task ID and permanently binds each vault to one of three global asset and adapter configurations. It does not submit or store the selected proposed market.
+
+A deployable market version requires a new route registry or route ID, an asset-specific adapter, canonical contract verification, valuation-feed and multiplier handling, liquidity and exit-depth checks, route-specific caps, fork tests, and independent review. Stock Tokens provide tokenized exposure and are not shares in the underlying company. Availability can depend on jurisdiction.
+
 ## User flow
 
 1. Connect an EVM wallet on Robinhood Chain mainnet.
 2. Pick any of the seven pet appearances.
 3. Select stable yield, ETH range, or launch reserve.
-4. Set the Agent Key name, symbol, fixed whole-Key supply, and first ask.
-5. Sign the factory transaction. The factory deploys an Agent Key and capped ERC-4626 StrategyVault, registers its policy, and opens the first listing.
-6. Approve and deposit the task asset. The wallet receives transferable vault shares.
-7. The creator signs the task cycle. PolicyExecutor enforces the route and limits before the vault can call its immutable adapter.
-8. Depositors can redeem their shares. Full redemption recalls the complete adapter position and pays the assets actually realized.
-9. Key holders can buy, list, bid, sell, or permanently bind whole Keys through the native marketplace.
+4. Select the live market for that task. Proposed Stock Token, basket, and community routes can be inspected but not launched.
+5. Set the Agent Key name, symbol, fixed whole-Key supply, and first ask.
+6. Sign the factory transaction. The factory deploys an Agent Key and capped ERC-4626 StrategyVault, registers its policy, and opens the first listing.
+7. Approve and deposit the task asset. The wallet receives transferable vault shares.
+8. The creator signs the task cycle. PolicyExecutor enforces the route and limits before the vault can call its immutable adapter.
+9. Depositors can redeem their shares. Full redemption recalls the complete adapter position and pays the assets actually realized.
+10. Key holders can buy, list, bid, sell, or permanently bind whole Keys through the native marketplace.
 
 The browser signs and submits user transactions through the injected wallet. The FastAPI service reads public state and metadata. It does not custody funds or hold the deployer key.
 

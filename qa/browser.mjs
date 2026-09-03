@@ -33,7 +33,7 @@ async function revealLanding(page) {
   return { count, hidden: await page.locator('[data-reveal]:not(.is-visible)').count() }
 }
 
-const ultraBrowser = await chromium.launch({ headless: true })
+const ultraBrowser = await chromium.launch({ headless: true, args: ['--disable-gpu'] })
 const ultra = await ultraBrowser.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 2 })
 const ultraPage = await ultra.newPage()
 watch(ultraPage, '4k')
@@ -43,7 +43,7 @@ results.hero4kSelected = await ultraPage.locator('.hero-world-art img').evaluate
 await ultra.close()
 await ultraBrowser.close()
 
-const browser = await chromium.launch({ headless: true })
+const browser = await chromium.launch({ headless: true, args: ['--disable-gpu'] })
 const desktop = await browser.newContext({ viewport: { width: 1440, height: 980 } })
 await useKnownHandle(desktop)
 let page = await desktop.newPage()
@@ -106,6 +106,7 @@ await page.goto(`${baseUrl}/app/create`, { waitUntil: 'networkidle' })
 results.networkPillRemoved = await page.locator('.network-pill').count() === 0
 results.createChainNumberRemoved = !((await page.locator('.create-page').innerText()).includes('4663'))
 results.petPickerCount = await page.locator('.pet-picker button').count()
+results.builderProgressSteps = await page.locator('.compact-builder-progress button').count()
 results.descriptionInputs = await page.locator('textarea, input[name="description"]').count()
 results.appearanceCopy = await page.getByText(/Appearance changes no permissions/i).count() === 1
 await page.getByRole('button', { name: /Continue/ }).click()
@@ -119,6 +120,21 @@ results.ethRangeExplained = await page.getByText(/Converts WETH through the cano
 await page.getByRole('button', { name: /Launch pool/i }).click()
 results.launchPoolSelectable = await page.getByRole('button', { name: /Launch pool/i }).getAttribute('aria-pressed') === 'true'
 results.launchPoolExplained = await page.getByText(/Keeps a small, isolated WETH reserve/i).count() === 1
+await page.getByRole('button', { name: /ETH range/i }).click()
+await page.getByRole('button', { name: /Continue/ }).click()
+await page.getByText('Choose where this pet can work.').waitFor()
+results.marketUniverseOptions = await page.locator('.strategy-market-grid button').count()
+results.marketReviewOptions = await page.locator('.strategy-market-grid .market-review').count()
+results.liveMarketDefault = await page.getByRole('button', { name: /ETH market/i }).getAttribute('aria-pressed') === 'true'
+results.marketPairs = await page.locator('.strategy-market-pair').allTextContents()
+await page.getByRole('button', { name: /NVIDIA market/i }).click()
+results.marketReviewExplained = await page.getByText(/current factory cannot deploy this market yet/i).count() === 1
+results.stockTokenBoundary = await page.getByText(/not shares in the underlying company/i).count() === 1
+results.reviewRouteBlocksContinue = await page.getByRole('button', { name: /Continue/ }).isDisabled()
+await page.getByRole('button', { name: /ETH market/i }).click()
+results.liveMarketReady = await page.getByText(/ready in current factory/i).count() === 1
+results.liveRouteAllowsContinue = !(await page.getByRole('button', { name: /Continue/ }).isDisabled())
+await page.screenshot({ path: new URL('create-market-universe.png', screenshotDir).pathname, fullPage: false })
 await page.getByRole('button', { name: /Continue/ }).click()
 await page.getByText('Name it and open the floor.').waitFor()
 results.floorField = await page.locator('label').filter({ hasText: 'base floor' }).locator('input').count() === 1
@@ -168,7 +184,8 @@ watch(page, 'docs')
 await page.goto(`${baseUrl}/docs`, { waitUntil: 'networkidle' })
 results.docsTitle = await page.title()
 results.docsSections = await page.locator('.docs-layout article > section').count()
-results.docsSevenPets = await page.getByRole('heading', { name: 'Seven pets, three selectable tasks' }).count() === 1
+results.docsSevenPets = await page.getByRole('heading', { name: 'Seven pets, three live tasks' }).count() === 1
+results.docsMarketUniverse = await page.getByRole('heading', { name: 'Stock Token and community markets' }).count() === 1
 results.docsAlgorithm = await page.getByRole('heading', { name: 'The backend algorithm' }).count() === 1
 results.docsBoundary = await page.getByText(/real USDG, WETH, Morpho, Uniswap and EZManager/i).count() === 1
 results.docsLiveContracts = await page.getByText(/0x570F0FEBFE8b33F37D01f7153F0F85E59FfcE460/i).count() === 1
@@ -218,7 +235,7 @@ results.reducedMotionAlive = true
 await reduced.close()
 await browser.close()
 
-const mobileBrowser = await chromium.launch({ headless: true })
+const mobileBrowser = await chromium.launch({ headless: true, args: ['--disable-gpu'] })
 const mobile = await mobileBrowser.newContext({ viewport: { width: 390, height: 844 } })
 await useKnownHandle(mobile)
 const mobilePage = await mobile.newPage()
@@ -235,6 +252,13 @@ await mobilePage.goto(`${baseUrl}/app/create`, { waitUntil: 'networkidle' })
 results.mobileNavVisible = await mobilePage.locator('.mobile-app-nav').isVisible()
 results.mobileCreateOverflow = await mobilePage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
 await mobilePage.screenshot({ path: new URL('create-mobile.png', screenshotDir).pathname, fullPage: false })
+await mobilePage.getByRole('button', { name: /Continue/ }).click()
+await mobilePage.getByRole('button', { name: /ETH range/i }).click()
+await mobilePage.getByRole('button', { name: /Continue/ }).click()
+await mobilePage.getByText('Choose where this pet can work.').waitFor()
+results.mobileMarketOverflow = await mobilePage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
+results.mobileMarketColumns = await mobilePage.locator('.strategy-market-grid').evaluate((node) => getComputedStyle(node).gridTemplateColumns.split(' ').length)
+await mobilePage.screenshot({ path: new URL('market-mobile.png', screenshotDir).pathname, fullPage: false })
 await mobilePage.goto(`${baseUrl}/docs`, { waitUntil: 'networkidle' })
 results.mobileDocsOverflow = await mobilePage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
 await mobile.close()
@@ -276,6 +300,7 @@ const failed =
   || !results.networkPillRemoved
   || !results.createChainNumberRemoved
   || results.petPickerCount !== 7
+  || results.builderProgressSteps !== 5
   || results.descriptionInputs !== 0
   || !results.appearanceCopy
   || results.taskPickerCount !== 3
@@ -285,6 +310,15 @@ const failed =
   || !results.ethRangeExplained
   || !results.launchPoolSelectable
   || !results.launchPoolExplained
+  || results.marketUniverseOptions !== 5
+  || results.marketReviewOptions !== 4
+  || !results.liveMarketDefault
+  || JSON.stringify(results.marketPairs) !== JSON.stringify(['WETH / USDG', 'NVDA / USDG', 'GME / USDG', 'SPCX / USDG', 'SPY / USDG'])
+  || !results.marketReviewExplained
+  || !results.stockTokenBoundary
+  || !results.reviewRouteBlocksContinue
+  || !results.liveMarketReady
+  || !results.liveRouteAllowsContinue
   || !results.floorField
   || !results.keySupplyField
   || !results.firstAskCopy
@@ -296,8 +330,9 @@ const failed =
   || !results.portfolioConnectState
   || !results.portfolioChainNumberRemoved
   || results.docsTitle !== 'Docs | LIQUIDMUPPETS'
-  || results.docsSections !== 11
+  || results.docsSections !== 12
   || !results.docsSevenPets
+  || !results.docsMarketUniverse
   || !results.docsAlgorithm
   || !results.docsBoundary
   || !results.docsLiveContracts
@@ -313,6 +348,8 @@ const failed =
   || !results.mobileXPickerVisible
   || !results.mobileXPickerInViewport
   || results.mobileCreateOverflow
+  || results.mobileMarketOverflow
+  || results.mobileMarketColumns !== 1
   || results.mobileDocsOverflow
   || !results.mobileNavVisible
   || results.degradedTaskPickerCount !== 3

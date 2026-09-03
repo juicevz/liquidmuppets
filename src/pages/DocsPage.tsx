@@ -38,7 +38,7 @@ const docsSections: DocsSection[] = [
   },
   {
     number: '02',
-    title: 'Seven pets, three selectable tasks',
+    title: 'Seven pets, three live tasks',
     body: 'Blue, sage, stone, fox, plum, frog and gold are appearance choices. Any pet can use stable yield, ETH range, or launch reserve. The pet never changes the money path or permissions.',
     visual: 'pets',
   },
@@ -51,49 +51,59 @@ const docsSections: DocsSection[] = [
   },
   {
     number: '04',
+    title: 'Stock Token and community markets',
+    body: 'After choosing a task, the launch flow now shows its market universe. The current immutable route is marked live. Stock Token ranges, a company basket, and community-token pools are marked route review and cannot continue to launch until their own adapters and policies are deployed.',
+    details: [
+      'range candidates: NVDA, GME, SPCX and SPY Stock Tokens paired with USDG',
+      'basket candidate: NVDA, MSFT and GOOGL with separate feed, weight and drift limits',
+      'community candidates require contract identity, pool age, liquidity, volume, exit-depth and oracle review',
+    ],
+  },
+  {
+    number: '05',
     title: 'Vault shares and yield',
     body: 'Each StrategyVault is an ERC-4626 vault. Deposits mint transferable shares. Stable shares follow the USDG value returned by Morpho. Range shares follow the WETH value realized by the LP position. Launch-reserve shares remain WETH with no pool yield.',
     details: ['Morpho interest is variable and can be zero', 'concentrated liquidity can underperform holding WETH', 'a full redemption recalls the complete adapter position before paying the realized assets'],
     visual: 'vault',
   },
   {
-    number: '05',
+    number: '06',
     title: 'The backend algorithm',
     body: 'The creator signs each allocation from the app. PolicyExecutor applies the task cap, daily cap, cooldown and expiry. Stable yield then checks Morpho health. ETH range opens a fixed-width position through EZManager. Launch reserve only isolates WETH.',
     details: ['Morpho supply must remain at least 10,000,000 USDG and utilization at or below 95%', 'range recenter closes and reopens atomically, so it cannot stop halfway', 'no deployer or keeper key is stored in the browser or public API'],
     visual: 'policy',
   },
   {
-    number: '06',
+    number: '07',
     title: 'The onchain leash',
     body: 'PolicyExecutor is the final authority. It checks creator or keeper authorization, pause state, expiry, cooldown, per-action cap, daily cap and total allocation cap before StrategyVault can move assets into its fixed adapter. The creator can allocate, recall all, or atomically recenter an ETH range, but cannot replace the route.',
   },
   {
-    number: '07',
+    number: '08',
     title: 'Agent Keys and their market',
     body: 'Each Muppet has a fixed-supply, zero-decimal ERC-20 Agent Key. The creator receives the supply and chooses the first ask. The actual floor is always the cheapest active ask. The native marketplace supports partial asks, bids, buys and sells and charges 3% only when a trade fills.',
     details: ['Key ownership is not vault ownership', 'Key price does not change vault share price', 'current utility is trading and permanent onchain binding'],
     visual: 'keys',
   },
   {
-    number: '08',
+    number: '09',
     title: 'Binding a Key',
     body: 'A holder can permanently bind whole Keys to their wallet. Binding burns the transferable units and records the bound balance in the Key contract. It does not mint an NFT and cannot claim vault assets.',
   },
   {
-    number: '09',
+    number: '10',
     title: 'How to use the live loop',
-    body: 'Connect an EVM wallet on Robinhood Chain mainnet, choose any pet and task, set a Key supply and first floor, then deposit the task asset. The creator runs the bounded cycle. Anyone can buy, list, bid, sell or bind a Key. Portfolio reads balances from chain.',
+    body: 'Connect an EVM wallet on Robinhood Chain mainnet, choose any pet and task, then select that task\'s live market. Set a Key supply and first floor, then deposit the task asset. The creator runs the bounded cycle. Anyone can buy, list, bid, sell or bind a Key. Portfolio reads balances from chain.',
     visual: 'steps',
   },
   {
-    number: '10',
+    number: '11',
     title: 'Public activity and handles',
     body: 'The marketplace tape decodes launches, listings, fills, deposits, withdrawals, allocations, recalls and Key binding from mainnet logs. A wallet can sign an app-handle claim with no gas. If no handle is claimed, the tape shows the shortened wallet instead.',
     details: ['green values mark buys, deposits, launches and allocations', 'red values mark sells, withdrawals and recalls', 'asks and bids are neutral until they fill', 'an app handle proves wallet control, not ownership of an external social account'],
   },
   {
-    number: '11',
+    number: '12',
     title: 'Current boundary',
     body: 'The mainnet contracts use real USDG, WETH, Morpho, Uniswap and EZManager. Local and fork tests cover the adapters, full redemption and atomic recentering, but the contracts are not independently audited. Caps limit exposure and do not remove protocol, oracle, liquidity, LP or stablecoin risk.',
     details: [
@@ -130,7 +140,7 @@ function ProductLoopVisual() {
       </div>
       <ol className="docs-loop-track">
         <li><span>01</span><strong>choose pet</strong></li>
-        <li><span>02</span><strong>assign task</strong></li>
+        <li><span>02</span><strong>task + market</strong></li>
         <li><span>03</span><strong>deploy vault</strong></li>
         <li><span>04</span><strong>open Key floor</strong></li>
       </ol>
@@ -231,7 +241,7 @@ function KeyMarketVisual() {
 
 function LiveStepsVisual() {
   const steps = [
-    ['01', 'launch', 'pet + task'],
+    ['01', 'launch', 'pet + task + market'],
     ['02', 'fund', 'USDG or WETH'],
     ['03', 'run', 'policy checked'],
     ['04', 'track', 'live chain reads'],
