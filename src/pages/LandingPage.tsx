@@ -4,6 +4,7 @@ import type { View } from '../types'
 import { pets } from '../data/pets'
 import { Brand } from '../components/Brand'
 import { DarkNoiseField } from '../components/DarkNoiseField'
+import { HeaderSocialLinks } from '../components/HeaderSocialLinks'
 import { Icon } from '../components/Icon'
 import { PixelAgents } from '../components/PixelAgents'
 import heroWorld2k from '../assets/muppets-lucid-meadow-hero-v3-2k.webp'
@@ -128,9 +129,12 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
           <a href="#safety">Safety</a>
           <a href="/docs" onClick={(event) => { event.preventDefault(); onNavigate('docs') }}>Docs</a>
         </nav>
-        <button type="button" className="button button-dark header-cta" onClick={() => onNavigate('marketplace')}>
-          Open key market <Icon name="arrow" />
-        </button>
+        <div className="landing-header-actions">
+          <HeaderSocialLinks />
+          <button type="button" className="button button-dark header-cta" onClick={() => onNavigate('marketplace')}>
+            Open key market <Icon name="arrow" />
+          </button>
+        </div>
       </header>
 
       <main>

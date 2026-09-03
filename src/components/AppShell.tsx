@@ -7,6 +7,7 @@ import { claimWalletProfile, createProfileChallenge, fetchWalletProfile } from '
 import { getInjectedProvider } from '../lib/protocol'
 import { Brand } from './Brand'
 import { HandleModal } from './HandleModal'
+import { HeaderSocialLinks } from './HeaderSocialLinks'
 import { Icon } from './Icon'
 import { CreateAgentPage } from '../pages/CreateAgentPage'
 import { DocsPage } from '../pages/DocsPage'
@@ -110,6 +111,7 @@ export function AppShell({ view, onNavigate }: AppShellProps) {
           </button>
         </nav>
         <div className="app-header-actions">
+          <HeaderSocialLinks />
           {wallet.status === 'connected' && (
             <button type="button" className="header-handle" onClick={() => setShowHandle(true)}>
               {handle ?? '@ set handle'}
