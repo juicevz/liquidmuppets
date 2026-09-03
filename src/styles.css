@@ -10655,6 +10655,10 @@ select:focus-visible {
   gap: 6px;
 }
 
+.x-account-picker {
+  position: relative;
+}
+
 .header-social-link {
   display: grid;
   width: 34px;
@@ -10669,6 +10673,11 @@ select:focus-visible {
   transition: color 180ms ease, border-color 180ms ease, background-color 180ms ease, transform 180ms ease;
 }
 
+button.header-social-link {
+  padding: 0;
+  cursor: pointer;
+}
+
 .header-social-link svg {
   width: 15px;
   height: 15px;
@@ -10679,6 +10688,113 @@ select:focus-visible {
   background: rgba(5, 9, 7, 0.38);
   color: #ffffff;
   transform: translateY(-1px);
+}
+
+.header-social-link.is-open {
+  border-color: rgba(100, 214, 173, 0.48);
+  background: rgba(100, 214, 173, 0.1);
+  color: #9ce7ca;
+}
+
+.header-social-menu {
+  position: absolute;
+  z-index: 240;
+  top: calc(100% + 9px);
+  right: 0;
+  width: 218px;
+  padding: 6px;
+  overflow: hidden;
+  border: 1px solid rgba(215, 229, 220, 0.14);
+  border-radius: 13px;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(100, 214, 173, 0.09), transparent 42%),
+    rgba(8, 13, 10, 0.97);
+  box-shadow: 0 18px 52px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  color: #eef4f0;
+  text-shadow: none;
+  backdrop-filter: blur(20px) saturate(118%);
+  transform-origin: top right;
+  animation: social-menu-in 170ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.header-social-menu-label {
+  display: block;
+  padding: 6px 9px 7px;
+  color: #718078;
+  font-family: 'JetBrains Mono Variable', monospace;
+  font-size: 8px;
+  font-weight: 560;
+  letter-spacing: 0.11em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.header-social-account {
+  display: flex;
+  min-height: 47px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 7px 9px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
+}
+
+.header-social-account + .header-social-account {
+  margin-top: 2px;
+}
+
+.header-social-account > span:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.header-social-account strong {
+  overflow: hidden;
+  color: #edf4ef;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.header-social-account small {
+  color: #78867e;
+  font-size: 9px;
+  line-height: 1.1;
+}
+
+.header-social-account-arrow {
+  color: #64726a;
+  font-size: 12px;
+  transition: color 160ms ease, transform 160ms ease;
+}
+
+.header-social-account:hover,
+.header-social-account:focus-visible {
+  border-color: rgba(100, 214, 173, 0.15);
+  background: rgba(100, 214, 173, 0.075);
+}
+
+.header-social-account:hover .header-social-account-arrow,
+.header-social-account:focus-visible .header-social-account-arrow {
+  color: var(--app-accent);
+  transform: translate(1px, -1px);
+}
+
+@keyframes social-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-5px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .landing-v2.landing-v3 .landing-header.header-dark .header-social-link {
@@ -10708,6 +10824,18 @@ select:focus-visible {
   border-color: rgba(100, 214, 173, 0.34);
   background: rgba(100, 214, 173, 0.07);
   color: var(--app-accent);
+}
+
+.app-header .header-social-link.is-open {
+  border-color: rgba(100, 214, 173, 0.34);
+  background: rgba(100, 214, 173, 0.07);
+  color: var(--app-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .header-social-menu {
+    animation: none;
+  }
 }
 
 @media (max-width: 660px) {

@@ -58,6 +58,15 @@ results.storyLeaves = await page.locator('.folio-index li').count()
 results.strategyCards = await page.locator('.strategy-roles .type-grid article').count()
 results.petPreviewCards = await page.locator('.landing-pet-card').count()
 results.explicitMainnetBoundary = await page.getByText(/unaudited contracts/i).count() > 0
+const xPickerTrigger = page.getByRole('button', { name: 'Choose an X account' })
+await xPickerTrigger.click()
+const xAccountMenu = page.getByRole('menu', { name: 'X accounts' })
+results.xPickerVisible = await xAccountMenu.isVisible()
+results.xAccountHrefs = await xAccountMenu.locator('a').evaluateAll((links) => links.map((link) => link.getAttribute('href')))
+results.xAccountLabels = (await xAccountMenu.locator('a').allTextContents()).map((label) => label.replace(/\s+/g, ' ').trim())
+results.githubHref = await page.getByRole('link', { name: 'LiquidMuppets on GitHub' }).getAttribute('href')
+await page.keyboard.press('Escape')
+results.xPickerEscapeCloses = await page.locator('.header-social-menu').count() === 0
 
 const startingTransform = await page.locator('.pixel-agent-blue').evaluate((node) => getComputedStyle(node).transform)
 await page.waitForFunction(
@@ -215,6 +224,12 @@ const mobilePage = await mobile.newPage()
 watch(mobilePage, 'mobile')
 await mobilePage.goto(baseUrl, { waitUntil: 'networkidle' })
 results.mobileLandingOverflow = await mobilePage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
+await mobilePage.getByRole('button', { name: 'Choose an X account' }).click()
+results.mobileXPickerVisible = await mobilePage.getByRole('menu', { name: 'X accounts' }).isVisible()
+results.mobileXPickerInViewport = await mobilePage.getByRole('menu', { name: 'X accounts' }).evaluate((node) => {
+  const rect = node.getBoundingClientRect()
+  return rect.left >= 0 && rect.right <= window.innerWidth
+})
 await mobilePage.goto(`${baseUrl}/app/create`, { waitUntil: 'networkidle' })
 results.mobileNavVisible = await mobilePage.locator('.mobile-app-nav').isVisible()
 results.mobileCreateOverflow = await mobilePage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
@@ -248,6 +263,11 @@ const failed =
   || results.strategyCards !== 3
   || results.petPreviewCards !== 7
   || !results.explicitMainnetBoundary
+  || !results.xPickerVisible
+  || results.xAccountHrefs.join(',') !== 'https://x.com/liquidmuppets,https://x.com/AMBF'
+  || results.xAccountLabels.join(',') !== '@liquidmuppets official,@AMBF juice, founder'
+  || results.githubHref !== 'https://github.com/juicevz/liquidmuppets'
+  || !results.xPickerEscapeCloses
   || !results.normalMotionChanged
   || results.heroExitOpacity >= 0.8
   || results.landingHiddenReveals !== 0
@@ -288,6 +308,8 @@ const failed =
   || !results.reducedMotionAlive
   || !results.hero4kSelected
   || results.mobileLandingOverflow
+  || !results.mobileXPickerVisible
+  || !results.mobileXPickerInViewport
   || results.mobileCreateOverflow
   || results.mobileDocsOverflow
   || !results.mobileNavVisible
