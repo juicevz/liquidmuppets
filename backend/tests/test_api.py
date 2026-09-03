@@ -1,11 +1,14 @@
 from pathlib import Path
 
+import httpx
 from eth_account import Account
 from eth_account.messages import encode_defunct
 from fastapi.testclient import TestClient
+from pytest import MonkeyPatch
 
 from app.config import Settings
 from app.main import create_app
+from app.routers import system
 
 
 def test_strategy_api_exposes_three_concrete_tasks(tmp_path: Path) -> None:
@@ -47,6 +50,32 @@ def test_rpc_proxy_rejects_transaction_submission(tmp_path: Path) -> None:
             json={"jsonrpc": "2.0", "id": 1, "method": "eth_sendRawTransaction", "params": ["0x00"]},
         )
     assert response.status_code == 403
+
+
+def test_rpc_proxy_retries_a_transient_upstream_failure(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    attempts = 0
+
+    def fake_post(url: str, **_kwargs: object) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        request = httpx.Request("POST", url)
+        if attempts == 1:
+            return httpx.Response(503, request=request)
+        return httpx.Response(200, json={"jsonrpc": "2.0", "id": 1, "result": "0x1237"}, request=request)
+
+    monkeypatch.setattr(system, "sleep", lambda _: None)
+    app = create_app(Settings(database_path=tmp_path / "test.sqlite3", rpc_url="https://rpc.invalid"))
+
+    with TestClient(app) as client:
+        monkeypatch.setattr(app.state.rpc_client, "post", fake_post)
+        response = client.post(
+            "/api/v1/rpc",
+            json={"jsonrpc": "2.0", "id": 1, "method": "eth_chainId", "params": []},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["result"] == "0x1237"
+    assert attempts == 2
 
 
 def test_wallet_profile_requires_the_wallet_signature(tmp_path: Path) -> None:

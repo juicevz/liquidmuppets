@@ -8,6 +8,7 @@
     "dev": "vite --host 0.0.0.0",
     "preview": "vite preview --host 0.0.0.0",
     "qa:browser": "node qa/browser.mjs",
+    "qa:fork": "node qa/mainnet-fork-e2e.mjs",
     "qa:testnet": "node qa/testnet-e2e.mjs",
     "typecheck": "tsc -b --pretty false",
     "test": "vitest run",

@@ -1,5 +1,6 @@
 import {
   createPublicClient,
+  custom,
   decodeEventLog,
   defineChain,
   encodeFunctionData,
@@ -189,7 +190,14 @@ export function createProtocolClient(config: ProtocolConfig): PublicClient {
     rpcUrls: { default: { http: [config.rpcUrl] } },
     blockExplorers: { default: { name: 'Blockscout', url: config.explorerUrl } },
   })
-  return createPublicClient({ chain, transport: http(config.rpcUrl) })
+  return createPublicClient({
+    chain,
+    transport: http(config.rpcUrl, {
+      batch: { batchSize: 40, wait: 10 },
+      retryCount: 1,
+      retryDelay: 250,
+    }),
+  })
 }
 
 export async function loadProtocolSnapshot(config: ProtocolConfig, walletAddress?: string): Promise<ProtocolSnapshot> {
@@ -510,7 +518,23 @@ async function sendAndWait(
   const transaction: Record<string, string> = { from: account, to, data }
   if (value !== undefined) transaction.value = toHex(value)
   const hash = await provider.request({ method: 'eth_sendTransaction', params: [transaction] }) as Hash
-  return client.waitForTransactionReceipt({ hash, confirmations: 1, timeout: 60_000 })
+  const receiptClient = createPublicClient({
+    chain: client.chain,
+    transport: custom(provider, { retryCount: 1, retryDelay: 250 }),
+  })
+  let receipt: TransactionReceipt
+  try {
+    receipt = await receiptClient.waitForTransactionReceipt({ hash, confirmations: 1, timeout: 60_000 })
+  } catch (reason) {
+    throw new Error(
+      `Transaction ${hash.slice(0, 10)}… was submitted, but its confirmation could not be read. Check your wallet, then refresh.`,
+      { cause: reason },
+    )
+  }
+  if (receipt.status !== 'success') {
+    throw new Error(`Transaction ${hash.slice(0, 10)}… reverted onchain. No changes from this confirmation were applied.`)
+  }
+  return receipt
 }
 
 export function formatAsset(value: bigint, decimals: number, digits = 4): string {

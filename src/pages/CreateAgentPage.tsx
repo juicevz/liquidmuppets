@@ -4,6 +4,7 @@ import { Icon } from '../components/Icon'
 import { pets } from '../data/pets'
 import { useProtocol } from '../hooks/useProtocol'
 import { getInjectedProvider, launchAgent, type LaunchResult } from '../lib/protocol'
+import { actionErrorMessage } from '../lib/errors'
 import type { StrategyTaskId } from '../types'
 
 interface CreateAgentPageProps {
@@ -97,7 +98,7 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
       setProgress('Muppet launched. Vault, Key, and first ask are live.')
       refresh()
     } catch (reason) {
-      setLaunchError(reason instanceof Error ? reason.message : 'The launch failed.')
+      setLaunchError(actionErrorMessage(reason, 'The launch failed.'))
       setProgress('')
     }
   }

@@ -4,6 +4,7 @@ import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -20,8 +21,10 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
     activity_service = ActivityService(app_settings)
 
     @asynccontextmanager
-    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    async def lifespan(live_app: FastAPI) -> AsyncIterator[None]:
         database.initialize()
+        rpc_client = httpx.Client(timeout=8)
+        live_app.state.rpc_client = rpc_client
         stop = asyncio.Event()
         keeper_task = None
         if app_settings.auto_keeper_enabled and chain.keeper_configured:
@@ -32,6 +35,7 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
             stop.set()
             if keeper_task is not None:
                 await keeper_task
+            rpc_client.close()
 
     app = FastAPI(
         title="LiquidMuppets Strategy API",

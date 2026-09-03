@@ -140,6 +140,7 @@ Browser chain reads use `/api/v1/rpc`, a same-origin relay that allowlists read-
 
 ```bash
 npm run check
+npm run qa:fork # with the documented local mainnet fork, API, and Vite server running
 cd backend
 .venv/bin/ruff check app tests
 .venv/bin/mypy app

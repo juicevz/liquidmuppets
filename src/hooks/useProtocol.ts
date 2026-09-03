@@ -25,24 +25,37 @@ export function useProtocol(walletAddress?: string): ProtocolState {
     let active = true
     setLoading(true)
     setError('')
-    Promise.all([fetchProtocolConfig(), fetchStrategyTasks()])
-      .then(async ([nextConfig, nextTasks]) => {
-        const nextSnapshot = await loadProtocolSnapshot(nextConfig, walletAddress)
+
+    const load = async () => {
+      try {
+        const [nextConfig, nextTasks] = await Promise.all([fetchProtocolConfig(), fetchStrategyTasks()])
         if (!active) return
+
+        // Task selection is API metadata and must not disappear just because a
+        // live RPC snapshot is temporarily unavailable.
         setConfig(nextConfig)
         setTasks(nextTasks)
-        setSnapshot(nextSnapshot)
-      })
-      .catch((reason: unknown) => {
+
+        try {
+          const nextSnapshot = await loadProtocolSnapshot(nextConfig, walletAddress)
+          if (!active) return
+          setSnapshot(nextSnapshot)
+        } catch {
+          if (!active) return
+          setSnapshot(null)
+          setError('Live marketplace data is temporarily unavailable. Task selection and wallet transactions still work.')
+        }
+      } catch (reason: unknown) {
         if (!active) return
         setError(reason instanceof Error ? reason.message : 'Protocol data could not be loaded.')
-      })
-      .finally(() => {
+      } finally {
         if (active) setLoading(false)
-      })
+      }
+    }
+
+    void load()
     return () => { active = false }
   }, [refreshToken, walletAddress])
 
   return { config, snapshot, tasks, loading, error, refresh }
 }
-

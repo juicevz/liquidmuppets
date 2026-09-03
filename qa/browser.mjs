@@ -175,6 +175,22 @@ await page.locator('#docs-03').scrollIntoViewIfNeeded()
 await page.screenshot({ path: new URL('docs-money-path.png', screenshotDir).pathname, fullPage: false })
 await desktop.close()
 
+const degraded = await browser.newContext({ viewport: { width: 1440, height: 980 } })
+await useKnownHandle(degraded)
+await degraded.route('**/api/v1/rpc', (route) => route.fulfill({
+  status: 502,
+  contentType: 'application/json',
+  body: JSON.stringify({ detail: 'simulated upstream outage' }),
+}))
+const degradedPage = await degraded.newPage()
+await degradedPage.goto(`${baseUrl}/app/create`, { waitUntil: 'networkidle' })
+await degradedPage.getByRole('button', { name: /Continue/ }).click()
+await degradedPage.getByText('What should this pet do?').waitFor()
+results.degradedTaskPickerCount = await degradedPage.locator('.task-picker button').count()
+results.degradedTaskWarning = await degradedPage.getByRole('alert')
+  .getByText(/task selection and wallet transactions still work/i).count() === 1
+await degraded.close()
+
 const reduced = await browser.newContext({ viewport: { width: 1280, height: 850 }, reducedMotion: 'reduce' })
 const reducedPage = await reduced.newPage()
 watch(reducedPage, 'reduced')
@@ -275,6 +291,8 @@ const failed =
   || results.mobileCreateOverflow
   || results.mobileDocsOverflow
   || !results.mobileNavVisible
+  || results.degradedTaskPickerCount !== 3
+  || !results.degradedTaskWarning
   || consoleErrors.length > 0
 
 if (failed) process.exitCode = 1
