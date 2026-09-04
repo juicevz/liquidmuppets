@@ -22,6 +22,14 @@ export interface ProtocolConfig {
   launchReserveAdapter: `0x${string}` | null
   WETH: `0x${string}`
   ezWrapper: `0x${string}`
+  accessGate: {
+    feature: 'agent_launch'
+    tokenAddress: `0x${string}` | null
+    tokenSymbol: string
+    minimum: string
+    configured: boolean
+    enforcement: 'app_and_api'
+  }
   mode: 'testnet' | 'mainnet'
 }
 
@@ -45,6 +53,26 @@ export function fetchProtocolConfig(): Promise<ProtocolConfig> {
 
 export function fetchStrategyTasks(): Promise<StrategyTaskDefinition[]> {
   return request('/strategies')
+}
+
+export interface TokenAccess {
+  wallet: `0x${string}`
+  feature: 'agent_launch'
+  configured: boolean
+  eligible: boolean
+  tokenAddress: `0x${string}` | null
+  tokenSymbol: string
+  minimum: string
+  decimals: number | null
+  balance: string | null
+  balanceRaw: string | null
+  minimumRaw: string | null
+  reason: 'eligible' | 'below_minimum' | 'token_not_configured' | 'access_check_unavailable'
+  source: string
+}
+
+export function fetchTokenAccess(wallet: string): Promise<TokenAccess> {
+  return request(`/access/${wallet}`, { cache: 'no-store' })
 }
 
 export interface WalletProfile {

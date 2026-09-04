@@ -11,15 +11,17 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import Settings, settings
 from app.database import Database, KeeperRunRecord
-from app.routers import activity, keeper, profiles, strategies, system
+from app.routers import access, activity, keeper, profiles, strategies, system
 from app.services.activity import ActivityService
 from app.services.chain import ChainService
+from app.services.token_gate import TokenGateService
 
 
 def create_app(app_settings: Settings = settings) -> FastAPI:
     database = Database(app_settings.database_path)
     chain = ChainService(app_settings)
     activity_service = ActivityService(app_settings)
+    token_gate = TokenGateService(app_settings, chain.web3)
 
     @asynccontextmanager
     async def lifespan(live_app: FastAPI) -> AsyncIterator[None]:
@@ -51,6 +53,7 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
     app.state.database = database
     app.state.chain = chain
     app.state.activity = activity_service
+    app.state.token_gate = token_gate
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(app_settings.cors_origins),
@@ -59,6 +62,7 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
         allow_headers=["Content-Type", "X-LiquidMuppets-Fresh"],
     )
     app.include_router(system.router, prefix="/api/v1")
+    app.include_router(access.router, prefix="/api/v1")
     app.include_router(strategies.router, prefix="/api/v1")
     app.include_router(keeper.router, prefix="/api/v1")
     app.include_router(profiles.router, prefix="/api/v1")

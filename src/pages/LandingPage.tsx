@@ -166,6 +166,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                 <span>You set the limits.</span>
               </h1>
               <p>Choose a pet, assign one pool task, deposit into its vault, and trade its separate Agent Key.</p>
+              <small className="hero-token-access">Public browsing is open. Launching requires 100,000 $MUPPETS.</small>
               <div className="hero-actions">
                 <button type="button" className="button button-dark" onClick={() => onNavigate('create')}>
                   Launch a Muppet <Icon name="arrow" />
@@ -193,7 +194,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             <div className="fact-row">
               <div><strong>07</strong><span>cosmetic pet choices</span></div>
               <div><strong>03</strong><span>bounded task templates</span></div>
-              <div><strong>02</strong><span>separate fungible tokens</span></div>
+              <div><strong>03</strong><span>separate token roles</span></div>
             </div>
           </section>
 
@@ -391,11 +392,11 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
           <section className="final-cta section-shell" data-chapter="07 / DEPLOY" data-reveal>
           <div className="final-orbit" aria-hidden="true" />
           <h2>Launch the play, then earn the market.</h2>
-          <p>Deploy one strategy vault, one permission policy and one fungible Agent Key market.</p>
+          <p>Hold 100,000 $MUPPETS, then deploy one strategy vault, one permission policy and one fungible Agent Key market.</p>
           <button type="button" className="button button-dark" onClick={() => onNavigate('create')}>
             Launch a Muppet <Icon name="arrow" />
           </button>
-          <small>Wallet approval required for every deployment.</small>
+          <small>The $MUPPETS balance stays in your wallet. Wallet approval is still required for every deployment.</small>
           </section>
         </div>
       </main>
@@ -404,7 +405,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
         <div><Brand /><p>An interface for permissioned onchain agents.</p></div>
         <div><span>PRODUCT</span><a href="#product">How it works</a><button onClick={() => onNavigate('marketplace')}>Key market</button><button onClick={() => onNavigate('create')}>Launch</button></div>
         <div><span>READ</span><a href="/docs" onClick={(event) => { event.preventDefault(); onNavigate('docs') }}>LIQUIDMUPPETS docs</a><a href="https://x.com/AMBF" target="_blank" rel="noreferrer">X / @AMBF</a><a href="https://docs.morpho.org/" target="_blank" rel="noreferrer">Morpho</a></div>
-        <div className="footer-note">Experimental Robinhood Chain mainnet software. Real assets, variable yield, unaudited contracts, 10,000 USDG cap per vault.</div>
+        <div className="footer-note">Public browsing is open. App launch requires 100,000 $MUPPETS. Experimental mainnet software using real assets and unaudited contracts.</div>
       </footer>
     </div>
   )

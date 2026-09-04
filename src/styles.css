@@ -8376,6 +8376,16 @@ select:focus-visible {
   line-height: 1.5;
 }
 
+.landing-v2.landing-v3 .hero-token-access {
+  display: block;
+  margin-top: 10px;
+  color: #65746c;
+  font-family: 'JetBrains Mono Variable', monospace;
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
 .landing-v2.landing-v3 .hero-actions {
   margin-top: 21px;
 }
@@ -10763,6 +10773,49 @@ select:focus-visible {
 
 .live-launch-review .review-market {
   grid-column: 1 / -1;
+}
+
+.launch-token-gate {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 12px 13px;
+  border: 1px solid rgba(196, 166, 111, 0.32);
+  border-radius: 10px;
+  background: rgba(185, 150, 66, 0.055);
+}
+
+.launch-token-gate > svg {
+  width: 17px;
+  flex: 0 0 auto;
+  color: #c4a66f;
+}
+
+.launch-token-gate > span {
+  display: grid;
+  gap: 3px;
+}
+
+.launch-token-gate strong {
+  color: #d9c795;
+  font-size: 11px;
+}
+
+.launch-token-gate small {
+  color: #8e9b93;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.launch-token-gate.unlocked {
+  border-color: rgba(100, 214, 173, 0.34);
+  background: rgba(100, 214, 173, 0.055);
+}
+
+.launch-token-gate.unlocked > svg,
+.launch-token-gate.unlocked strong {
+  color: var(--app-accent);
 }
 
 .route-unavailable {

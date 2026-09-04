@@ -100,6 +100,27 @@ class HealthResponse(BaseModel):
     keeper_configured: bool
 
 
+class TokenAccessResponse(BaseModel):
+    wallet: str
+    feature: Literal["agent_launch"]
+    configured: bool
+    eligible: bool
+    tokenAddress: str | None
+    tokenSymbol: str
+    minimum: str
+    decimals: int | None
+    balance: str | None
+    balanceRaw: str | None
+    minimumRaw: str | None
+    reason: Literal[
+        "eligible",
+        "below_minimum",
+        "token_not_configured",
+        "access_check_unavailable",
+    ]
+    source: str
+
+
 class ProfileChallengeRequest(BaseModel):
     wallet: str = Field(pattern=r"^0x[a-fA-F0-9]{40}$")
     handle: str = Field(pattern=r"^@?[a-zA-Z0-9_]{3,20}$")

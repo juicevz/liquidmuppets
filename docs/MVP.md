@@ -5,7 +5,21 @@ LiquidMuppets combines two separate products on Robinhood Chain mainnet:
 1. a task-bound ERC-4626 vault where depositors own transferable shares
 2. a fixed-supply Agent Key market for trading and permanent binding
 
-A creator chooses one of seven cosmetic pets, assigns one of three enabled tasks, chooses that task's live market, sets the Key supply and initial ask, and signs the factory transaction. The selected task fixes the deposit asset, adapter, allocation cap, cooldown, and vault cap. Pet appearance never changes the financial behavior.
+A third token has platform access utility. Public browsing remains open, but a creator must hold at least `100,000 $MUPPETS` in the connected wallet to launch a new agent through the LiquidMuppets app. The token remains in the wallet and is not spent, locked or burned.
+
+A qualifying creator chooses one of seven cosmetic pets, assigns one of three enabled tasks, chooses that task's live market, sets the Key supply and initial ask, and signs the factory transaction. The selected task fixes the deposit asset, adapter, allocation cap, cooldown, and vault cap. Pet appearance never changes the financial behavior.
+
+## $MUPPETS access gate
+
+- gated feature: launching a new Muppet through `/app/create`
+- minimum balance: `100,000 $MUPPETS`
+- public without the token: landing, docs, marketplace, activity, agent detail and portfolio reads
+- balance verification: FastAPI reads `balanceOf(wallet)` from Robinhood Chain; the browser checks again before sending the first transaction
+- token address: pending deployment and runtime configuration
+
+The gate fails closed. An empty address, invalid contract, RPC failure or balance below the threshold cannot launch through the app.
+
+The current mainnet factory was deployed before this rule and does not check `$MUPPETS` itself. A technically capable user can call that factory directly. Unbypassable protocol-level utility requires a gated factory migration after the canonical token is deployed. Until then, this is an app and API access rule.
 
 ## Current deployment
 
@@ -79,16 +93,18 @@ A deployable market version requires a new route registry or route ID, an asset-
 
 ## User flow
 
-1. Connect an EVM wallet on Robinhood Chain mainnet.
-2. Pick any of the seven pet appearances.
-3. Select stable yield, ETH range, or launch reserve.
-4. Select the live market for that task. Proposed Stock Token, basket, and community routes can be inspected but not launched.
-5. Set the Agent Key name, symbol, fixed whole-Key supply, and first ask.
-6. Sign the factory transaction. The factory deploys an Agent Key and capped ERC-4626 StrategyVault, registers its policy, and opens the first listing.
-7. Approve and deposit the task asset. The wallet receives transferable vault shares.
-8. The creator signs the task cycle. PolicyExecutor enforces the route and limits before the vault can call its immutable adapter.
-9. Depositors can redeem their shares. Full redemption recalls the complete adapter position and pays the assets actually realized.
-10. Key holders can buy, list, bid, sell, or permanently bind whole Keys through the native marketplace.
+1. Browse agents, markets and documentation without connecting a wallet or holding `$MUPPETS`.
+2. Connect an EVM wallet on Robinhood Chain mainnet.
+3. Hold at least `100,000 $MUPPETS` to unlock agent launch through the app.
+4. Pick any of the seven pet appearances.
+5. Select stable yield, ETH range, or launch reserve.
+6. Select the live market for that task. Proposed Stock Token, basket, and community routes can be inspected but not launched.
+7. Set the Agent Key name, symbol, fixed whole-Key supply, and first ask.
+8. Sign the factory transaction. The factory deploys an Agent Key and capped ERC-4626 StrategyVault, registers its policy, and opens the first listing.
+9. Approve and deposit the task asset. The wallet receives transferable vault shares.
+10. The creator signs the task cycle. PolicyExecutor enforces the route and limits before the vault can call its immutable adapter.
+11. Depositors can redeem their shares. Full redemption recalls the complete adapter position and pays the assets actually realized.
+12. Key holders can buy, list, bid, sell, or permanently bind whole Keys through the native marketplace.
 
 The browser signs and submits user transactions through the injected wallet. The FastAPI service reads public state and metadata. It does not custody funds or hold the deployer key.
 
@@ -136,6 +152,7 @@ All three have live asks of 20 Keys at 0.001 ETH per Key and one bound Key. Thes
 
 The API reads deployment configuration from environment variables and validates chain connectivity on startup. Thin routes delegate to services that:
 
+- verify `$MUPPETS` launch eligibility against the canonical token contract
 - query factory, vault, Key, marketplace, and adapter state through RPC
 - decode public activity logs and enrich them with agent metadata
 - cache the activity response briefly to avoid repeated wide log scans
@@ -146,6 +163,8 @@ The API reads deployment configuration from environment variables and validates 
 SQLite stores public profile claims, challenges, and keeper-run metadata. A claimed handle is normalized and unique. Challenges expire after 10 minutes and cannot be reused.
 
 Failure handling is explicit: RPC or decode failures return an API error, activity polling shows a reconnecting state, contract transactions surface wallet errors, and policy or adapter checks revert the whole onchain action.
+
+`GET /api/v1/access/{wallet}` returns the token address, required amount, live balance and eligibility decision. Access verification fails closed when token configuration or RPC reads are unavailable.
 
 ## Verification
 
@@ -179,6 +198,8 @@ The Morpho fork test allocates and redeems canonical USDG. The EZManager fork te
 
 ## Launch boundary
 
+- the canonical `$MUPPETS` contract address is not configured, so app launch is currently locked for every wallet
+- the existing factory does not enforce the token rule against direct contract calls
 - mainnet deposits use real assets and carry loss risk
 - contracts are tested but not independently audited
 - the current owner and treasury are a dedicated EOA rather than a multisig

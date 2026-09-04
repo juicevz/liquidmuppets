@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { Address } from 'viem'
 import { Icon } from '../components/Icon'
 import { pets } from '../data/pets'
 import { defaultMarketForTask, marketsForTask } from '../data/strategyMarkets'
 import { useProtocol } from '../hooks/useProtocol'
+import { fetchTokenAccess, type TokenAccess } from '../lib/api'
 import { getInjectedProvider, launchAgent, type LaunchResult } from '../lib/protocol'
 import { actionErrorMessage } from '../lib/errors'
 import type { StrategyTaskId } from '../types'
@@ -48,6 +49,8 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
   const [progress, setProgress] = useState('')
   const [launchError, setLaunchError] = useState('')
   const [result, setResult] = useState<LaunchResult | null>(null)
+  const [access, setAccess] = useState<TokenAccess | null>(null)
+  const [accessLoading, setAccessLoading] = useState(false)
 
   const pet = pets[petId]
   const task = tasks.find((item) => item.id === taskId)
@@ -63,9 +66,10 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
       && Number.isInteger(listed) && listed >= 1 && listed <= supply
       && Number.isFinite(floor) && floor > 0,
   )
-  const canLaunch = Boolean(
+  const routeCanLaunch = Boolean(
     config?.factory && config.keyMarketplace && formReady && Boolean(task?.live) && market?.status === 'live',
   )
+  const canLaunch = routeCanLaunch && (!walletAddress || access?.eligible === true)
   const canContinue = useMemo(
     () => step === 0
       || (step === 1 && Boolean(task))
@@ -77,6 +81,27 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
   const route = task
     ? config?.mode === 'testnet' ? task.testnet_route : task.production_route
     : ''
+
+  useEffect(() => {
+    if (!walletAddress) {
+      setAccess(null)
+      setAccessLoading(false)
+      return
+    }
+    let active = true
+    setAccessLoading(true)
+    fetchTokenAccess(walletAddress)
+      .then((next) => {
+        if (active) setAccess(next)
+      })
+      .catch(() => {
+        if (active) setAccess(null)
+      })
+      .finally(() => {
+        if (active) setAccessLoading(false)
+      })
+    return () => { active = false }
+  }, [walletAddress])
 
   const selectTask = (nextTaskId: StrategyTaskId) => {
     setTaskId(nextTaskId)
@@ -97,6 +122,15 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
     setLaunchError('')
     setResult(null)
     try {
+      setProgress('Checking $MUPPETS access…')
+      const latestAccess = await fetchTokenAccess(walletAddress)
+      setAccess(latestAccess)
+      if (!latestAccess.eligible) {
+        const required = Number(latestAccess.minimum).toLocaleString('en-US')
+        throw new Error(latestAccess.reason === 'token_not_configured'
+          ? 'The canonical $MUPPETS contract is not configured yet.'
+          : `Hold at least ${required} $MUPPETS to launch a Muppet.`)
+      }
       const next = await launchAgent(config, provider, walletAddress as Address, {
         petId,
         taskId,
@@ -269,9 +303,34 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
               <div className="deployment-sequence">
                 <span><b>1</b> deploy vault + Key</span><span><b>2</b> approve listed Keys</span><span><b>3</b> open first ask</span>
               </div>
+              <div className={`launch-token-gate ${access?.eligible ? 'unlocked' : 'locked'}`}>
+                <Icon name={access?.eligible ? 'check' : 'lock'} />
+                <span>
+                  <strong>100,000 $MUPPETS required to launch.</strong>
+                  <small>{!walletAddress
+                    ? 'Connect a wallet to check its Robinhood Chain balance.'
+                    : accessLoading
+                      ? 'Checking the connected wallet.'
+                      : access?.eligible
+                        ? `${access.balance} $MUPPETS verified. Launch is unlocked.`
+                        : access?.reason === 'below_minimum'
+                          ? `Wallet balance: ${access.balance ?? '0'} $MUPPETS. Tokens remain in the wallet.`
+                          : 'Launch stays locked until the canonical $MUPPETS contract is configured and readable.'}</small>
+                </span>
+              </div>
               {task && !task.live && <div className="route-unavailable"><Icon name="lock" /><span><strong>Preview is ready.</strong> Launch unlocks when this route adapter is deployed.</span></div>}
               <button type="button" className="builder-primary" disabled={!canLaunch || Boolean(progress && !result)} onClick={deploy}>
-                <Icon name={task?.live && !walletAddress ? 'wallet' : 'receipt'} /> {task && !task.live ? 'Route not live yet' : walletAddress ? 'Launch Muppet' : 'Connect wallet'}
+                <Icon name={task?.live && !walletAddress ? 'wallet' : access?.eligible ? 'receipt' : 'lock'} /> {task && !task.live
+                  ? 'Route not live yet'
+                  : !walletAddress
+                    ? 'Connect wallet'
+                    : accessLoading
+                      ? 'Checking $MUPPETS'
+                      : access?.eligible
+                        ? 'Launch Muppet'
+                        : access?.reason === 'below_minimum'
+                          ? 'Hold 100,000 $MUPPETS'
+                          : '$MUPPETS contract pending'}
               </button>
               {progress && <div className={`transaction-progress ${result ? 'complete' : ''}`} role="status"><Icon name={result ? 'check' : 'spark'} />{progress}</div>}
               {result && config && (

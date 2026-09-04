@@ -141,6 +141,11 @@ results.floorField = await page.locator('label').filter({ hasText: 'base floor' 
 results.keySupplyField = await page.locator('label').filter({ hasText: 'Key supply' }).locator('input').count() === 1
 results.firstAskCopy = await page.getByText(/This becomes a real ask/i).count() === 1
 await page.screenshot({ path: new URL('create-seven-pets.png', screenshotDir).pathname, fullPage: false })
+await page.locator('label').filter({ hasText: 'muppet name' }).locator('input').fill('browser gate')
+await page.locator('label').filter({ hasText: 'Key ticker' }).locator('input').fill('GATE')
+await page.getByRole('button', { name: /Continue/ }).click()
+results.launchTokenGate = await page.getByText('100,000 $MUPPETS required to launch.', { exact: true }).count() === 1
+results.launchGateConnect = await page.getByRole('button', { name: 'Connect wallet' }).count() === 1
 
 await page.close()
 page = await desktop.newPage()
@@ -184,6 +189,7 @@ watch(page, 'docs')
 await page.goto(`${baseUrl}/docs`, { waitUntil: 'networkidle' })
 results.docsTitle = await page.title()
 results.docsSections = await page.locator('.docs-layout article > section').count()
+results.docsTokenGate = await page.getByRole('heading', { name: '$MUPPETS launch access' }).count() === 1
 results.docsSevenPets = await page.getByRole('heading', { name: 'Seven pets, three live tasks' }).count() === 1
 results.docsMarketUniverse = await page.getByRole('heading', { name: 'Stock Token and community markets' }).count() === 1
 results.docsAlgorithm = await page.getByRole('heading', { name: 'The backend algorithm' }).count() === 1
@@ -202,9 +208,9 @@ for (let index = 0; index < await docsImages.count(); index += 1) {
 }
 results.docsImagesReady = await page.locator('.docs-visual img').evaluateAll((images) => images.every((image) => image.complete && image.naturalWidth > 0))
 await page.screenshot({ path: new URL('docs-functional.png', screenshotDir).pathname, fullPage: false })
-await page.locator('#docs-02').scrollIntoViewIfNeeded()
-await page.screenshot({ path: new URL('docs-seven-pets.png', screenshotDir).pathname, fullPage: false })
 await page.locator('#docs-03').scrollIntoViewIfNeeded()
+await page.screenshot({ path: new URL('docs-seven-pets.png', screenshotDir).pathname, fullPage: false })
+await page.locator('#docs-04').scrollIntoViewIfNeeded()
 await page.screenshot({ path: new URL('docs-money-path.png', screenshotDir).pathname, fullPage: false })
 await desktop.close()
 
@@ -328,6 +334,8 @@ const failed =
   || !results.floorField
   || !results.keySupplyField
   || !results.firstAskCopy
+  || !results.launchTokenGate
+  || !results.launchGateConnect
   || results.marketHeading !== 'Pet marketplace.'
   || !results.marketChainNumberRemoved
   || !results.listedPercent
@@ -336,7 +344,8 @@ const failed =
   || !results.portfolioConnectState
   || !results.portfolioChainNumberRemoved
   || results.docsTitle !== 'Docs | LIQUIDMUPPETS'
-  || results.docsSections !== 12
+  || results.docsSections !== 13
+  || !results.docsTokenGate
   || !results.docsSevenPets
   || !results.docsMarketUniverse
   || !results.docsAlgorithm

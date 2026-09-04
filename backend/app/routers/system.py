@@ -78,6 +78,14 @@ def contracts(request: Request) -> dict[str, object]:
         "launchReserveAdapter": settings.launch_reserve_adapter_address or None,
         "WETH": settings.weth_address,
         "ezWrapper": settings.ez_wrapper_address,
+        "accessGate": {
+            "feature": "agent_launch",
+            "tokenAddress": settings.muppets_token_address or None,
+            "tokenSymbol": settings.muppets_token_symbol,
+            "minimum": str(settings.muppets_token_minimum),
+            "configured": request.app.state.token_gate.configured,
+            "enforcement": "app_and_api",
+        },
         "mode": "testnet" if settings.chain_id == 46630 else "mainnet",
     }
 

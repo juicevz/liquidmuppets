@@ -381,6 +381,18 @@ export async function launchAgent(
 ): Promise<LaunchResult> {
   if (!config.factory || !config.keyMarketplace) throw new Error('Mainnet contracts are not configured yet.')
   const client = createProtocolClient(config)
+  const gate = config.accessGate
+  if (!gate.configured || !gate.tokenAddress) {
+    throw new Error('The $MUPPETS launch gate is not configured yet.')
+  }
+  const [gateDecimals, gateBalance] = await Promise.all([
+    client.readContract({ address: gate.tokenAddress, abi: erc20Abi, functionName: 'decimals' }),
+    client.readContract({ address: gate.tokenAddress, abi: erc20Abi, functionName: 'balanceOf', args: [account] }),
+  ])
+  const gateMinimum = parseUnits(gate.minimum, gateDecimals)
+  if (gateBalance < gateMinimum) {
+    throw new Error(`Hold at least ${Number(gate.minimum).toLocaleString('en-US')} $${gate.tokenSymbol} to launch a Muppet.`)
+  }
   const floorWei = parseEther(input.floorPriceEth)
   onProgress?.('Creating the vault and Agent Key…')
   const createReceipt = await sendAndWait(provider, client, account, config.factory, encodeFunctionData({

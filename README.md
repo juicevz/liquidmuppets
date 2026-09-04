@@ -1,6 +1,8 @@
 # LIQUIDMUPPETS
 
-LIQUIDMUPPETS is a Robinhood Chain mainnet marketplace for policy-bounded onchain agents. A creator picks one of seven cosmetic pets, assigns one of three tasks, selects its live market, deploys a single-asset ERC-4626 vault and a separate fungible Agent Key, then opens the first Key ask.
+LIQUIDMUPPETS is a Robinhood Chain mainnet marketplace for policy-bounded onchain agents. Public browsing remains open. Launching a new agent through the app requires at least `100,000 $MUPPETS` in the connected wallet.
+
+The `$MUPPETS` balance is reusable access utility. It remains in the wallet and is not spent, locked or burned. The canonical token address is currently unset, so app launch fails closed until that deployed address is configured. The existing factory predates the rule and remains directly callable; a gated factory migration is required for protocol-level enforcement.
 
 Public interface: [https://liquidmuppets.io](https://liquidmuppets.io)
 
@@ -16,6 +18,7 @@ X: [@AMBF](https://x.com/AMBF)
 - 3% marketplace fee on filled value only
 - public activity built from contract logs
 - optional app handles claimed with a wallet signature and no gas
+- app and API balance gate requiring `100,000 $MUPPETS` to launch a new agent
 - no deployer or keeper key in the browser, API, or VPS
 
 The routes are deliberately different:
@@ -90,6 +93,8 @@ Full vault redemption recalls the complete adapter position and pays the assets 
 - neutral: asks and bids before a fill
 
 `POST /api/v1/profiles/challenge` and `POST /api/v1/profiles/claim` let a wallet claim an app handle with an EIP-191 signature. The signature proves control of that wallet. It does not verify an X account or any other external identity.
+
+`GET /api/v1/access/{wallet}` checks launch eligibility against the configured `$MUPPETS` token on Robinhood Chain. Missing configuration, unreadable contract state and insufficient balance all fail closed.
 
 ## Seeded mainnet state
 
@@ -172,6 +177,7 @@ The frontend uses atomic release directories under `/var/www/liquidmuppets/relea
 
 - `GET /api/v1/health`
 - `GET /api/v1/contracts`
+- `GET /api/v1/access/{wallet}`
 - `GET /api/v1/strategies`
 - `POST /api/v1/strategies/preview`
 - `GET /api/v1/activity`
@@ -185,6 +191,8 @@ Keeper endpoints remain available for future automation, but mainnet ships with 
 
 ## Risk boundary
 
+- `$MUPPETS` launch access is enforced by the app and API, not the current factory contract
+- the canonical `$MUPPETS` address is still pending, so the shipped app currently locks agent launch for every wallet
 - contracts are tested but not independently audited
 - stable APY is variable and can be zero
 - Morpho withdrawals depend on market liquidity
