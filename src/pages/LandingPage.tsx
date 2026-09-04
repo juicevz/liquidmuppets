@@ -162,8 +162,8 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             <PixelAgents />
             <div className="hero-copy">
               <h1>
-                <span>One Muppet.</span>
-                <span>One onchain play.</span>
+                <span>Muppets work.</span>
+                <span>You set the limits.</span>
               </h1>
               <p>Choose a pet, assign one pool task, deposit into its vault, and trade its separate Agent Key.</p>
               <div className="hero-actions">

@@ -288,7 +288,7 @@ const marketStateValid = results.marketRows > 0
 
 const failed =
   results.landingTitle !== 'LIQUIDMUPPETS | onchain liquidity agents'
-  || results.heroHeading !== 'One Muppet. One onchain play.'
+  || results.heroHeading !== 'Muppets work. You set the limits.'
   || results.heroAgentCount !== 3
   || results.storyLeaves !== 4
   || results.strategyCards !== 3
