@@ -6,6 +6,7 @@ import { Brand } from '../components/Brand'
 import { DarkNoiseField } from '../components/DarkNoiseField'
 import { HeaderSocialLinks } from '../components/HeaderSocialLinks'
 import { Icon } from '../components/Icon'
+import { LandingSoundControl } from '../components/LandingSoundControl'
 import { PixelAgents } from '../components/PixelAgents'
 import heroWorld2k from '../assets/muppets-lucid-meadow-hero-v3-2k.webp'
 import heroWorld4k from '../assets/muppets-lucid-meadow-hero-v3-4k.webp'
@@ -136,6 +137,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
           </button>
         </div>
       </header>
+      <LandingSoundControl />
 
       <main>
         <section ref={heroScrollRef} className="hero-scroll" id="product">

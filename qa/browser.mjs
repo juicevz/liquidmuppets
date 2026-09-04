@@ -58,6 +58,38 @@ results.storyLeaves = await page.locator('.folio-index li').count()
 results.strategyCards = await page.locator('.strategy-roles .type-grid article').count()
 results.petPreviewCards = await page.locator('.landing-pet-card').count()
 results.explicitMainnetBoundary = await page.getByText(/unaudited contracts/i).count() > 0
+const soundDock = page.getByRole('button', { name: /Open soundtrack controls/i })
+results.soundDockVisible = await soundDock.isVisible()
+results.soundDockPosition = await page.locator('.landing-sound-control').evaluate((node) => getComputedStyle(node).position)
+await page.waitForFunction(() => {
+  const audio = document.querySelector('.landing-sound-control audio')
+  return audio instanceof HTMLAudioElement && audio.volume === 0.45
+})
+results.soundDefault = await page.locator('.landing-sound-control audio').evaluate((audio) => ({
+  paused: audio.paused,
+  volume: audio.volume,
+  loop: audio.loop,
+  source: audio.currentSrc || audio.src,
+}))
+await soundDock.click()
+const soundPanel = page.getByRole('group', { name: 'Soundtrack controls' })
+results.soundPanelVisible = await soundPanel.isVisible()
+results.soundDefaultSlider = await page.getByRole('slider', { name: 'Soundtrack volume' }).inputValue()
+results.soundDuration = await soundPanel.getByText(/5:16/).count() === 1
+await page.getByRole('button', { name: 'Play soundtrack' }).click()
+await page.waitForFunction(() => {
+  const audio = document.querySelector('.landing-sound-control audio')
+  return audio instanceof HTMLAudioElement && !audio.paused
+})
+results.soundPlays = await page.locator('.landing-sound-control audio').evaluate((audio) => !audio.paused)
+await page.getByRole('slider', { name: 'Soundtrack volume' }).fill('31')
+results.soundVolumeChanges = await page.locator('.landing-sound-control audio').evaluate((audio) => Math.abs(audio.volume - 0.31) < 0.001)
+results.soundVolumePersists = await page.evaluate(() => window.localStorage.getItem('liquidmuppets-sound-volume') === '31')
+await page.getByRole('button', { name: 'Pause soundtrack' }).click()
+results.soundPauses = await page.locator('.landing-sound-control audio').evaluate((audio) => audio.paused)
+await page.screenshot({ path: new URL('landing-sound-controls.png', screenshotDir).pathname, fullPage: false })
+await page.getByRole('button', { name: /Close soundtrack controls/i }).click()
+results.soundPanelCloses = await page.locator('.sound-control-panel').count() === 0
 const xPickerTrigger = page.getByRole('button', { name: 'Choose an X account' })
 await xPickerTrigger.click()
 const xAccountMenu = page.getByRole('menu', { name: 'X accounts' })
@@ -254,6 +286,14 @@ const mobilePage = await mobile.newPage()
 watch(mobilePage, 'mobile')
 await mobilePage.goto(baseUrl, { waitUntil: 'networkidle' })
 results.mobileLandingOverflow = await mobilePage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
+await mobilePage.getByRole('button', { name: /Open soundtrack controls/i }).click()
+results.mobileSoundPanelVisible = await mobilePage.getByRole('group', { name: 'Soundtrack controls' }).isVisible()
+results.mobileSoundPanelInViewport = await mobilePage.getByRole('group', { name: 'Soundtrack controls' }).evaluate((node) => {
+  const rect = node.getBoundingClientRect()
+  return rect.left >= 0 && rect.right <= window.innerWidth && rect.top >= 0 && rect.bottom <= window.innerHeight
+})
+results.mobileSoundOpenOverflow = await mobilePage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
+await mobilePage.getByRole('button', { name: /Close soundtrack controls/i }).click()
 await mobilePage.getByRole('button', { name: 'Choose an X account' }).click()
 results.mobileXPickerVisible = await mobilePage.getByRole('menu', { name: 'X accounts' }).isVisible()
 results.mobileXPickerInViewport = await mobilePage.getByRole('menu', { name: 'X accounts' }).evaluate((node) => {
@@ -300,6 +340,20 @@ const failed =
   || results.strategyCards !== 3
   || results.petPreviewCards !== 7
   || !results.explicitMainnetBoundary
+  || !results.soundDockVisible
+  || results.soundDockPosition !== 'fixed'
+  || !results.soundDefault.paused
+  || results.soundDefault.volume !== 0.45
+  || !results.soundDefault.loop
+  || !results.soundDefault.source.includes('granat-extended')
+  || !results.soundPanelVisible
+  || results.soundDefaultSlider !== '45'
+  || !results.soundDuration
+  || !results.soundPlays
+  || !results.soundVolumeChanges
+  || !results.soundVolumePersists
+  || !results.soundPauses
+  || !results.soundPanelCloses
   || !results.xPickerVisible
   || results.xAccountHrefs.join(',') !== 'https://x.com/liquidmuppets,https://x.com/AMBF'
   || JSON.stringify(results.xAccountHandles) !== JSON.stringify(['@liquidmuppets', '@AMBF'])
@@ -360,6 +414,9 @@ const failed =
   || !results.reducedMotionAlive
   || !results.hero4kSelected
   || results.mobileLandingOverflow
+  || !results.mobileSoundPanelVisible
+  || !results.mobileSoundPanelInViewport
+  || results.mobileSoundOpenOverflow
   || !results.mobileXPickerVisible
   || !results.mobileXPickerInViewport
   || results.mobileCreateOverflow
