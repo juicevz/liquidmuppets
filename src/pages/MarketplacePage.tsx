@@ -3,6 +3,7 @@ import { formatEther, formatUnits, type Address } from 'viem'
 import { Icon } from '../components/Icon'
 import { getPet } from '../data/pets'
 import { useProtocol } from '../hooks/useProtocol'
+import { performancePath } from '../lib/navigation'
 import {
   bindKeys,
   buyFloorKeys,
@@ -370,6 +371,7 @@ function LiveAgentDrawer({ agent, config, feeBps, tasks, walletAddress, onConnec
           <div><h2>{agent.name}</h2><p>${agent.key.symbol} · {task?.label}</p></div>
         </div>
         <div className="contract-links">
+          <a href={performancePath(agent.id)}>public performance <Icon name="arrow" /></a>
           <a href={`${config.explorerUrl}/address/${agent.vault.address}`} target="_blank" rel="noreferrer">vault {short(agent.vault.address)}</a>
           <a href={`${config.explorerUrl}/address/${agent.key.address}`} target="_blank" rel="noreferrer">Key {short(agent.key.address)}</a>
         </div>

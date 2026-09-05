@@ -130,6 +130,115 @@ export function fetchActivity(limit = 40): Promise<ActivityItem[]> {
   return request(`/activity?limit=${limit}`)
 }
 
+export function fetchAgentActivity(agentId: number, limit = 100): Promise<ActivityItem[]> {
+  return request(`/activity?agent_id=${agentId}&limit=${limit}`, { cache: 'no-store' })
+}
+
+export interface PerformanceCheckpoint {
+  block_number: number
+  timestamp: string
+  total_assets_raw: string
+  total_supply_raw: string
+  share_price_raw: string
+  idle_assets_raw: string
+  deployed_assets_raw: string
+  deposits_raw: string
+  withdrawals_raw: string
+  flow_adjusted_change_raw: string
+  flow_adjusted_change_bps: number | null
+}
+
+export interface MarketEvidence {
+  task_id: number
+  route: string
+  asset: { address: `0x${string}`; symbol: string }
+  adapter: `0x${string}`
+  venue: string
+  pair?: string
+  pool: `0x${string}` | null
+  market_id?: string | null
+  range: {
+    status: 'open' | 'next_target'
+    position_key: string | null
+    lower_tick: number
+    upper_tick: number
+    current_tick: number
+    in_range: boolean | null
+    tick_spacing: number
+    half_range_ticks: number
+  } | null
+  oracle: {
+    status: 'value_available_timestamp_not_exposed' | 'unavailable' | 'not_used'
+    address?: `0x${string}`
+    updated_at: string | null
+    age_seconds: number | null
+    detail: string
+    price_raw?: string
+  }
+  health: {
+    status: 'healthy' | 'blocked' | 'mismatch' | 'unavailable'
+    detail: string
+    metrics: Record<string, string | number | boolean | null>
+  }
+}
+
+export interface PerformanceKeeperDecision {
+  id: number
+  vault: `0x${string}`
+  task_id: number
+  action: string
+  amount: string
+  reason: string
+  status: string
+  tx_hash: `0x${string}` | null
+  created_at: string
+}
+
+export interface PerformanceKeyMarket {
+  status: 'available' | 'unavailable'
+  detail: string
+  symbol: string | null
+  supply_raw: string | null
+  total_bound_raw: string | null
+  listed_raw: string | null
+  floor_wei: string | null
+  top_bid_wei: string | null
+  fee_bps: number | null
+}
+
+export interface MuppetPerformance {
+  network: {
+    chain_id: number
+    chain_name: string
+    explorer_url: string
+  }
+  agent: {
+    id: number
+    name: string
+    creator: `0x${string}`
+    pet_id: number
+    task_id: number
+    task_label: string
+    created_at: number
+    vault: `0x${string}`
+    key: `0x${string}`
+  }
+  tracking_started_at: string
+  captured_at: string
+  asset: { address: `0x${string}`; symbol: string; decimals: number }
+  share: { symbol: string; decimals: number }
+  current: PerformanceCheckpoint
+  history: PerformanceCheckpoint[]
+  change_method: { id: string; label: string; explanation: string }
+  market: MarketEvidence
+  keeper: PerformanceKeeperDecision | null
+  key_market: PerformanceKeyMarket
+}
+
+export function fetchMuppetPerformance(agentId: number): Promise<MuppetPerformance> {
+  return request(`/agents/${agentId}/performance`, { cache: 'no-store' })
+}
+
 export interface RwaReserveRoute {
   index: number
   symbol: string

@@ -116,6 +116,18 @@ const docsSections: DocsSection[] = [
   },
   {
     number: '13',
+    title: 'Public Muppet performance',
+    body: 'Every Muppet has a shareable /app/muppet/{id} page. Five minute checkpoints record vault share price, NAV, deployed and idle capital, and deposits and withdrawals observed after tracking began. The page shows the exact route, market or pool, active ticks when a range exists, current health evidence, and the latest keeper action or hold with its reason.',
+    details: [
+      'cash-flow-adjusted change removes recorded deposits and adds recorded withdrawals before comparing with opening NAV',
+      'tracking starts with the first recorded checkpoint; no earlier curve or historical APY is invented',
+      'when an oracle interface has no update timestamp, the page says timestamp not exposed instead of calling it fresh',
+      'deposits, withdrawals, allocations and recalls link to their transaction receipts',
+      'the Agent Key market stays in a separate section because Keys do not own vault assets',
+    ],
+  },
+  {
+    number: '14',
     title: 'Current boundary',
     body: 'The mainnet contracts use real USDG, WETH, Morpho, Uniswap and EZManager. Local and fork tests cover the adapters, full redemption and atomic recentering, but the contracts are not independently audited. Caps limit exposure and do not remove protocol, oracle, liquidity, LP or stablecoin risk.',
     details: [
@@ -307,7 +319,7 @@ export function DocsPage() {
       <header className="docs-heading">
         <p>LIQUIDMUPPETS / DOCUMENTATION</p>
         <h1>Everything about LIQUIDMUPPETS.</h1>
-        <span>The money path, Stock Token reserve, $MUPPETS launch gate, Key market and onchain limits.</span>
+        <span>The money path, public performance record, Stock Token reserve, $MUPPETS launch gate, Key market and onchain limits.</span>
       </header>
 
       <div className="docs-layout">

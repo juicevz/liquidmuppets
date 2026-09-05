@@ -10,6 +10,7 @@ from pytest import MonkeyPatch
 from app.config import Settings
 from app.main import create_app
 from app.routers import system
+from app.services.activity import ActivityService
 from app.services.token_gate import TokenGateService, format_token_amount
 
 
@@ -82,6 +83,42 @@ def test_contract_config_exposes_fee_reserve(tmp_path: Path) -> None:
         response = client.get("/api/v1/contracts")
     assert response.status_code == 200
     assert response.json()["feeRwaReserve"] == reserve
+
+
+def test_activity_api_filters_receipts_by_agent(tmp_path: Path) -> None:
+    app = create_app(Settings(database_path=tmp_path / "test.sqlite3", rpc_url="http://127.0.0.1:1"))
+    row = {
+        "id": "0xreceipt-0",
+        "tx_hash": "0x1111111111111111111111111111111111111111111111111111111111111111",
+        "block_number": 123,
+        "timestamp": "2026-09-05T22:00:00+00:00",
+        "action": "deposited",
+        "actor": "0x1111111111111111111111111111111111111111",
+        "agent_id": 2,
+        "agent_name": "launch sage",
+        "key_symbol": "SAGE",
+        "quantity": None,
+        "value": "1",
+        "value_symbol": "WETH",
+        "direction": "positive",
+    }
+    app.state.activity = MagicMock()
+    app.state.activity.list_agent_activity.return_value = [row]
+
+    with TestClient(app) as client:
+        response = client.get("/api/v1/activity?agent_id=2&limit=100")
+
+    assert response.status_code == 200
+    assert response.json()[0]["agent_id"] == 2
+    app.state.activity.list_agent_activity.assert_called_once_with(2, 100)
+
+
+def test_activity_uses_stale_receipts_during_a_transient_rpc_error(monkeypatch: MonkeyPatch) -> None:
+    service = ActivityService(Settings(rpc_url="https://rpc.invalid"))
+    service._cache = [{"agent_id": 1, "action": "deposited"}]
+    monkeypatch.setattr(service, "_read_chain_activity", MagicMock(side_effect=RuntimeError("rate limited")))
+
+    assert service.list_agent_activity(1) == [{"agent_id": 1, "action": "deposited"}]
 
 
 def test_public_rwa_keeper_trigger_is_disabled(tmp_path: Path) -> None:

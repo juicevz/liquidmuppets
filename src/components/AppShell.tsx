@@ -12,10 +12,12 @@ import { Icon } from './Icon'
 import { CreateAgentPage } from '../pages/CreateAgentPage'
 import { DocsPage } from '../pages/DocsPage'
 import { MarketplacePage } from '../pages/MarketplacePage'
+import { MuppetPerformancePage } from '../pages/MuppetPerformancePage'
 import { PortfolioPage } from '../pages/PortfolioPage'
 
 interface AppShellProps {
   view: Exclude<View, 'landing'>
+  performanceAgentId: number | null
   onNavigate: (view: View) => void
 }
 
@@ -26,7 +28,7 @@ type WalletState =
   | { status: 'missing' }
   | { status: 'error'; message: string }
 
-export function AppShell({ view, onNavigate }: AppShellProps) {
+export function AppShell({ view, performanceAgentId, onNavigate }: AppShellProps) {
   const [wallet, setWallet] = useState<WalletState>({ status: 'idle' })
   const [handle, setHandle] = useState<string | null>(null)
   const [showHandle, setShowHandle] = useState(false)
@@ -97,7 +99,7 @@ export function AppShell({ view, onNavigate }: AppShellProps) {
           <Brand />
         </button>
         <nav className="app-nav" aria-label="App navigation">
-          <button className={view === 'marketplace' ? 'active' : ''} onClick={() => onNavigate('marketplace')} type="button">
+          <button className={view === 'marketplace' || view === 'performance' ? 'active' : ''} onClick={() => onNavigate('marketplace')} type="button">
             Marketplace
           </button>
           <button className={view === 'portfolio' ? 'active' : ''} onClick={() => onNavigate('portfolio')} type="button">
@@ -144,10 +146,11 @@ export function AppShell({ view, onNavigate }: AppShellProps) {
         {view === 'portfolio' && <PortfolioPage walletAddress={wallet.status === 'connected' ? wallet.address : undefined} onConnect={requestWallet} />}
         {view === 'create' && <CreateAgentPage creatorHandle={handle ?? '@unclaimed'} walletAddress={wallet.status === 'connected' ? wallet.address : undefined} onConnect={requestWallet} />}
         {view === 'docs' && <DocsPage />}
+        {view === 'performance' && <MuppetPerformancePage agentId={performanceAgentId} />}
       </main>
 
       <nav className="mobile-app-nav" aria-label="Mobile app navigation">
-        <button type="button" className={view === 'marketplace' ? 'active' : ''} onClick={() => onNavigate('marketplace')}>Market</button>
+        <button type="button" className={view === 'marketplace' || view === 'performance' ? 'active' : ''} onClick={() => onNavigate('marketplace')}>Market</button>
         <button type="button" className={view === 'portfolio' ? 'active' : ''} onClick={() => onNavigate('portfolio')}>Portfolio</button>
         <button type="button" className={view === 'create' ? 'active' : ''} onClick={() => onNavigate('create')}>Launch</button>
         <button type="button" className={view === 'docs' ? 'active' : ''} onClick={() => onNavigate('docs')}>Docs</button>

@@ -20,6 +20,26 @@ class KeeperRunRecord:
     tx_hash: str | None = None
 
 
+@dataclass(frozen=True)
+class PerformanceCheckpointRecord:
+    agent_id: int
+    vault: str
+    task_id: int
+    block_number: int
+    block_timestamp: str
+    asset_symbol: str
+    asset_decimals: int
+    share_symbol: str
+    share_decimals: int
+    total_assets: str
+    total_supply: str
+    share_price_raw: str
+    idle_assets: str
+    deployed_assets: str
+    cumulative_deposits: str
+    cumulative_withdrawals: str
+
+
 class Database:
     def __init__(self, path: Path) -> None:
         self.path = path
@@ -74,6 +94,37 @@ class Database:
                 )
                 """
             )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS performance_checkpoints (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    agent_id INTEGER NOT NULL,
+                    vault TEXT NOT NULL,
+                    task_id INTEGER NOT NULL,
+                    block_number INTEGER NOT NULL,
+                    block_timestamp TEXT NOT NULL,
+                    asset_symbol TEXT NOT NULL,
+                    asset_decimals INTEGER NOT NULL,
+                    share_symbol TEXT NOT NULL,
+                    share_decimals INTEGER NOT NULL,
+                    total_assets TEXT NOT NULL,
+                    total_supply TEXT NOT NULL,
+                    share_price_raw TEXT NOT NULL,
+                    idle_assets TEXT NOT NULL,
+                    deployed_assets TEXT NOT NULL,
+                    cumulative_deposits TEXT NOT NULL,
+                    cumulative_withdrawals TEXT NOT NULL,
+                    captured_at TEXT NOT NULL,
+                    UNIQUE(vault, block_number)
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE INDEX IF NOT EXISTS performance_checkpoints_agent_time
+                ON performance_checkpoints (agent_id, block_number)
+                """
+            )
 
     def add_keeper_run(self, record: KeeperRunRecord) -> int:
         values = asdict(record)
@@ -94,6 +145,66 @@ class Database:
             rows = connection.execute(
                 "SELECT * FROM keeper_runs ORDER BY id DESC LIMIT ?",
                 (max(1, min(limit, 200)),),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def get_last_keeper_run(self, vault: str) -> dict[str, object] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM keeper_runs WHERE LOWER(vault) = LOWER(?) ORDER BY id DESC LIMIT 1",
+                (vault,),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def add_performance_checkpoint(self, record: PerformanceCheckpointRecord) -> dict[str, object]:
+        values = asdict(record)
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR IGNORE INTO performance_checkpoints (
+                    agent_id, vault, task_id, block_number, block_timestamp,
+                    asset_symbol, asset_decimals, share_symbol, share_decimals,
+                    total_assets, total_supply, share_price_raw, idle_assets, deployed_assets,
+                    cumulative_deposits, cumulative_withdrawals, captured_at
+                ) VALUES (
+                    :agent_id, :vault, :task_id, :block_number, :block_timestamp,
+                    :asset_symbol, :asset_decimals, :share_symbol, :share_decimals,
+                    :total_assets, :total_supply, :share_price_raw, :idle_assets, :deployed_assets,
+                    :cumulative_deposits, :cumulative_withdrawals, :captured_at
+                )
+                """,
+                {**values, "captured_at": datetime.now(UTC).isoformat()},
+            )
+            row = connection.execute(
+                "SELECT * FROM performance_checkpoints WHERE LOWER(vault) = LOWER(?) AND block_number = ?",
+                (record.vault, record.block_number),
+            ).fetchone()
+        if row is None:
+            raise RuntimeError("performance checkpoint insert could not be read")
+        return dict(row)
+
+    def get_latest_performance_checkpoint(self, vault: str) -> dict[str, object] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                """
+                SELECT * FROM performance_checkpoints
+                WHERE LOWER(vault) = LOWER(?)
+                ORDER BY block_number DESC, id DESC
+                LIMIT 1
+                """,
+                (vault,),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def list_performance_checkpoints(self, agent_id: int) -> list[dict[str, object]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM performance_checkpoints
+                WHERE agent_id = ?
+                ORDER BY block_number ASC, id ASC
+                """,
+                (agent_id,),
             ).fetchall()
         return [dict(row) for row in rows]
 

@@ -1,0 +1,20 @@
+LIQUIDMUPPETS OFFICIAL
+
+Public Muppet performance pages are live.
+
+Track share price, NAV, flow-adjusted change, deployed vs idle capital, exact routes and ranges, market health, keeper decisions and receipts.
+
+History starts now. No backfilled APY.
+
+https://liquidmuppets.io/app/muppet/0
+
+
+FOUNDER
+
+wanted a cleaner answer to “how is this Muppet actually doing?”
+
+every Muppet has a public page now: share price, NAV, deployed vs idle, exact pool/range, keeper decisions and receipts.
+
+tracking starts now. no fake APY history.
+
+https://liquidmuppets.io/app/muppet/0

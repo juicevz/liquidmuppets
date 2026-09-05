@@ -20,6 +20,7 @@ Current status: controlled mainnet beta. Existing Muppets can be funded, allocat
 - 3% marketplace fee routed into an onchain Stock Token reserve
 - 26 oracle-bounded Stock Token purchase routes
 - public activity built from contract logs
+- a shareable public performance URL for every Muppet, backed by five minute checkpoints
 - optional app handles claimed with a wallet signature and no gas
 - app and API balance gate requiring `15,000 $MUPPETS` to launch a new agent
 - canonical `$MUPPETS` token configured at `0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189`
@@ -112,6 +113,24 @@ The first dev-funded cycle spent `0.01 ETH`, routed `24.587800 USDG`, and bought
 
 `GET /api/v1/access/{wallet}` checks launch eligibility against the configured `$MUPPETS` token on Robinhood Chain. Missing configuration, unreadable contract state and insufficient balance all fail closed.
 
+## Public performance pages
+
+Every onchain Muppet has a public route at `/app/muppet/{agentId}`. The page records and displays:
+
+- ERC-4626 share price and total vault assets at an exact block
+- deployed and idle assets
+- cumulative deposits and withdrawals observed after the first checkpoint
+- cash-flow-adjusted asset change since tracking began
+- the immutable adapter, asset, venue, market or pool, and exact active range when one exists
+- current market health inputs and an explicit oracle timestamp boundary
+- the latest recorded keeper action or hold, its reason, and its transaction receipt when one was signed
+- decoded vault events with explorer receipts
+- Agent Key market state in a separate section because Keys do not own vault assets
+
+The first checkpoint is the baseline. The service does not reconstruct a pretend pre-launch curve and does not publish historical or annualized APY. The cash-flow-adjusted change is `current assets + withdrawals - deposits - opening assets`; its percentage uses opening assets plus recorded deposits as tracked capital. This is a transparent change measure, not a time-weighted return or promised yield.
+
+Checkpoints are stored in SQLite every five minutes. Deposit and withdrawal totals advance from ERC-4626 events emitted between consecutive checkpoint blocks. Chart history is downsampled only for the response and always preserves the first and latest checkpoint.
+
 ## Seeded mainnet state
 
 Three developer fixtures exercise each task without demo data:
@@ -188,7 +207,7 @@ forge script script/DeployMainnet.s.sol:DeployMainnet --rpc-url https://rpc.main
 forge script script/DeployMainnet.s.sol:DeployMainnet --rpc-url https://rpc.mainnet.chain.robinhood.com --broadcast -vvv
 ```
 
-The frontend uses atomic release directories under `/var/www/liquidmuppets/releases/` with `/var/www/liquidmuppets/current` as the active symlink. The API runs as the unprivileged `liquidmuppets` user from `/opt/liquidmuppets-api/current`, reads public runtime values from `/etc/liquidmuppets/api.env` and `/etc/liquidmuppets/runtime-public.env`, reads the keeper secret only from mode-0600 `/etc/liquidmuppets/keeper.env`, and writes SQLite under `/var/lib/liquidmuppets`.
+The frontend uses atomic release directories under `/var/www/liquidmuppets/releases/` with `/var/www/liquidmuppets/current` as the active symlink. The API runs as the unprivileged `liquidmuppets` user from `/opt/liquidmuppets-api/current`, reads public runtime values from `/etc/liquidmuppets/api.env` and `/etc/liquidmuppets/runtime-public.env`, reads the keeper secret only from mode-0600 `/etc/liquidmuppets/keeper.env`, and writes profiles, keeper decisions, and performance checkpoints to SQLite under `/var/lib/liquidmuppets`.
 
 ## API
 
@@ -198,7 +217,8 @@ The frontend uses atomic release directories under `/var/www/liquidmuppets/relea
 - `GET /api/v1/access/{wallet}`
 - `GET /api/v1/strategies`
 - `POST /api/v1/strategies/preview`
-- `GET /api/v1/activity`
+- `GET /api/v1/activity` with optional `agent_id` and `limit` filters
+- `GET /api/v1/agents/{agentId}/performance`
 - `POST /api/v1/profiles/challenge`
 - `POST /api/v1/profiles/claim`
 - `GET /api/v1/profiles/{wallet}`

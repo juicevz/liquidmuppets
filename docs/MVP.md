@@ -98,6 +98,27 @@ Robinhood's official assets API returned 194 active Robinhood Chain assets on 20
 
 Stock Tokens are tokenized debt securities. They do not grant legal or beneficial ownership, voting rights, or shareholder rights in the underlying company. Chainlink prices already incorporate the Stock Token multiplier, so the reserve does not apply `uiMultiplier()` a second time.
 
+## Public Muppet performance
+
+Each Muppet has a shareable page at `/app/muppet/{agentId}`. Public performance tracking begins with the first checkpoint recorded after this feature is deployed. The API records another checkpoint every five minutes and never invents a curve for blocks before that baseline.
+
+Each checkpoint binds the following values to one Robinhood Chain block:
+
+- `totalAssets`, `totalSupply`, and `convertToAssets(10 ** shareDecimals)` for NAV and share price
+- `deployedAssets` and `idleAssets`
+- the vault asset, decimals, share symbol, adapter, and task
+- cumulative ERC-4626 deposits and withdrawals emitted after tracking began
+
+The displayed cash-flow-adjusted asset change is:
+
+`current assets + withdrawals - deposits - opening assets`
+
+The displayed percentage divides that change by opening assets plus recorded deposits. This removes simple capital inflows and outflows from the change figure, but it is not a time-weighted return and is not APY.
+
+The same page reads the current route evidence directly from the task adapter. Stable Muppets expose the exact Morpho market ID, supply, borrowing, utilization, and nonzero oracle result. Range Muppets expose the canonical Uniswap pool, active position key, exact opened ticks, current tick, pool allowlist state, liquidity, and valuation result. Launch Muppets expose the isolated reserve balance and state plainly that no pool or oracle is used.
+
+Some adapter oracle interfaces return a value without an update timestamp. In that case, the page says `timestamp not exposed`; it does not label the oracle fresh. The latest keeper record includes the action or hold, reason, time, status, amount, and transaction link when a transaction was actually signed. Deposits, withdrawals, allocations, recalls, and range receipts link to decoded onchain events. The Agent Key market appears in a separate section because Keys have no claim on vault assets.
+
 ## User flow
 
 1. Browse agents, markets and documentation without connecting a wallet or holding `$MUPPETS`.

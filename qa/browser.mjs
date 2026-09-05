@@ -234,12 +234,31 @@ if (results.marketRows > 0) {
   results.drawerTaskPath = await page.getByRole('dialog').locator('.execution-path').count() === 1
   results.drawerTinyStatusRemoved = await page.getByRole('dialog').getByText(/creator signs, policy enforces/i).count() === 0
   results.drawerKeyTabs = await page.getByRole('dialog').locator('.key-tabs button').count()
+  results.drawerPerformanceLink = (await page.getByRole('dialog').getByRole('link', { name: /public performance/i }).getAttribute('href')) === '/app/muppet/0'
   results.drawerRiskNoteRemoved = await page.getByRole('dialog').getByText(/APY is variable|concentrated liquidity|reviewed launch route/i).count() === 0
   results.drawerKeyQualifierRemoved = await page.getByRole('dialog').locator('.fee-note, .honest-test-note, .execution-state-note').count() === 0
   results.drawerOverflow = await page.getByRole('dialog').evaluate((node) => node.scrollWidth > node.clientWidth)
   await page.screenshot({ path: new URL('marketplace-live-drawer.png', screenshotDir).pathname, fullPage: false })
   await page.getByRole('button', { name: 'Close agent details' }).click()
 }
+
+await page.close()
+page = await desktop.newPage()
+watch(page, 'performance')
+await page.goto(`${baseUrl}/app/muppet/1`, { waitUntil: 'domcontentloaded' })
+await page.getByRole('heading', { name: 'range fox' }).waitFor({ timeout: 60_000 })
+results.performanceSinceTracking = await page.getByRole('heading', { name: 'Since tracking began' }).count() === 1
+results.performanceChartPoints = await page.locator('.performance-chart circle').count()
+results.performanceFlowAdjusted = await page.getByText('flow-adjusted change', { exact: true }).count() === 1
+results.performanceCapital = await page.getByRole('heading', { name: 'Deployed versus idle' }).count() === 1
+results.performanceExactRange = await page.getByText(/tick -\d+ to -\d+/).count() === 1
+results.performanceOracleBoundary = await page.getByText(/timestamp not exposed/i).count() > 0
+results.performanceKeeper = await page.getByRole('heading', { name: 'Last keeper decision' }).count() === 1
+results.performanceReceipts = await page.locator('.receipt-row').count()
+results.performanceKeySeparate = await page.getByRole('heading', { name: 'Agent Key market' }).count() === 1
+results.performanceNoHistoricalApy = await page.getByText(/historical APY/i).count() === 0
+results.performanceOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
+await page.screenshot({ path: new URL('muppet-performance.png', screenshotDir).pathname, fullPage: false })
 
 await page.close()
 page = await desktop.newPage()
@@ -258,6 +277,7 @@ results.docsSections = await page.locator('.docs-layout article > section').coun
 results.docsTokenGate = await page.getByRole('heading', { name: '$MUPPETS launch access' }).count() === 1
 results.docsSevenPets = await page.getByRole('heading', { name: 'Seven pets, three live tasks' }).count() === 1
 results.docsFeeReserve = await page.getByRole('heading', { name: 'Marketplace fee reserve' }).count() === 1
+results.docsPerformance = await page.getByRole('heading', { name: 'Public Muppet performance' }).count() === 1
 results.docsAlgorithm = await page.getByRole('heading', { name: 'The backend algorithm' }).count() === 1
 results.docsBoundary = await page.getByText(/real USDG, WETH, Morpho, Uniswap and EZManager/i).count() === 1
 results.docsLiveContracts = await page.getByText(/0x570F0FEBFE8b33F37D01f7153F0F85E59FfcE460/i).count() === 1
@@ -347,6 +367,10 @@ results.mobileMarketColumns = await mobilePage.locator('.strategy-market-grid').
 await mobilePage.screenshot({ path: new URL('market-mobile.png', screenshotDir).pathname, fullPage: false })
 await mobilePage.goto(`${baseUrl}/docs`, { waitUntil: 'networkidle' })
 results.mobileDocsOverflow = await mobilePage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
+await mobilePage.goto(`${baseUrl}/app/muppet/1`, { waitUntil: 'domcontentloaded' })
+await mobilePage.getByRole('heading', { name: 'range fox' }).waitFor({ timeout: 60_000 })
+results.mobilePerformanceOverflow = await mobilePage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
+results.mobilePerformanceKeyVisible = await mobilePage.getByRole('heading', { name: 'Agent Key market' }).count() === 1
 await mobile.close()
 await mobileBrowser.close()
 
@@ -359,6 +383,9 @@ results.narrowAppOverflow = await narrowPage.evaluate(() => document.documentEle
 results.narrowHeaderVisible = await narrowPage.locator('.mobile-app-nav').isVisible()
 await narrowPage.goto(`${baseUrl}/docs`, { waitUntil: 'networkidle' })
 results.narrowDocsOverflow = await narrowPage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
+await narrowPage.goto(`${baseUrl}/app/muppet/1`, { waitUntil: 'domcontentloaded' })
+await narrowPage.getByRole('heading', { name: 'range fox' }).waitFor({ timeout: 60_000 })
+results.narrowPerformanceOverflow = await narrowPage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
 await narrow.close()
 await narrowBrowser.close()
 
@@ -380,6 +407,7 @@ const marketStateValid = results.marketRows > 0
     && results.drawerTaskPath
     && results.drawerTinyStatusRemoved
     && results.drawerKeyTabs === 5
+    && results.drawerPerformanceLink
     && results.drawerRiskNoteRemoved
     && results.drawerKeyQualifierRemoved
     && !results.drawerOverflow
@@ -449,14 +477,26 @@ const failed =
   || !results.marketChainNumberRemoved
   || !results.listedPercent
   || !marketStateValid
+  || !results.performanceSinceTracking
+  || results.performanceChartPoints < 1
+  || !results.performanceFlowAdjusted
+  || !results.performanceCapital
+  || !results.performanceExactRange
+  || !results.performanceOracleBoundary
+  || !results.performanceKeeper
+  || results.performanceReceipts < 1
+  || !results.performanceKeySeparate
+  || !results.performanceNoHistoricalApy
+  || results.performanceOverflow
   || !results.portfolioHonestCopy
   || !results.portfolioConnectState
   || !results.portfolioChainNumberRemoved
   || results.docsTitle !== 'Docs | LIQUIDMUPPETS'
-  || results.docsSections !== 13
+  || results.docsSections !== 14
   || !results.docsTokenGate
   || !results.docsSevenPets
   || !results.docsFeeReserve
+  || !results.docsPerformance
   || !results.docsAlgorithm
   || !results.docsBoundary
   || !results.docsLiveContracts
@@ -478,9 +518,12 @@ const failed =
   || results.mobileMarketOverflow
   || results.mobileMarketColumns !== 1
   || results.mobileDocsOverflow
+  || results.mobilePerformanceOverflow
+  || !results.mobilePerformanceKeyVisible
   || !results.mobileNavVisible
   || results.narrowAppOverflow
   || results.narrowDocsOverflow
+  || results.narrowPerformanceOverflow
   || !results.narrowHeaderVisible
   || results.degradedTaskPickerCount !== 3
   || !results.degradedTaskWarning

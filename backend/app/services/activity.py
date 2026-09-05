@@ -153,12 +153,28 @@ class ActivityService:
         self._cache: list[dict[str, object]] = []
 
     def list_activity(self, limit: int = 40) -> list[dict[str, object]]:
-        limit = max(1, min(limit, 100))
+        limit = max(1, min(limit, 200))
         with self._lock:
             if monotonic() - self._cache_at > 20:
-                self._cache = self._read_chain_activity()
-                self._cache_at = monotonic()
+                self._refresh_cache()
             return self._cache[:limit]
+
+    def list_agent_activity(self, agent_id: int, limit: int = 100) -> list[dict[str, object]]:
+        limit = max(1, min(limit, 200))
+        with self._lock:
+            if monotonic() - self._cache_at > 20:
+                self._refresh_cache()
+            return [row for row in self._cache if row.get("agent_id") == agent_id][:limit]
+
+    def _refresh_cache(self) -> None:
+        try:
+            rows = self._read_chain_activity()
+        except Exception:
+            if not self._cache:
+                raise
+        else:
+            self._cache = rows
+        self._cache_at = monotonic()
 
     def _read_chain_activity(self) -> list[dict[str, object]]:
         if not self.settings.factory_address or not self.settings.key_marketplace_address:

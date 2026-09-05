@@ -48,6 +48,7 @@ class Settings:
     allow_public_keeper_run: bool = _bool("ALLOW_PUBLIC_KEEPER_RUN", False)
     auto_keeper_enabled: bool = _bool("AUTO_KEEPER_ENABLED", False)
     auto_keeper_interval_seconds: int = int(getenv("AUTO_KEEPER_INTERVAL_SECONDS", "60"))
+    performance_checkpoint_interval_seconds: int = int(getenv("PERFORMANCE_CHECKPOINT_INTERVAL_SECONDS", "300"))
     database_path: Path = Path(getenv("DATABASE_PATH", "/tmp/liquidmuppets.sqlite3"))
     cors_origins: tuple[str, ...] = tuple(
         origin.strip()

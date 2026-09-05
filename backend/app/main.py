@@ -12,9 +12,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import Settings, settings
 from app.database import Database, KeeperRunRecord
-from app.routers import access, activity, keeper, profiles, strategies, system
+from app.routers import access, activity, keeper, performance, profiles, strategies, system
 from app.services.activity import ActivityService
 from app.services.chain import ChainService
+from app.services.performance import PerformanceService
 from app.services.token_gate import TokenGateService
 
 logger = logging.getLogger(__name__)
@@ -25,6 +26,7 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
     chain = ChainService(app_settings)
     activity_service = ActivityService(app_settings)
     token_gate = TokenGateService(app_settings, chain.web3)
+    performance_service = PerformanceService(app_settings, database, chain)
 
     @asynccontextmanager
     async def lifespan(live_app: FastAPI) -> AsyncIterator[None]:
@@ -35,6 +37,9 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
         live_app.state.rpc_cache_lock = Lock()
         stop = asyncio.Event()
         keeper_task = None
+        performance_task = None
+        if app_settings.factory_address:
+            performance_task = asyncio.create_task(_performance_loop(performance_service, app_settings, stop))
         if (
             app_settings.auto_keeper_enabled
             and app_settings.keeper_private_key
@@ -47,6 +52,8 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
             stop.set()
             if keeper_task is not None:
                 await keeper_task
+            if performance_task is not None:
+                await performance_task
             rpc_client.close()
 
     app = FastAPI(
@@ -60,6 +67,7 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
     app.state.database = database
     app.state.chain = chain
     app.state.activity = activity_service
+    app.state.performance = performance_service
     app.state.token_gate = token_gate
     app.add_middleware(
         CORSMiddleware,
@@ -74,10 +82,30 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
     app.include_router(keeper.router, prefix="/api/v1")
     app.include_router(profiles.router, prefix="/api/v1")
     app.include_router(activity.router, prefix="/api/v1")
+    app.include_router(performance.router, prefix="/api/v1")
     return app
 
 
 app = create_app()
+
+
+async def _performance_loop(
+    performance_service: PerformanceService,
+    app_settings: Settings,
+    stop: asyncio.Event,
+) -> None:
+    while not stop.is_set():
+        try:
+            await asyncio.to_thread(performance_service.capture_all)
+        except Exception as error:
+            logger.warning("scheduled performance capture failed: %s", type(error).__name__)
+        try:
+            await asyncio.wait_for(
+                stop.wait(),
+                timeout=max(30, app_settings.performance_checkpoint_interval_seconds),
+            )
+        except TimeoutError:
+            continue
 
 
 async def _auto_keeper_loop(
