@@ -168,7 +168,9 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                 <span>You set the limits.</span>
               </h1>
               <p>Choose a pet, assign one pool task, deposit into its vault, and trade its separate Agent Key.</p>
-              <small className="hero-token-access">Public browsing is open. Launching requires 15,000 $MUPPETS.</small>
+              <strong className="hero-token-access">
+                0x5e7516be1be5d4396b0<wbr />60908cd44c9db093c4189
+              </strong>
               <div className="hero-actions">
                 <button type="button" className="button button-dark" onClick={() => onNavigate('create')}>
                   Launch a Muppet <Icon name="arrow" />

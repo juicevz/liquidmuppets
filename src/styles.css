@@ -8379,11 +8379,14 @@ select:focus-visible {
 .landing-v2.landing-v3 .hero-token-access {
   display: block;
   margin-top: 10px;
-  color: #65746c;
+  color: #ffffff;
   font-family: 'JetBrains Mono Variable', monospace;
-  font-size: 9px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  font-size: clamp(13px, 1.2vw, 16px);
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  line-height: 1.35;
+  text-shadow: 0 2px 14px rgba(2, 5, 4, 0.72);
+  white-space: nowrap;
 }
 
 .landing-v2.landing-v3 .hero-actions {
@@ -8612,6 +8615,11 @@ select:focus-visible {
 @media (max-width: 660px) {
   .landing-v2.landing-v3 .hero-copy {
     top: 368px;
+  }
+
+  .landing-v2.landing-v3 .hero-token-access {
+    font-size: 13px;
+    white-space: normal;
   }
 
   .landing-v2.landing-v3 .hero-copy h1 {
