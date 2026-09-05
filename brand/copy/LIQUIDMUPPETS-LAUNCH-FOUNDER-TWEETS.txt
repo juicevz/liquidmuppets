@@ -20,7 +20,7 @@ Robinhood Chain.
 
 $MUPPETS does one real thing at launch.
 
-hold 100,000 in your wallet and you can create a Muppet through the app. it stays there. no staking screen, lock, or burn required.
+hold 15,000 in your wallet and you can create a Muppet through the app. it stays there. no staking screen, lock, or burn required.
 
 03
 
@@ -38,7 +38,7 @@ $MUPPETS: 0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189
 
 05
 
-100,000 $MUPPETS lets you launch one Muppet, then another, because the balance stays in your wallet.
+15,000 $MUPPETS lets you launch one Muppet, then another, because the balance stays in your wallet.
 
 reusable access felt more useful than inventing another place to park tokens.
 

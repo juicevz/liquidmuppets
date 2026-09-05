@@ -5,14 +5,14 @@ LiquidMuppets combines two separate products on Robinhood Chain mainnet:
 1. a task-bound ERC-4626 vault where depositors own transferable shares
 2. a fixed-supply Agent Key market for trading and permanent binding
 
-A third token has platform access utility. Public browsing remains open, but a creator must hold at least `100,000 $MUPPETS` in the connected wallet to launch a new agent through the LiquidMuppets app. The token remains in the wallet and is not spent, locked or burned.
+A third token has platform access utility. Public browsing remains open, but a creator must hold at least `15,000 $MUPPETS` in the connected wallet to launch a new agent through the LiquidMuppets app. The token remains in the wallet and is not spent, locked or burned.
 
 A qualifying creator chooses one of seven cosmetic pets, assigns one of three enabled tasks, chooses that task's live market, sets the Key supply and initial ask, and signs the factory transaction. The selected task fixes the deposit asset, adapter, allocation cap, cooldown, and vault cap. Pet appearance never changes the financial behavior.
 
 ## $MUPPETS access gate
 
 - gated feature: launching a new Muppet through `/app/create`
-- minimum balance: `100,000 $MUPPETS`
+- minimum balance: `15,000 $MUPPETS`
 - public without the token: landing, docs, marketplace, activity, agent detail and portfolio reads
 - balance verification: FastAPI reads `balanceOf(wallet)` from Robinhood Chain; the browser checks again before sending the first transaction
 - token address: `0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189`
@@ -102,7 +102,7 @@ Stock Tokens are tokenized debt securities. They do not grant legal or beneficia
 
 1. Browse agents, markets and documentation without connecting a wallet or holding `$MUPPETS`.
 2. Connect an EVM wallet on Robinhood Chain mainnet.
-3. Hold at least `100,000 $MUPPETS` to unlock agent launch through the app.
+3. Hold at least `15,000 $MUPPETS` to unlock agent launch through the app.
 4. Pick any of the seven pet appearances.
 5. Select stable yield, ETH range, or launch reserve.
 6. Confirm the deployed market for that task.
@@ -215,7 +215,7 @@ The Morpho fork test allocates and redeems canonical USDG. The EZManager fork te
 
 ## Launch readiness
 
-The controlled mainnet beta is operational: qualifying creator launches, deposits, bounded strategy cycles, withdrawals, Key asks, bids, partial fills, binding, public activity, scheduled keeper checks, and the Stock Token reserve are live. The app and API unlock creator launch when the connected wallet holds at least `100,000 $MUPPETS`.
+The controlled mainnet beta is operational: qualifying creator launches, deposits, bounded strategy cycles, withdrawals, Key asks, bids, partial fills, binding, public activity, scheduled keeper checks, and the Stock Token reserve are live. The app and API unlock creator launch when the connected wallet holds at least `15,000 $MUPPETS`.
 
 Before an unrestricted public launch:
 

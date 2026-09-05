@@ -59,6 +59,7 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
   const supply = Number(keySupply)
   const listed = Number(listingQuantity)
   const floor = Number(floorPrice)
+  const requiredMuppets = Number(access?.minimum ?? config?.accessGate.minimum ?? 15_000).toLocaleString('en-US')
   const keyValid = /^[A-Za-z0-9]{2,10}$/.test(keySymbol)
   const formReady = Boolean(
     name.trim().length >= 2 && name.trim().length <= 32 && keyValid
@@ -292,7 +293,7 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
               <div className={`launch-token-gate ${access?.eligible ? 'unlocked' : 'locked'}`}>
                 <Icon name={access?.eligible ? 'check' : 'lock'} />
                 <span>
-                  <strong>100,000 $MUPPETS required to launch.</strong>
+                  <strong>{requiredMuppets} $MUPPETS required to launch.</strong>
                   <small>{!walletAddress
                     ? 'Connect a wallet to check its Robinhood Chain balance.'
                     : accessLoading
@@ -323,7 +324,7 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
                       : access?.eligible
                         ? 'Launch Muppet'
                         : access?.reason === 'below_minimum'
-                          ? 'Hold 100,000 $MUPPETS'
+                          ? `Hold ${requiredMuppets} $MUPPETS`
                           : '$MUPPETS address required'}
               </button>
               {progress && <div className={`transaction-progress ${result ? 'complete' : ''}`} role="status"><Icon name={result ? 'check' : 'spark'} />{progress}</div>}

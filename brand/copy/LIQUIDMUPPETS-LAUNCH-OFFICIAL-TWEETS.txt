@@ -14,7 +14,7 @@ $MUPPETS is live on Robinhood Chain.
 
 CA: 0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189
 
-hold 100,000 $MUPPETS to launch a Muppet through the app. the balance stays in your wallet. it is not spent, locked or burned.
+hold 15,000 $MUPPETS to launch a Muppet through the app. the balance stays in your wallet. it is not spent, locked or burned.
 
 app: https://liquidmuppets.io
 
@@ -39,7 +39,7 @@ $MUPPETS is live.
 
 CA: 0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189
 
-it unlocks agent creation inside liquidmuppets. hold 100,000 in your wallet, choose a pet, assign one bounded task, and launch its vault and Agent Key.
+it unlocks agent creation inside liquidmuppets. hold 15,000 in your wallet, choose a pet, assign one bounded task, and launch its vault and Agent Key.
 
 04
 
@@ -52,7 +52,7 @@ Agent Keys form the market around it.
 
 05
 
-$MUPPETS is reusable launch access. the 100,000-token balance remains in your wallet.
+$MUPPETS is reusable launch access. the 15,000-token balance remains in your wallet.
 
 it is not deposited into an agent, spent by the app, locked in a vault, or burned during launch.
 

@@ -63,11 +63,11 @@ const accessGateProof = await page.evaluate(async ({ tokenAddress }) => {
     return {
       configured: configResponse.ok && config.accessGate?.configured === true,
       addressMatches: String(config.accessGate?.tokenAddress).toLowerCase() === tokenAddress.toLowerCase(),
-      minimumMatches: config.accessGate?.minimum === '100000',
+      minimumMatches: config.accessGate?.minimum === '15000',
       liveRead: accessResponse.ok
         && access.configured === true
         && access.decimals === 18
-        && access.minimumRaw === '100000000000000000000000'
+        && access.minimumRaw === '15000000000000000000000'
         && access.reason === 'below_minimum',
     }
   } catch {
@@ -198,7 +198,7 @@ await page.screenshot({ path: new URL('create-seven-pets.png', screenshotDir).pa
 await page.locator('label').filter({ hasText: 'muppet name' }).locator('input').fill('browser gate')
 await page.locator('label').filter({ hasText: 'Key ticker' }).locator('input').fill('GATE')
 await page.getByRole('button', { name: /Continue/ }).click()
-results.launchTokenGate = await page.getByText('100,000 $MUPPETS required to launch.', { exact: true }).count() === 1
+results.launchTokenGate = await page.getByText('15,000 $MUPPETS required to launch.', { exact: true }).count() === 1
 results.launchGateConnect = await page.getByRole('button', { name: 'Connect wallet' }).count() === 1
 const muppetsContractLink = page.getByRole('link', { name: `MUPPETS contract ${expectedMuppetsToken}` })
 results.launchTokenAddressLink = await muppetsContractLink.count() === 1

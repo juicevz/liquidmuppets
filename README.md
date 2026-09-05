@@ -1,6 +1,6 @@
 # LIQUIDMUPPETS
 
-LIQUIDMUPPETS is a Robinhood Chain mainnet marketplace for policy-bounded onchain agents. Public browsing remains open. Launching a new agent through the app requires at least `100,000 $MUPPETS` in the connected wallet.
+LIQUIDMUPPETS is a Robinhood Chain mainnet marketplace for policy-bounded onchain agents. Public browsing remains open. Launching a new agent through the app requires at least `15,000 $MUPPETS` in the connected wallet.
 
 The `$MUPPETS` balance is reusable access utility. It remains in the wallet and is not spent, locked or burned. The canonical Robinhood Chain token is `0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189`. The existing factory predates the rule and remains directly callable; a gated factory migration is required for protocol-level enforcement.
 
@@ -8,7 +8,7 @@ Public interface: [https://liquidmuppets.io](https://liquidmuppets.io)
 
 X: [@AMBF](https://x.com/AMBF)
 
-Current status: controlled mainnet beta. Existing Muppets can be funded, allocated, traded and redeemed. New creator launches are available through the app to connected wallets holding at least `100,000 $MUPPETS`. If that rule must be enforced by the protocol rather than only the app and API, the current factory must also be replaced with a gated version.
+Current status: controlled mainnet beta. Existing Muppets can be funded, allocated, traded and redeemed. New creator launches are available through the app to connected wallets holding at least `15,000 $MUPPETS`. If that rule must be enforced by the protocol rather than only the app and API, the current factory must also be replaced with a gated version.
 
 ## Live mainnet scope
 
@@ -21,7 +21,7 @@ Current status: controlled mainnet beta. Existing Muppets can be funded, allocat
 - 26 oracle-bounded Stock Token purchase routes
 - public activity built from contract logs
 - optional app handles claimed with a wallet signature and no gas
-- app and API balance gate requiring `100,000 $MUPPETS` to launch a new agent
+- app and API balance gate requiring `15,000 $MUPPETS` to launch a new agent
 - canonical `$MUPPETS` token configured at `0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189`
 - no deployer key in the browser, API, or VPS; the limited keeper key is accepted only through the host-encrypted vault and loaded only by the private service
 
@@ -212,7 +212,7 @@ Public keeper triggering is disabled. The production scheduler is active every f
 
 - `$MUPPETS` launch access is enforced by the app and API, not the current factory contract
 - app launch fails closed if the canonical `$MUPPETS` contract or its Robinhood Chain balance read is unavailable
-- an unbypassable 100,000 `$MUPPETS` rule requires a gated factory migration because the current factory predates the rule
+- an unbypassable 15,000 `$MUPPETS` rule requires a gated factory migration because the current factory predates the rule
 - contracts are tested but not independently audited
 - stable APY is variable and can be zero
 - Morpho withdrawals depend on market liquidity

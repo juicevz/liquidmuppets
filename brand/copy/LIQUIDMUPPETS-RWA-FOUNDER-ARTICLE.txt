@@ -40,7 +40,7 @@ what is actually ready
 
 the existing-agent loop is live as a controlled mainnet beta. three funded Muppets cover the stable, range, and launch-reserve tasks. they have live vault positions, asks, bids, and public activity. the private keeper is running. the fee reserve is deployed, funded once for proof, and visible in the app.
 
-the final $MUPPETS contract is now configured in the app at 0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189. a wallet holding 100,000 tokens can launch. the current factory still predates that rule, so a new gated factory is required if we want the same check enforced onchain instead of only in the app and api.
+the final $MUPPETS contract is now configured in the app at 0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189. a wallet holding 15,000 tokens can launch. the current factory still predates that rule, so a new gated factory is required if we want the same check enforced onchain instead of only in the app and api.
 
 i also want verified contract source, an independent review, multisig ownership, and legal review for the intended launch audience before asking people to treat this like mature infrastructure. Stock Token availability and restrictions depend on jurisdiction. the current owner can pause the reserve and rescue its holdings while paused. those are not decorative checklist items.
 

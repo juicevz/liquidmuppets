@@ -32,14 +32,14 @@ const docsSections: DocsSection[] = [
   {
     number: '01',
     title: 'The product loop',
-    body: 'LIQUIDMUPPETS is a Robinhood mainnet marketplace for policy-bounded onchain agents. A creator holding 100,000 $MUPPETS chooses a cosmetic pet, assigns a live task, deploys a single-asset vault and fungible Agent Key, then opens the first Key ask.',
+    body: 'LIQUIDMUPPETS is a Robinhood mainnet marketplace for policy-bounded onchain agents. A creator holding 15,000 $MUPPETS chooses a cosmetic pet, assigns a live task, deploys a single-asset vault and fungible Agent Key, then opens the first Key ask.',
     details: ['pet appearance has no financial effect', 'the task fixes the asset, adapter and risk caps', 'vault shares and Agent Keys remain separate'],
     visual: 'loop',
   },
   {
     number: '02',
     title: '$MUPPETS launch access',
-    body: 'Every public page remains open. Launching a new agent through the app requires at least 100,000 $MUPPETS in the connected wallet. The API checks the canonical token balance on Robinhood Chain and the browser checks it again immediately before the first launch transaction.',
+    body: 'Every public page remains open. Launching a new agent through the app requires at least 15,000 $MUPPETS in the connected wallet. The API checks the canonical token balance on Robinhood Chain and the browser checks it again immediately before the first launch transaction.',
     details: [
       'the balance remains in the wallet and is not spent, locked or burned',
       'canonical token · 0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189',
@@ -105,7 +105,7 @@ const docsSections: DocsSection[] = [
   {
     number: '11',
     title: 'How to use the live loop',
-    body: 'Connect an EVM wallet on Robinhood Chain mainnet. Existing Muppets can be funded, allocated, traded and redeemed now. New launches unlock when the connected wallet holds 100,000 $MUPPETS. Choose a pet and task, set a Key supply and first floor, then deposit the task asset.',
+    body: 'Connect an EVM wallet on Robinhood Chain mainnet. Existing Muppets can be funded, allocated, traded and redeemed now. New launches unlock when the connected wallet holds 15,000 $MUPPETS. Choose a pet and task, set a Key supply and first floor, then deposit the task asset.',
     visual: 'steps',
   },
   {

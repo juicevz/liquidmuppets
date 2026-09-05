@@ -42,7 +42,7 @@ class Settings:
     ez_wrapper_address: str = getenv("EZ_WRAPPER_ADDRESS", "0x6F81790Ebac25497be379Dc66143fb298663Ae11")
     muppets_token_address: str = getenv("MUPPETS_TOKEN_ADDRESS", "")
     muppets_token_symbol: str = getenv("MUPPETS_TOKEN_SYMBOL", "MUPPETS")
-    muppets_token_minimum: int = int(getenv("MUPPETS_TOKEN_MINIMUM", "100000"))
+    muppets_token_minimum: int = int(getenv("MUPPETS_TOKEN_MINIMUM", "15000"))
     keeper_private_key: str = getenv("KEEPER_PRIVATE_KEY", "")
     keeper_expected_address: str = getenv("KEEPER_EXPECTED_ADDRESS", "")
     allow_public_keeper_run: bool = _bool("ALLOW_PUBLIC_KEEPER_RUN", False)

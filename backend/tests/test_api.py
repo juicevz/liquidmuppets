@@ -46,7 +46,7 @@ def test_contract_config_uses_same_origin_read_proxy(tmp_path: Path) -> None:
         "feature": "agent_launch",
         "tokenAddress": None,
         "tokenSymbol": "MUPPETS",
-        "minimum": "100000",
+        "minimum": "15000",
         "configured": False,
         "enforcement": "app_and_api",
     }
@@ -105,7 +105,7 @@ def test_token_gate_fails_closed_until_contract_is_configured(tmp_path: Path) ->
     assert response.status_code == 200
     assert response.json()["eligible"] is False
     assert response.json()["reason"] == "token_not_configured"
-    assert response.json()["minimum"] == "100000"
+    assert response.json()["minimum"] == "15000"
 
 
 def test_token_gate_rejects_invalid_wallet(tmp_path: Path) -> None:
@@ -118,25 +118,25 @@ def test_token_gate_rejects_invalid_wallet(tmp_path: Path) -> None:
 def test_token_gate_unlocks_at_exact_threshold() -> None:
     settings = Settings(
         muppets_token_address="0x2222222222222222222222222222222222222222",
-        muppets_token_minimum=100_000,
+        muppets_token_minimum=15_000,
     )
     fake_web3 = MagicMock()
     fake_web3.eth.get_code.return_value = b"\x60"
     fake_contract = fake_web3.eth.contract.return_value
     fake_contract.functions.decimals.return_value.call.return_value = 18
-    fake_contract.functions.balanceOf.return_value.call.return_value = 100_000 * 10**18
+    fake_contract.functions.balanceOf.return_value.call.return_value = 15_000 * 10**18
 
     result = TokenGateService(settings, fake_web3).check("0x1111111111111111111111111111111111111111")
 
     assert result["configured"] is True
     assert result["eligible"] is True
-    assert result["balance"] == "100000"
-    assert result["minimumRaw"] == str(100_000 * 10**18)
+    assert result["balance"] == "15000"
+    assert result["minimumRaw"] == str(15_000 * 10**18)
     assert result["reason"] == "eligible"
 
 
 def test_token_amount_formatting_is_exact() -> None:
-    assert format_token_amount(100_000 * 10**18, 18) == "100000"
+    assert format_token_amount(15_000 * 10**18, 18) == "15000"
     assert format_token_amount(12_345_600, 6) == "12.3456"
 
 
