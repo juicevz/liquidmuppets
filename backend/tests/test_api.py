@@ -52,6 +52,23 @@ def test_contract_config_uses_same_origin_read_proxy(tmp_path: Path) -> None:
     }
 
 
+def test_contract_config_exposes_canonical_muppets_token(tmp_path: Path) -> None:
+    token = "0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189"
+    app = create_app(
+        Settings(
+            database_path=tmp_path / "test.sqlite3",
+            rpc_url="http://127.0.0.1:1",
+            muppets_token_address=token,
+        )
+    )
+    with TestClient(app) as client:
+        response = client.get("/api/v1/contracts")
+
+    assert response.status_code == 200
+    assert response.json()["accessGate"]["tokenAddress"] == token
+    assert response.json()["accessGate"]["configured"] is True
+
+
 def test_contract_config_exposes_fee_reserve(tmp_path: Path) -> None:
     reserve = "0xF10DA007314bB3e7B34FE06bB5c590190dcE9765"
     app = create_app(

@@ -302,6 +302,15 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
                         : access?.reason === 'below_minimum'
                           ? `Wallet balance: ${access.balance ?? '0'} $MUPPETS. Tokens remain in the wallet.`
                           : 'Add the canonical $MUPPETS contract address to enable launch.'}</small>
+                  {config?.accessGate.tokenAddress && (
+                    <a
+                      className="launch-token-address"
+                      href={`${config.explorerUrl}/address/${config.accessGate.tokenAddress}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label={`MUPPETS contract ${config.accessGate.tokenAddress}`}
+                    >CA {config.accessGate.tokenAddress}</a>
+                  )}
                 </span>
               </div>
               <button type="button" className="builder-primary" disabled={!canLaunch || Boolean(progress && !result)} onClick={deploy}>

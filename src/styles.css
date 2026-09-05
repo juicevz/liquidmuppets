@@ -10865,6 +10865,24 @@ select:focus-visible {
   line-height: 1.45;
 }
 
+.launch-token-address {
+  width: fit-content;
+  max-width: 100%;
+  color: #a9b7af;
+  font-family: 'JetBrains Mono Variable', monospace;
+  font-size: 8px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  text-decoration: underline;
+  text-decoration-color: rgba(169, 183, 175, 0.35);
+  text-underline-offset: 3px;
+}
+
+.launch-token-address:hover {
+  color: var(--app-accent);
+  text-decoration-color: currentColor;
+}
+
 .launch-token-gate.unlocked {
   border-color: rgba(100, 214, 173, 0.34);
   background: rgba(100, 214, 173, 0.055);

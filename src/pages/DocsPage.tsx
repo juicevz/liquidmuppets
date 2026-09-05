@@ -42,7 +42,7 @@ const docsSections: DocsSection[] = [
     body: 'Every public page remains open. Launching a new agent through the app requires at least 100,000 $MUPPETS in the connected wallet. The API checks the canonical token balance on Robinhood Chain and the browser checks it again immediately before the first launch transaction.',
     details: [
       'the balance remains in the wallet and is not spent, locked or burned',
-      'the canonical token address has not been supplied, so launch currently fails closed',
+      'canonical token · 0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189',
       'the deployed factory predates this access rule; direct contract calls are not token-gated until a gated factory migration',
     ],
   },
@@ -105,7 +105,7 @@ const docsSections: DocsSection[] = [
   {
     number: '11',
     title: 'How to use the live loop',
-    body: 'Connect an EVM wallet on Robinhood Chain mainnet. Existing Muppets can be funded, allocated, traded and redeemed now. New launches unlock after the canonical $MUPPETS address is installed and the connected wallet holds 100,000 tokens. Choose a pet and task, set a Key supply and first floor, then deposit the task asset.',
+    body: 'Connect an EVM wallet on Robinhood Chain mainnet. Existing Muppets can be funded, allocated, traded and redeemed now. New launches unlock when the connected wallet holds 100,000 $MUPPETS. Choose a pet and task, set a Key supply and first floor, then deposit the task asset.',
     visual: 'steps',
   },
   {
@@ -123,6 +123,7 @@ const docsSections: DocsSection[] = [
       'policy · 0x948c21BAC4eB147a0c5Cd8E722fb49dD7eCc7fAc',
       'Key market · 0x255573d6Cb2F8Ebb73677f6Ab9b3D98c2458B2cb',
       'fee RWA reserve · 0xF10DA007314bB3e7B34FE06bB5c590190dcE9765',
+      '$MUPPETS · 0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189',
       'keeper · 0xA5960A69E57F4EbC924503bC829f1E6670BfBA51',
       'the owner can pause the fee reserve and rescue held assets while it is paused',
       'Stock Token availability and restrictions depend on jurisdiction; the app does not determine legal eligibility',

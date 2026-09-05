@@ -15,7 +15,7 @@ A qualifying creator chooses one of seven cosmetic pets, assigns one of three en
 - minimum balance: `100,000 $MUPPETS`
 - public without the token: landing, docs, marketplace, activity, agent detail and portfolio reads
 - balance verification: FastAPI reads `balanceOf(wallet)` from Robinhood Chain; the browser checks again before sending the first transaction
-- token address: not supplied; runtime configuration is required
+- token address: `0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189`
 
 The gate fails closed. An empty address, invalid contract, RPC failure or balance below the threshold cannot launch through the app.
 
@@ -29,6 +29,7 @@ The current mainnet factory was deployed before this rule and does not check `$M
 - policy executor: `0x948c21BAC4eB147a0c5Cd8E722fb49dD7eCc7fAc`
 - Key marketplace: `0x255573d6Cb2F8Ebb73677f6Ab9b3D98c2458B2cb`
 - fee RWA reserve: `0xF10DA007314bB3e7B34FE06bB5c590190dcE9765`
+- `$MUPPETS` token: `0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189`
 - limited keeper: `0xA5960A69E57F4EbC924503bC829f1E6670BfBA51`
 - Morpho adapter: `0x169EfD23f67811709C0Db823f7c82fcF2732781d`
 - EZManager range adapter: `0xc6b531e504Ebb718dCd66Df45c9aC63564a0C96d`
@@ -75,7 +76,7 @@ This route currently allows up to 3% swap and LP execution slippage, and EZManag
 - cooldown: 30 minutes
 - vault cap: 0.25 WETH
 
-This choice is enabled so creators can launch and fund the full product shape, but the adapter only isolates WETH by vault. It cannot swap, lend, bridge, enter a token pool, or send funds to an administrator. It produces no yield. A `$MUPPETS` pool cannot be configured until the canonical token address and initial liquidity terms are supplied.
+This choice is enabled so creators can launch and fund the full product shape, but the adapter only isolates WETH by vault. It cannot swap, lend, bridge, enter a token pool, or send funds to an administrator. It produces no yield. The canonical `$MUPPETS` address is now known, but a pool route is not configured because no initial liquidity terms or approved adapter migration have been supplied.
 
 There is no platform-volume threshold hiding the route. The restriction is venue safety. The inspected thin pool did not have enough oracle history to justify automated mainnet allocation.
 
@@ -214,11 +215,11 @@ The Morpho fork test allocates and redeems canonical USDG. The EZManager fork te
 
 ## Launch readiness
 
-The existing-agent loop is operational as a controlled mainnet beta: deposits, bounded strategy cycles, withdrawals, Key asks, bids, partial fills, binding, public activity, scheduled keeper checks, and the Stock Token reserve are live. New creator launches are intentionally locked until the canonical `$MUPPETS` address is configured.
+The controlled mainnet beta is operational: qualifying creator launches, deposits, bounded strategy cycles, withdrawals, Key asks, bids, partial fills, binding, public activity, scheduled keeper checks, and the Stock Token reserve are live. The app and API unlock creator launch when the connected wallet holds at least `100,000 $MUPPETS`.
 
 Before an unrestricted public launch:
 
-- the canonical `$MUPPETS` contract address has not been supplied, so app launch is currently locked for every wallet
+- the canonical `$MUPPETS` contract is configured in the app and API, with unavailable reads still failing closed
 - the existing factory does not enforce the token rule against direct contract calls; a gated factory migration is required if the rule must be unbypassable
 - mainnet deposits use real assets and carry loss risk
 - contracts are tested but not independently audited

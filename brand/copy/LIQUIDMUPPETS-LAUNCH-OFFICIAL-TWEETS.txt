@@ -2,9 +2,9 @@ liquidmuppets overall and live CA tweets
 account: @liquidmuppets
 prepared: september 5, 2026
 
-important before posting the CA drafts
+CA status
 
-replace [PASTE VERIFIED CA] only after the final token is deployed, the app returns configured: true for the access gate, and the address has been checked against the deployment receipt. never put the CA in an image only. keep it as selectable text in the post.
+verified on Robinhood Chain and installed in the live app: 0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189. never put the CA in an image only. keep it as selectable text in the post.
 
 recommended live CA post
 
@@ -12,7 +12,7 @@ recommended live CA post
 
 $MUPPETS is live on Robinhood Chain.
 
-CA: [PASTE VERIFIED CA]
+CA: 0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189
 
 hold 100,000 $MUPPETS to launch a Muppet through the app. the balance stays in your wallet. it is not spent, locked or burned.
 
@@ -24,7 +24,7 @@ short CA version
 
 official $MUPPETS contract address:
 
-[PASTE VERIFIED CA]
+0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189
 
 chain: Robinhood Chain
 chain ID: 4663
@@ -37,7 +37,7 @@ recommended launch thread
 
 $MUPPETS is live.
 
-CA: [PASTE VERIFIED CA]
+CA: 0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189
 
 it unlocks agent creation inside liquidmuppets. hold 100,000 in your wallet, choose a pet, assign one bounded task, and launch its vault and Agent Key.
 
@@ -86,7 +86,7 @@ app: https://liquidmuppets.io
 docs: https://liquidmuppets.io/docs
 code: https://github.com/juicevz/liquidmuppets
 
-CA: [PASTE VERIFIED CA]
+CA: 0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189
 
 overall standalone tweets
 

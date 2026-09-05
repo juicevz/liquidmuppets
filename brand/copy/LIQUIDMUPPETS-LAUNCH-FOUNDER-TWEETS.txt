@@ -2,9 +2,9 @@ liquidmuppets overall and live CA tweets
 account: @AMBF
 prepared: september 5, 2026
 
-important before posting the CA drafts
+CA status
 
-replace [PASTE VERIFIED CA] only after the final token is deployed and verified in the live app. the short posts are intentional. let the official account carry the longer mechanics.
+verified on Robinhood Chain and installed in the live app: 0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189. the short posts are intentional. let the official account carry the longer mechanics.
 
 recommended founder CA post
 
@@ -12,7 +12,7 @@ recommended founder CA post
 
 gave the muppets a CA.
 
-$MUPPETS: [PASTE VERIFIED CA]
+$MUPPETS: 0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189
 
 Robinhood Chain.
 
@@ -26,7 +26,7 @@ hold 100,000 in your wallet and you can create a Muppet through the app. it stay
 
 official CA once because the scammers will post it four hundred times:
 
-[PASTE VERIFIED CA]
+0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189
 
 verify it inside https://liquidmuppets.io
 
@@ -34,7 +34,7 @@ verify it inside https://liquidmuppets.io
 
 shipped the token after shipping the thing it unlocks.
 
-$MUPPETS: [PASTE VERIFIED CA]
+$MUPPETS: 0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189
 
 05
 

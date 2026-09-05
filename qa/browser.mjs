@@ -2,6 +2,7 @@ import { chromium } from 'playwright'
 import { mkdir } from 'node:fs/promises'
 
 const baseUrl = process.env.LIQUIDMUPPETS_QA_URL ?? 'http://127.0.0.1:4317'
+const expectedMuppetsToken = '0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189'
 const screenshotDir = new URL('./screenshots/', import.meta.url)
 await mkdir(screenshotDir, { recursive: true })
 
@@ -51,6 +52,32 @@ watch(page, 'desktop')
 
 await page.goto(baseUrl, { waitUntil: 'networkidle' })
 await page.waitForSelector('.pixel-stage')
+const accessGateProof = await page.evaluate(async ({ tokenAddress }) => {
+  try {
+    const [configResponse, accessResponse] = await Promise.all([
+      fetch('/api/v1/contracts', { cache: 'no-store' }),
+      fetch('/api/v1/access/0x0000000000000000000000000000000000000000', { cache: 'no-store' }),
+    ])
+    const config = await configResponse.json()
+    const access = await accessResponse.json()
+    return {
+      configured: configResponse.ok && config.accessGate?.configured === true,
+      addressMatches: String(config.accessGate?.tokenAddress).toLowerCase() === tokenAddress.toLowerCase(),
+      minimumMatches: config.accessGate?.minimum === '100000',
+      liveRead: accessResponse.ok
+        && access.configured === true
+        && access.decimals === 18
+        && access.minimumRaw === '100000000000000000000000'
+        && access.reason === 'below_minimum',
+    }
+  } catch {
+    return { configured: false, addressMatches: false, minimumMatches: false, liveRead: false }
+  }
+}, { tokenAddress: expectedMuppetsToken })
+results.muppetsGateConfigured = accessGateProof.configured
+results.muppetsAddressMatches = accessGateProof.addressMatches
+results.muppetsMinimumMatches = accessGateProof.minimumMatches
+results.muppetsLiveRead = accessGateProof.liveRead
 results.landingTitle = await page.title()
 results.heroHeading = (await page.locator('.hero h1').innerText()).replace(/\s+/g, ' ').trim()
 results.heroAgentCount = await page.locator('.pixel-agent').count()
@@ -173,6 +200,9 @@ await page.locator('label').filter({ hasText: 'Key ticker' }).locator('input').f
 await page.getByRole('button', { name: /Continue/ }).click()
 results.launchTokenGate = await page.getByText('100,000 $MUPPETS required to launch.', { exact: true }).count() === 1
 results.launchGateConnect = await page.getByRole('button', { name: 'Connect wallet' }).count() === 1
+const muppetsContractLink = page.getByRole('link', { name: `MUPPETS contract ${expectedMuppetsToken}` })
+results.launchTokenAddressLink = await muppetsContractLink.count() === 1
+  && (await muppetsContractLink.getAttribute('href')) === `https://robinhoodchain.blockscout.com/address/${expectedMuppetsToken}`
 
 await page.close()
 page = await desktop.newPage()
@@ -377,6 +407,10 @@ const failed =
   || !results.soundVolumePersists
   || !results.soundPauses
   || !results.soundPanelCloses
+  || !results.muppetsGateConfigured
+  || !results.muppetsAddressMatches
+  || !results.muppetsMinimumMatches
+  || !results.muppetsLiveRead
   || !results.xPickerVisible
   || results.xAccountHrefs.join(',') !== 'https://x.com/liquidmuppets,https://x.com/AMBF'
   || JSON.stringify(results.xAccountHandles) !== JSON.stringify(['@liquidmuppets', '@AMBF'])
@@ -410,6 +444,7 @@ const failed =
   || !results.firstAskCopy
   || !results.launchTokenGate
   || !results.launchGateConnect
+  || !results.launchTokenAddressLink
   || results.marketHeading !== 'Pet marketplace.'
   || !results.marketChainNumberRemoved
   || !results.listedPercent
