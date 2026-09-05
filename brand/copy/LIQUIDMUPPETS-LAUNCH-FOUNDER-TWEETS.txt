@@ -1,0 +1,156 @@
+liquidmuppets overall and live CA tweets
+account: @AMBF
+prepared: september 5, 2026
+
+important before posting the CA drafts
+
+replace [PASTE VERIFIED CA] only after the final token is deployed and verified in the live app. the short posts are intentional. let the official account carry the longer mechanics.
+
+recommended founder CA post
+
+01
+
+gave the muppets a CA.
+
+$MUPPETS: [PASTE VERIFIED CA]
+
+Robinhood Chain.
+
+02
+
+$MUPPETS does one real thing at launch.
+
+hold 100,000 in your wallet and you can create a Muppet through the app. it stays there. no staking screen, lock, or burn required.
+
+03
+
+official CA once because the scammers will post it four hundred times:
+
+[PASTE VERIFIED CA]
+
+verify it inside https://liquidmuppets.io
+
+04
+
+shipped the token after shipping the thing it unlocks.
+
+$MUPPETS: [PASTE VERIFIED CA]
+
+05
+
+100,000 $MUPPETS lets you launch one Muppet, then another, because the balance stays in your wallet.
+
+reusable access felt more useful than inventing another place to park tokens.
+
+overall founder tweets
+
+06
+
+liquidmuppets is basically what happens when you give a cartoon pet a very strict employment contract.
+
+07
+
+pet gives it aura.
+task gives it limits.
+vault shares own the money.
+Keys create the market.
+
+surprisingly manageable once you stop mixing all four.
+
+08
+
+wanted agents people could understand before they funded them.
+
+one Muppet. one job. one fixed route. hard caps.
+
+09
+
+the app looks like a small forest. underneath it is mostly contracts refusing to do things.
+
+good architecture honestly.
+
+10
+
+seven pets with zero statistical advantage over each other.
+
+frog remains spiritually overpowered.
+
+11
+
+the easiest way to explain liquidmuppets:
+
+you create an onchain character, give it one bounded liquidity task, fund the vault, then open a separate market for its Key.
+
+12
+
+i wanted agent markets without pretending the agent token owns every dollar near it.
+
+vault shares own vault capital. Keys are Keys. the contracts keep them separate.
+
+13
+
+the muppets have three jobs right now:
+
+lend USDG
+manage a WETH / USDG range
+stage a WETH launch reserve
+
+no career changes after deployment.
+
+14
+
+gave the marketplace fees a job too.
+
+filled Key trades feed a reserve that rotates through 26 Robinhood Stock Tokens. first position is AAPL.
+
+15
+
+the keeper runs every five minutes and spends most of its time deciding not to transact.
+
+this is a compliment.
+
+16
+
+automatic agents are fun until the automatic part gets a funded wallet.
+
+ours gets a narrow signer, fixed routes, cooldowns, caps, and several reasons to stay home.
+
+17
+
+the product rule was simple: make the front feel alive and make the accounting painfully literal.
+
+18
+
+three funded Muppets are already onchain.
+
+morpho frog works.
+range fox works.
+launch sage mostly holds WETH and looks employed.
+
+19
+
+the whole loop is live enough to use and small enough to inspect.
+
+https://liquidmuppets.io
+
+20
+
+which one has more timeline aura:
+
+frog running stable yield
+fox managing an ETH range
+sage sitting on launch liquidity
+
+21
+
+Key fees buy Stock Tokens now.
+
+$MUPPETS unlocks creation.
+
+the pets remain completely unaware of both facts.
+
+22
+
+build the Muppet. give it one job. see if the internet gives it a market.
+
+that is the experiment.

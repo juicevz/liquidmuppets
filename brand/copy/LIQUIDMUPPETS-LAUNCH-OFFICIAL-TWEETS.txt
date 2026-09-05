@@ -1,0 +1,189 @@
+liquidmuppets overall and live CA tweets
+account: @liquidmuppets
+prepared: september 5, 2026
+
+important before posting the CA drafts
+
+replace [PASTE VERIFIED CA] only after the final token is deployed, the app returns configured: true for the access gate, and the address has been checked against the deployment receipt. never put the CA in an image only. keep it as selectable text in the post.
+
+recommended live CA post
+
+01
+
+$MUPPETS is live on Robinhood Chain.
+
+CA: [PASTE VERIFIED CA]
+
+hold 100,000 $MUPPETS to launch a Muppet through the app. the balance stays in your wallet. it is not spent, locked or burned.
+
+app: https://liquidmuppets.io
+
+short CA version
+
+02
+
+official $MUPPETS contract address:
+
+[PASTE VERIFIED CA]
+
+chain: Robinhood Chain
+chain ID: 4663
+
+this is the only CA posted by liquidmuppets. verify it through the app and official docs.
+
+recommended launch thread
+
+03
+
+$MUPPETS is live.
+
+CA: [PASTE VERIFIED CA]
+
+it unlocks agent creation inside liquidmuppets. hold 100,000 in your wallet, choose a pet, assign one bounded task, and launch its vault and Agent Key.
+
+04
+
+each Muppet has four separate parts:
+
+the pet gives it identity.
+the task fixes what it can do.
+vault shares track deposited capital.
+Agent Keys form the market around it.
+
+05
+
+$MUPPETS is reusable launch access. the 100,000-token balance remains in your wallet.
+
+it is not deposited into an agent, spent by the app, locked in a vault, or burned during launch.
+
+06
+
+three tasks are available:
+
+stable yield through one bounded Morpho route
+ETH range through one bounded WETH / USDG position
+launch reserve through isolated WETH accounting
+
+each task has its own cap and cooldown.
+
+07
+
+every settled Agent Key trade sends its 3% marketplace fee to an onchain Stock Token reserve.
+
+the private keeper checks it every five minutes and buys only when the threshold, cooldown, oracle, liquidity, and slippage rules pass.
+
+08
+
+the reserve has 26 enabled Stock Token routes. its first verified holding is AAPL.
+
+the reserve is platform-owned. $MUPPETS and Agent Keys do not represent a claim on its assets.
+
+09
+
+start here:
+
+app: https://liquidmuppets.io
+docs: https://liquidmuppets.io/docs
+code: https://github.com/juicevz/liquidmuppets
+
+CA: [PASTE VERIFIED CA]
+
+overall standalone tweets
+
+10
+
+muppets work. you set the limits.
+
+launch a pet with one fixed onchain task, fund its capped vault, and open the market for its separate Agent Key.
+
+https://liquidmuppets.io
+
+11
+
+pick a pet.
+give it one job.
+set the limits.
+open its market.
+
+that is liquidmuppets.
+
+12
+
+the pet is the identity.
+
+the policy is the product.
+
+each Muppet gets one fixed asset route, one adapter, one cooldown, and hard allocation limits before capital can move.
+
+13
+
+vault shares and Agent Keys do different jobs.
+
+vault shares own the capital claim.
+Agent Keys trade separately around each Muppet.
+
+Key demand never changes vault accounting.
+
+14
+
+one Muppet can run stable yield.
+one can manage an ETH range.
+one can stage a launch reserve.
+
+the task is fixed when the agent is created. the pet remains cosmetic.
+
+15
+
+the marketplace leaves something behind.
+
+every settled Key trade feeds a shared Stock Token reserve with 3% of filled value. the holdings and route list remain public onchain.
+
+16
+
+the keeper is active every five minutes. most checks should end with no transaction.
+
+it signs only when the strategy or reserve has a valid action inside its policy. doing nothing is part of the system.
+
+17
+
+liquidmuppets in one line:
+
+small onchain agents with visible identities, fixed jobs, capped vaults, separate Key markets, and a fee-funded Stock Token reserve.
+
+18
+
+seven pets. three tasks. twenty-six reserve routes.
+
+which Muppet are you launching first?
+
+19
+
+the fun layer is simple enough to screenshot.
+
+the money layer is strict enough to inspect.
+
+https://liquidmuppets.io/docs
+
+20
+
+every important object has its own address and accounting:
+
+$MUPPETS for launch access
+vault shares for deposited capital
+Agent Keys for each Muppet market
+FeeRwaReserve for marketplace fees
+
+21
+
+no invisible score decides where funds go.
+
+the selected task, deployed adapter, PolicyExecutor, cooldowns, and caps define the path onchain.
+
+22
+
+build the Muppet.
+fund the work.
+trade the Key.
+grow the reserve.
+
+https://liquidmuppets.io
