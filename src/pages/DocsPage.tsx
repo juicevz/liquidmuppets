@@ -125,6 +125,7 @@ const docsSections: DocsSection[] = [
       'fee RWA reserve · 0xF10DA007314bB3e7B34FE06bB5c590190dcE9765',
       'keeper · 0xA5960A69E57F4EbC924503bC829f1E6670BfBA51',
       'the owner can pause the fee reserve and rescue held assets while it is paused',
+      'Stock Token availability and restrictions depend on jurisdiction; the app does not determine legal eligibility',
       'Morpho adapter · 0x169EfD23f67811709C0Db823f7c82fcF2732781d',
       'range adapter · 0xc6b531e504Ebb718dCd66Df45c9aC63564a0C96d',
       'launch reserve · 0x956127B0B586B9427182FCd9325efe032E9B5181',

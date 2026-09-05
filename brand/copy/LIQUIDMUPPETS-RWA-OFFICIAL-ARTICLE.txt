@@ -49,7 +49,7 @@ the existing-agent loop is operational as a controlled Robinhood Chain mainnet b
 
 new creator launches remain locked until the canonical $MUPPETS contract address is configured. protocol-level enforcement of the 100,000-token launch rule also requires a gated factory migration. the contracts are tested but unaudited, source verification is pending, and the current owner is a dedicated EOA rather than a multisig.
 
-Stock Tokens are tokenized debt securities. they do not grant shareholder rights in the underlying companies. routes may lose liquidity, pause, or use prices that become stale. the reserve checks those conditions before execution, but it cannot remove market or smart-contract risk. the owner can pause the reserve and rescue held assets while it is paused.
+Stock Tokens are tokenized debt securities. they do not grant shareholder rights in the underlying companies. availability and restrictions depend on jurisdiction. routes may lose liquidity, pause, or use prices that become stale. the reserve checks those conditions before execution, but it cannot remove market or smart-contract risk. the owner can pause the reserve and rescue held assets while it is paused.
 
 app: https://liquidmuppets.io
 

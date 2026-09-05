@@ -118,7 +118,7 @@ docs: https://liquidmuppets.io/docs
 
 17
 
-Stock Tokens provide tokenized exposure. they are not shares and do not grant shareholder rights in the underlying company.
+Stock Tokens provide tokenized exposure. they are not shares and do not grant shareholder rights in the underlying company. availability and restrictions depend on jurisdiction.
 
 the fun part is the Muppet. the accounting still has to be exact.
 

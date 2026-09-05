@@ -218,6 +218,7 @@ Public keeper triggering is disabled. The production scheduler is active every f
 - concentrated liquidity can underperform holding WETH and incurs swap, LP, and impermanent-loss risk
 - launch reserve produces no yield and has no approved token-pool route yet
 - Stock Token purchases depend on pool liquidity and 24/5 price feeds; stale or paused routes are skipped
+- Stock Token availability and restrictions depend on jurisdiction; the app does not determine legal eligibility
 - USDG, WETH, USDe, their oracles, Morpho, Uniswap, EZManager, and Robinhood Chain add external risk
 - the owner controls task configuration, reserve pause and routes, and marketplace fee settings within contract limits
 - while the fee reserve is paused, the owner can rescue its native ETH or held tokens to a chosen receiver

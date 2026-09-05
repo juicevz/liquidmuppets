@@ -229,4 +229,5 @@ Before an unrestricted public launch:
 - the range route has execution, LP, pricing, smart-contract, and impermanent-loss risk
 - the launch route currently stages WETH and generates no yield
 - Stock Token routes can lose liquidity, pause, or hold stale prices; the contract skips those routes but cannot remove market risk
+- Stock Token availability and restrictions depend on jurisdiction; legal review is required for the intended launch audience
 - task and deposit caps reduce exposure but do not make any route safe or guaranteed

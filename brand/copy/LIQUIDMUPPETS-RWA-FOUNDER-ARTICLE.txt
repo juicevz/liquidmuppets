@@ -42,7 +42,7 @@ the existing-agent loop is live as a controlled mainnet beta. three funded Muppe
 
 one important input is still missing before i call creator launch fully open: the final $MUPPETS contract address. the app currently fails closed for every new launch. once the token exists, i can configure the address and move the 100,000-token rule into a new factory if we want the gate enforced onchain instead of only in the app and api.
 
-i also want verified contract source, an independent review, and multisig ownership before asking people to treat this like mature infrastructure. the current owner can pause the reserve and rescue its holdings while paused. those are not decorative checklist items.
+i also want verified contract source, an independent review, multisig ownership, and legal review for the intended launch audience before asking people to treat this like mature infrastructure. Stock Token availability and restrictions depend on jurisdiction. the current owner can pause the reserve and rescue its holdings while paused. those are not decorative checklist items.
 
 for now, the beta is small, the balances are real, and the receipts are public. the first Muppet portfolio position is AAPL. it could have been worse.
 
