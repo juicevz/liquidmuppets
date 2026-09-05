@@ -177,6 +177,11 @@ export interface ChainAgent {
   }
 }
 
+export interface VaultFundingTarget {
+  vault: Pick<ChainAgent['vault'],
+    'address' | 'symbol' | 'shareDecimals' | 'walletAssetBalance' | 'assetAddress' | 'assetSymbol' | 'assetDecimals'>
+}
+
 export interface ProtocolSnapshot {
   config: ProtocolConfig
   agents: ChainAgent[]
@@ -499,11 +504,41 @@ export async function launchAgent(
   }
 }
 
-export async function previewVaultDeposit(config: ProtocolConfig, agent: ChainAgent, amount: string): Promise<bigint> {
-  const assets = parseUnits(amount, agent.vault.assetDecimals)
+export async function loadVaultFundingTarget(
+  config: ProtocolConfig,
+  vaultAddress: Address,
+  account: Address,
+): Promise<VaultFundingTarget> {
+  const client = createProtocolClient(config, { fresh: true })
+  const [symbol, shareDecimals, assetAddress] = await Promise.all([
+    client.readContract({ address: vaultAddress, abi: vaultAbi, functionName: 'symbol' }),
+    client.readContract({ address: vaultAddress, abi: vaultAbi, functionName: 'decimals' }),
+    client.readContract({ address: vaultAddress, abi: vaultAbi, functionName: 'asset' }),
+  ])
+  const asset = assetAddress as Address
+  const [assetSymbol, assetDecimals, walletAssetBalance] = await Promise.all([
+    client.readContract({ address: asset, abi: erc20Abi, functionName: 'symbol' }),
+    client.readContract({ address: asset, abi: erc20Abi, functionName: 'decimals' }),
+    client.readContract({ address: asset, abi: erc20Abi, functionName: 'balanceOf', args: [account] }),
+  ])
+  return {
+    vault: {
+      address: vaultAddress,
+      symbol,
+      shareDecimals: Number(shareDecimals),
+      walletAssetBalance,
+      assetAddress: asset,
+      assetSymbol,
+      assetDecimals: Number(assetDecimals),
+    },
+  }
+}
+
+export async function previewVaultDeposit(config: ProtocolConfig, target: VaultFundingTarget, amount: string): Promise<bigint> {
+  const assets = parseUnits(amount, target.vault.assetDecimals)
   if (assets <= 0n) throw new Error('Enter an amount greater than zero.')
   return createProtocolClient(config).readContract({
-    address: agent.vault.address,
+    address: target.vault.address,
     abi: vaultAbi,
     functionName: 'previewDeposit',
     args: [assets],
@@ -514,19 +549,19 @@ export async function depositToVault(
   config: ProtocolConfig,
   provider: WalletProvider,
   account: Address,
-  agent: ChainAgent,
+  target: VaultFundingTarget,
   amount: string,
   onProgress?: (message: string) => void,
 ): Promise<Hash[]> {
   const client = createProtocolClient(config)
-  const assets = parseUnits(amount, agent.vault.assetDecimals)
+  const assets = parseUnits(amount, target.vault.assetDecimals)
   if (assets <= 0n) throw new Error('Enter an amount greater than zero.')
-  onProgress?.(`Approving ${agent.vault.assetSymbol} for the vault…`)
-  const approve = await sendAndWait(provider, client, account, agent.vault.assetAddress, encodeFunctionData({
-    abi: erc20Abi, functionName: 'approve', args: [agent.vault.address, assets],
+  onProgress?.(`Approving ${target.vault.assetSymbol} for the vault…`)
+  const approve = await sendAndWait(provider, client, account, target.vault.assetAddress, encodeFunctionData({
+    abi: erc20Abi, functionName: 'approve', args: [target.vault.address, assets],
   }))
-  onProgress?.(`Depositing ${agent.vault.assetSymbol} and minting vault shares…`)
-  const deposit = await sendAndWait(provider, client, account, agent.vault.address, encodeFunctionData({
+  onProgress?.(`Depositing ${target.vault.assetSymbol} and minting vault shares…`)
+  const deposit = await sendAndWait(provider, client, account, target.vault.address, encodeFunctionData({
     abi: vaultAbi, functionName: 'deposit', args: [assets, account],
   }))
   return [approve.transactionHash, deposit.transactionHash]

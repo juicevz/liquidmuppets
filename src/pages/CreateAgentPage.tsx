@@ -21,11 +21,13 @@ import {
   formatAsset,
   getInjectedProvider,
   launchAgent,
+  loadVaultFundingTarget,
   previewVaultDeposit,
   type ChainAgent,
   type LaunchCheckpoint,
   type LaunchInput,
   type LaunchResult,
+  type VaultFundingTarget,
 } from '../lib/protocol'
 import { actionErrorMessage } from '../lib/errors'
 import type { StrategyTaskId } from '../types'
@@ -156,8 +158,6 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
   useEffect(() => {
     if (!result || commandAgent) return
     refresh()
-    const timer = window.setInterval(refresh, 15_000)
-    return () => window.clearInterval(timer)
   }, [commandAgent, refresh, result?.agentId])
 
   const selectTask = (nextTaskId: StrategyTaskId) => {
@@ -524,6 +524,8 @@ function LaunchCommandCenter({
   const [fundError, setFundError] = useState('')
   const [fundReceipts, setFundReceipts] = useState<Hash[]>([])
   const [funding, setFunding] = useState(false)
+  const [directTarget, setDirectTarget] = useState<VaultFundingTarget | null>(null)
+  const [targetLoading, setTargetLoading] = useState(false)
   const [performance, setPerformance] = useState<MuppetPerformance | null>(null)
   const [now, setNow] = useState(Date.now())
 
@@ -534,16 +536,40 @@ function LaunchCommandCenter({
   const taskLabel = input.taskId === 0 ? 'stable yield' : input.taskId === 1 ? 'ETH range' : 'launch reserve'
   const shareText = `${input.name} is live on @liquidmuppets.\n\n${taskLabel}, an onchain vault, and public performance from the first recorded checkpoint.`
   const shareHref = `https://x.com/intent/post?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(performanceUrl)}`
+  const fundingTarget: VaultFundingTarget | null = agent ?? directTarget
   const amountRaw = useMemo(() => {
-    if (!agent) return null
+    if (!fundingTarget) return null
     try {
-      const value = parseUnits(fundAmount, agent.vault.assetDecimals)
+      const value = parseUnits(fundAmount, fundingTarget.vault.assetDecimals)
       return value > 0n ? value : null
     } catch {
       return null
     }
-  }, [agent, fundAmount])
-  const amountAvailable = Boolean(agent && amountRaw !== null && amountRaw <= agent.vault.walletAssetBalance)
+  }, [fundAmount, fundingTarget])
+  const amountAvailable = Boolean(fundingTarget && amountRaw !== null && amountRaw <= fundingTarget.vault.walletAssetBalance)
+
+  useEffect(() => {
+    if (agent) {
+      setDirectTarget(null)
+      setTargetLoading(false)
+      return
+    }
+    let active = true
+    setTargetLoading(true)
+    const load = () => loadVaultFundingTarget(config, result.vault, wallet)
+      .then((next) => {
+        if (!active) return
+        setDirectTarget(next)
+        setTargetLoading(false)
+      })
+      .catch(() => { if (active) setTargetLoading(false) })
+    void load()
+    const timer = window.setInterval(load, 15_000)
+    return () => {
+      active = false
+      window.clearInterval(timer)
+    }
+  }, [agent, config, result.vault, wallet])
 
   useEffect(() => {
     let active = true
@@ -566,10 +592,10 @@ function LaunchCommandCenter({
   useEffect(() => {
     setPreviewShares(null)
     setPreviewError('')
-    if (!agent || !amountRaw) return
+    if (!fundingTarget || !amountRaw) return
     let active = true
     const timer = window.setTimeout(() => {
-      previewVaultDeposit(config, agent, fundAmount)
+      previewVaultDeposit(config, fundingTarget, fundAmount)
         .then((shares) => { if (active) setPreviewShares(shares) })
         .catch(() => { if (active) setPreviewError('Preview unavailable') })
     }, 250)
@@ -577,10 +603,10 @@ function LaunchCommandCenter({
       active = false
       window.clearTimeout(timer)
     }
-  }, [agent, amountRaw, config, fundAmount])
+  }, [amountRaw, config, fundAmount, fundingTarget])
 
   const fundVault = async () => {
-    if (!agent || !amountAvailable) return
+    if (!fundingTarget || !amountAvailable) return
     const provider = getInjectedProvider()
     if (!provider) {
       setFundError('No injected wallet was found.')
@@ -590,7 +616,7 @@ function LaunchCommandCenter({
     setFundError('')
     setFundReceipts([])
     try {
-      const receipts = await depositToVault(config, provider, wallet, agent, fundAmount, setFundProgress)
+      const receipts = await depositToVault(config, provider, wallet, fundingTarget, fundAmount, setFundProgress)
       setFundReceipts(receipts)
       setFundProgress('Vault funded. Your ERC-4626 shares are in the connected wallet.')
       onRefresh()
@@ -629,17 +655,17 @@ function LaunchCommandCenter({
         <section className="command-card funding-card">
           <div className="command-card-head"><Icon name="wallet" /><span><small>01</small><h3>Fund vault</h3></span></div>
           <p>Previewed by the deployed ERC-4626 vault before your wallet signs.</p>
-          {agent ? (
+          {fundingTarget ? (
             <>
               <label className="command-fund-input">
                 <span>deposit amount</span>
-                <div className="unit-input"><input value={fundAmount} onChange={(event) => setFundAmount(event.target.value)} inputMode="decimal" /><b>{agent.vault.assetSymbol}</b></div>
+                <div className="unit-input"><input value={fundAmount} onChange={(event) => setFundAmount(event.target.value)} inputMode="decimal" /><b>{fundingTarget.vault.assetSymbol}</b></div>
               </label>
               <div className="command-fund-preview">
-                <span><small>expected vault shares</small><strong>{previewShares !== null ? `${formatAsset(previewShares, agent.vault.shareDecimals, 6)} ${agent.vault.symbol}` : previewError || 'reading onchain'}</strong></span>
-                <span><small>wallet balance</small><strong>{formatAsset(agent.vault.walletAssetBalance, agent.vault.assetDecimals, 6)} {agent.vault.assetSymbol}</strong></span>
+                <span><small>expected vault shares</small><strong>{previewShares !== null ? `${formatAsset(previewShares, fundingTarget.vault.shareDecimals, 6)} ${fundingTarget.vault.symbol}` : previewError || 'reading onchain'}</strong></span>
+                <span><small>wallet balance</small><strong>{formatAsset(fundingTarget.vault.walletAssetBalance, fundingTarget.vault.assetDecimals, 6)} {fundingTarget.vault.assetSymbol}</strong></span>
               </div>
-              {amountRaw !== null && amountRaw > agent.vault.walletAssetBalance && <small className="command-warning">Amount exceeds this wallet balance.</small>}
+              {amountRaw !== null && amountRaw > fundingTarget.vault.walletAssetBalance && <small className="command-warning">Amount exceeds this wallet balance.</small>}
               <button type="button" className="command-primary" disabled={funding || !amountAvailable || previewShares === null} onClick={fundVault}>
                 <Icon name="wallet" /> {funding ? 'Waiting for wallet' : 'Fund vault now'}
               </button>
@@ -647,7 +673,7 @@ function LaunchCommandCenter({
           ) : (
             <div className="command-loading">
               <Icon name="spark" />
-              <span><strong>{chainLoading ? 'Reading the new vault…' : 'Vault state is catching up.'}</strong><small>No transaction is needed to refresh it.</small></span>
+              <span><strong>{chainLoading || targetLoading ? 'Reading the new vault…' : 'Vault state is catching up.'}</strong><small>No transaction is needed to refresh it.</small></span>
               <button type="button" onClick={onRefresh}>Refresh</button>
             </div>
           )}
