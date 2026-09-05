@@ -15,7 +15,7 @@ A qualifying creator chooses one of seven cosmetic pets, assigns one of three en
 - minimum balance: `100,000 $MUPPETS`
 - public without the token: landing, docs, marketplace, activity, agent detail and portfolio reads
 - balance verification: FastAPI reads `balanceOf(wallet)` from Robinhood Chain; the browser checks again before sending the first transaction
-- token address: pending deployment and runtime configuration
+- token address: not supplied; runtime configuration is required
 
 The gate fails closed. An empty address, invalid contract, RPC failure or balance below the threshold cannot launch through the app.
 
@@ -28,11 +28,13 @@ The current mainnet factory was deployed before this rule and does not check `$M
 - factory: `0x570F0FEBFE8b33F37D01f7153F0F85E59FfcE460`
 - policy executor: `0x948c21BAC4eB147a0c5Cd8E722fb49dD7eCc7fAc`
 - Key marketplace: `0x255573d6Cb2F8Ebb73677f6Ab9b3D98c2458B2cb`
+- fee RWA reserve: `0xF10DA007314bB3e7B34FE06bB5c590190dcE9765`
+- limited keeper: `0xA5960A69E57F4EbC924503bC829f1E6670BfBA51`
 - Morpho adapter: `0x169EfD23f67811709C0Db823f7c82fcF2732781d`
 - EZManager range adapter: `0xc6b531e504Ebb718dCd66Df45c9aC63564a0C96d`
 - launch reserve adapter: `0x956127B0B586B9427182FCd9325efe032E9B5181`
 
-All deployment receipts succeeded and runtime bytecode is present. Source verification for this deployment is pending. The previous zero-agent release remains recorded in `contracts/deployments/robinhood-mainnet-v1.json`.
+All deployment receipts succeeded and runtime bytecode is present. The marketplace treasury now points to the fee RWA reserve. Source verification for this deployment is pending. The previous zero-agent release remains recorded in `contracts/deployments/robinhood-mainnet-v1.json`.
 
 ## Three task configurations
 
@@ -73,23 +75,27 @@ This route currently allows up to 3% swap and LP execution slippage, and EZManag
 - cooldown: 30 minutes
 - vault cap: 0.25 WETH
 
-This choice is enabled so creators can launch and fund the full product shape, but the adapter currently only isolates WETH by vault. It cannot swap, lend, bridge, enter a token pool, or send funds to an administrator. It produces no yield. A launch-token pool will require a separately reviewed venue and liquidity policy before this task can become active liquidity.
+This choice is enabled so creators can launch and fund the full product shape, but the adapter only isolates WETH by vault. It cannot swap, lend, bridge, enter a token pool, or send funds to an administrator. It produces no yield. A `$MUPPETS` pool cannot be configured until the canonical token address and initial liquidity terms are supplied.
 
 There is no platform-volume threshold hiding the route. The restriction is venue safety. The inspected thin pool did not have enough oracle history to justify automated mainnet allocation.
 
-## Proposed market universe
+## Marketplace fee to Stock Token reserve
 
-The launch flow includes a market step after task selection. It distinguishes the current immutable route from markets being evaluated for a future factory version:
+`FeeRwaReserve` receives the native ETH fee from every filled Key ask or bid. A purchase cycle wraps the ETH, swaps WETH to USDG through the canonical 0.01% pool, then swaps USDG into the next eligible Robinhood Stock Token. Purchased tokens remain in the reserve contract.
 
-- live now: the existing USDG Morpho route, WETH / USDG range, and isolated WETH launch reserve
-- Stock Token range candidates: NVDA / USDG, GME / USDG, SPCX / USDG, and SPY / USDG
-- Stock Token credit candidate: NVDA collateral with USDG
-- company basket candidate: NVDA, MSFT, and GOOGL with independent feeds, weights, drift limits, and caps
-- community candidates: a reviewed token paired with WETH or USDG; DOGE, PEPE, and SHIB are watchlist examples rather than approved pools
+- purchase threshold: `0.0001 ETH`
+- maximum purchase cycle: `0.01 ETH`
+- cycle cooldown: 30 minutes
+- maximum execution slippage: 3%
+- route oracle age limit: 3 days, allowing for 24/5 market closures
+- route checks: nonzero pool liquidity, `oraclePaused() = false`, positive Chainlink answer, complete round, and age within the route limit
+- route order: AAPL, AMD, AMZN, ASML, BABA, CRCL, DELL, GME, GOOGL, INTC, META, MSFT, MSTR, MU, NVDA, PLTR, QQQ, SGOV, SLV, SNDK, SPCX, SPY, TSLA, TSM, USAR, USO
 
-Every proposed market is labeled `route review`. A user can inspect it, but cannot continue to the Key step or launch it. The current factory accepts only a task ID and permanently binds each vault to one of three global asset and adapter configurations. It does not submit or store the selected proposed market.
+The first dev-funded cycle spent `0.01 ETH`, routed `24.587800 USDG`, and received `0.076456289003050387 AAPL`. This bootstrap is separate from platform fees. `totalFeesReceived` starts at zero and increases only when the marketplace itself pays the reserve.
 
-A deployable market version requires a new route registry or route ID, an asset-specific adapter, canonical contract verification, valuation-feed and multiplier handling, liquidity and exit-depth checks, route-specific caps, fork tests, and independent review. Stock Tokens provide tokenized exposure and are not shares in the underlying company. Availability can depend on jurisdiction.
+Robinhood's official assets API returned 194 active Robinhood Chain assets on 2026-09-05, including 191 with fractional market trading. The automatic contract enables 26 routes because those had a matching Robinhood Chain Chainlink feed and a USDG pool holding at least 25,000 USDG during review. The larger catalog is not presented as automatically executable until each route passes the same checks.
+
+Stock Tokens are tokenized debt securities. They do not grant legal or beneficial ownership, voting rights, or shareholder rights in the underlying company. Chainlink prices already incorporate the Stock Token multiplier, so the reserve does not apply `uiMultiplier()` a second time.
 
 ## User flow
 
@@ -98,13 +104,14 @@ A deployable market version requires a new route registry or route ID, an asset-
 3. Hold at least `100,000 $MUPPETS` to unlock agent launch through the app.
 4. Pick any of the seven pet appearances.
 5. Select stable yield, ETH range, or launch reserve.
-6. Select the live market for that task. Proposed Stock Token, basket, and community routes can be inspected but not launched.
+6. Confirm the deployed market for that task.
 7. Set the Agent Key name, symbol, fixed whole-Key supply, and first ask.
 8. Sign the factory transaction. The factory deploys an Agent Key and capped ERC-4626 StrategyVault, registers its policy, and opens the first listing.
 9. Approve and deposit the task asset. The wallet receives transferable vault shares.
-10. The creator signs the task cycle. PolicyExecutor enforces the route and limits before the vault can call its immutable adapter.
+10. The creator or private keeper requests the task cycle. PolicyExecutor enforces the route and limits before the vault can call its immutable adapter.
 11. Depositors can redeem their shares. Full redemption recalls the complete adapter position and pays the assets actually realized.
 12. Key holders can buy, list, bid, sell, or permanently bind whole Keys through the native marketplace.
+13. Every filled Key trade sends its 3% fee to the Stock Token reserve. The private keeper executes a purchase after the threshold and cooldown checks pass.
 
 The browser signs and submits user transactions through the injected wallet. The FastAPI service reads public state and metadata. It does not custody funds or hold the deployer key.
 
@@ -118,6 +125,7 @@ The browser signs and submits user transactions through the injected wallet. The
 - `LaunchReserveAdapter` can only receive and return each vault's recorded WETH reserve.
 - `AgentKey` is a zero-decimal, fixed-supply ERC-20 used for marketplace transfer and permanent binding.
 - `KeyMarketplace` supports native-currency listings, offers, partial fills, and a 3% fee on filled value.
+- `FeeRwaReserve` receives marketplace fees, enforces route and oracle checks, rotates purchases, and holds the purchased Stock Tokens.
 
 An Agent Key is not a vault share, debt claim, promised return, or permission to bypass policy. Key price never enters vault accounting.
 
@@ -146,7 +154,9 @@ The developer wallet launched one real agent per task:
 - `range fox`: funded WETH vault with a live EZManager range
 - `launch sage`: funded WETH vault with a staged reserve
 
-All three have live asks of 20 Keys at 0.001 ETH per Key and one bound Key. These records are labeled through the `@liquidmuppets_dev` app handle. No circular self-trades were added. Buy and resale behavior is covered by contract tests; a public mainnet trade needs another wallet.
+All three have live asks of 20 Keys at 0.001 ETH per Key, one bound Key, and a live 5-Key dev bid at 0.0008 ETH per Key. These records are labeled through the `@liquidmuppets_dev` app handle. No circular self-trades were added.
+
+The dev-funded liquidity activation also deposited 0.05 WETH into the range vault, converted 0.01 WETH into USDG for the stable vault, allocated both strategies to their policy targets, and made the first reserve purchase.
 
 ## Backend data flow
 
@@ -154,11 +164,14 @@ The API reads deployment configuration from environment variables and validates 
 
 - verify `$MUPPETS` launch eligibility against the canonical token contract
 - query factory, vault, Key, marketplace, and adapter state through RPC
+- return live fee-reserve totals, holdings, limits, and all 26 routes
 - decode public activity logs and enrich them with agent metadata
 - cache the activity response briefly to avoid repeated wide log scans
 - issue short-lived profile challenges and verify signed claims
 - expose strategy parameters and transaction previews without signing them
 - relay only allowlisted read-only JSON-RPC methods for the browser
+- validate that the encrypted keeper key derives to A5 and that A5 is allowed by both keeper contracts before any scheduled signing
+- check all live vaults and the fee reserve every five minutes, record every decision, and sign only executable actions
 
 SQLite stores public profile claims, challenges, and keeper-run metadata. A claimed handle is normalized and unique. Challenges expire after 10 minutes and cannot be reused.
 
@@ -192,20 +205,28 @@ forge test --match-contract MorphoBlueAdapterForkTest \
 
 forge test --match-contract EZManagerRangeAdapterForkTest \
   --fork-url https://rpc.mainnet.chain.robinhood.com -vv
+
+forge test --match-contract FeeRwaReserveForkTest \
+  --fork-url https://rpc.mainnet.chain.robinhood.com -vv
 ```
 
-The Morpho fork test allocates and redeems canonical USDG. The EZManager fork test deposits WETH, opens a real range, advances time, atomically recenters, and fully redeems.
+The Morpho fork test allocates and redeems canonical USDG. The EZManager fork test deposits WETH, opens a real range, advances time, atomically recenters, and fully redeems. The reserve fork test buys AAPL through the live WETH, USDG, and Stock Token pools with the onchain oracle minimum.
 
-## Launch boundary
+## Launch readiness
 
-- the canonical `$MUPPETS` contract address is not configured, so app launch is currently locked for every wallet
-- the existing factory does not enforce the token rule against direct contract calls
+The existing-agent loop is operational as a controlled mainnet beta: deposits, bounded strategy cycles, withdrawals, Key asks, bids, partial fills, binding, public activity, scheduled keeper checks, and the Stock Token reserve are live. New creator launches are intentionally locked until the canonical `$MUPPETS` address is configured.
+
+Before an unrestricted public launch:
+
+- the canonical `$MUPPETS` contract address has not been supplied, so app launch is currently locked for every wallet
+- the existing factory does not enforce the token rule against direct contract calls; a gated factory migration is required if the rule must be unbypassable
 - mainnet deposits use real assets and carry loss risk
 - contracts are tested but not independently audited
-- the current owner and treasury are a dedicated EOA rather than a multisig
+- the current owner is a dedicated EOA rather than a multisig; it can pause `FeeRwaReserve` and rescue reserve assets while paused
 - source verification for the current deployment is pending
-- there is no automatic mainnet keeper, hidden signer, or backend hot wallet
+- public keeper triggering is disabled; the host-encrypted A5 key is installed, both onchain allowlists are active, and scheduled checks run every five minutes
 - stable yield can be zero and can become temporarily illiquid
 - the range route has execution, LP, pricing, smart-contract, and impermanent-loss risk
 - the launch route currently stages WETH and generates no yield
+- Stock Token routes can lose liquidity, pause, or hold stale prices; the contract skips those routes but cannot remove market risk
 - task and deposit caps reduce exposure but do not make any route safe or guaranteed

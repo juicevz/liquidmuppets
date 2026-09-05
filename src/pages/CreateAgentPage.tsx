@@ -29,14 +29,14 @@ const taskDetails: Record<StrategyTaskId, { summary: string; movement: string; g
     guardrail: '15% stays idle, each vault is capped at 1 WETH, and EZManager currently charges a 0.4% entry fee.',
   },
   2: {
-    summary: 'Keeps a small, isolated WETH reserve ready for a reviewed launch-liquidity route.',
-    movement: 'A cycle can stage 10% in the reserve. No token pool is active, so the reserve does not trade or earn fees yet.',
+    summary: 'Keeps a small WETH position inside the vault\'s isolated launch-reserve adapter.',
+    movement: 'A cycle can stage 10% in the reserve. The position stays in WETH and remains recallable.',
     guardrail: '90% stays idle, each vault is capped at 0.25 WETH, and staged WETH remains recallable at any time.',
   },
 }
 
 export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: CreateAgentPageProps) {
-  const { config, tasks, loading, error, refresh } = useProtocol(walletAddress)
+  const { config, tasks, error, refresh } = useProtocol(walletAddress)
   const [step, setStep] = useState(0)
   const [petId, setPetId] = useState(0)
   const [taskId, setTaskId] = useState<StrategyTaskId>(0)
@@ -67,15 +67,15 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
       && Number.isFinite(floor) && floor > 0,
   )
   const routeCanLaunch = Boolean(
-    config?.factory && config.keyMarketplace && formReady && Boolean(task?.live) && market?.status === 'live',
+    config?.factory && config.keyMarketplace && formReady && Boolean(task?.live) && market,
   )
   const canLaunch = routeCanLaunch && (!walletAddress || access?.eligible === true)
   const canContinue = useMemo(
     () => step === 0
       || (step === 1 && Boolean(task))
-      || (step === 2 && market?.status === 'live')
+      || (step === 2 && Boolean(market))
       || (step === 3 && formReady),
-    [formReady, market?.status, step, task],
+    [formReady, market?.id, step, task],
   )
   const detail = task ? taskDetails[task.id] : null
   const route = task
@@ -128,7 +128,7 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
       if (!latestAccess.eligible) {
         const required = Number(latestAccess.minimum).toLocaleString('en-US')
         throw new Error(latestAccess.reason === 'token_not_configured'
-          ? 'The canonical $MUPPETS contract is not configured yet.'
+          ? 'The canonical $MUPPETS contract address is required to launch.'
           : `Hold at least ${required} $MUPPETS to launch a Muppet.`)
       }
       const next = await launchAgent(config, provider, walletAddress as Address, {
@@ -154,11 +154,7 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
       <section className="app-page-heading create-heading">
         <div>
           <h1>Pick the pet. Pick the work.</h1>
-          <p>The appearance is cosmetic. The task fixes the vault; the market step shows its live route and the routes still under review.</p>
-        </div>
-        <div className={`protocol-ready-card ${config?.factory ? 'ready' : ''}`}>
-          <small>launch status</small>
-          <strong>{loading ? 'checking' : config?.factory ? 'ready' : 'not deployed'}</strong>
+          <p>The appearance is cosmetic. The task fixes the vault and its deployed money route.</p>
         </div>
       </section>
 
@@ -203,7 +199,6 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
               <div className="task-picker" role="group" aria-label="Choose type of task">
                 {tasks.map((item) => (
                   <button type="button" aria-pressed={taskId === item.id} className={taskId === item.id ? 'active' : ''} onClick={() => selectTask(item.id)} key={item.id}>
-                    <span className={`task-availability ${item.live ? 'live' : ''}`}>{item.execution_mode === 'reserve' ? 'reserve live' : item.live ? 'available' : 'preview'}</span>
                     <strong>{item.label}</strong><span className="task-assets">{item.deposit_asset} → {item.share_prefix}</span><i />
                   </button>
                 ))}
@@ -234,20 +229,16 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
             <div className="builder-step market-universe-step">
               <span className="builder-step-number">03 / MARKET</span>
               <h2>Choose where this pet can work.</h2>
-              <div className="market-status-legend" aria-label="Market route status">
-                <span><i className="live" /> live now</span>
-                <span><i /> route review</span>
-              </div>
               <div className="strategy-market-grid" role="group" aria-label="Choose market route">
                 {marketOptions.map((item) => (
                   <button
                     type="button"
-                    className={`${market?.id === item.id ? 'active' : ''} market-${item.status}`}
+                    className={market?.id === item.id ? 'active' : ''}
                     aria-pressed={market?.id === item.id}
                     onClick={() => setMarketId(item.id)}
                     key={item.id}
                   >
-                    <span className="strategy-market-topline"><small>{item.groupLabel}</small><b>{item.status === 'live' ? 'live' : 'route review'}</b></span>
+                    <span className="strategy-market-topline"><small>{item.groupLabel}</small></span>
                     <strong>{item.title}</strong>
                     <span className="strategy-market-pair">{item.market}</span>
                     <p>{item.description}</p>
@@ -256,16 +247,11 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
                 ))}
               </div>
               {market && (
-                <div className={`strategy-market-detail market-detail-${market.status}`} aria-live="polite">
+                <div className="strategy-market-detail" aria-live="polite">
                   <div>
                     <span><small>selected market</small><strong>{market.market}</strong></span>
-                    <b>{market.status === 'live' ? 'ready in current factory' : 'requires a new reviewed adapter'}</b>
                   </div>
                   <ul>{market.checks.map((check) => <li key={check}><Icon name="check" />{check}</li>)}</ul>
-                  {market.status === 'review' && (
-                    <p className="market-review-boundary"><Icon name="lock" /><span><strong>Visible for route review.</strong> The current factory cannot deploy this market yet. Choose the live route to launch today.</span></p>
-                  )}
-                  {market.usesStockTokens && <p className="stock-token-note">Stock Tokens provide tokenized exposure. They are not shares in the underlying company, and availability can depend on jurisdiction.</p>}
                 </div>
               )}
             </div>
@@ -315,13 +301,12 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
                         ? `${access.balance} $MUPPETS verified. Launch is unlocked.`
                         : access?.reason === 'below_minimum'
                           ? `Wallet balance: ${access.balance ?? '0'} $MUPPETS. Tokens remain in the wallet.`
-                          : 'Launch stays locked until the canonical $MUPPETS contract is configured and readable.'}</small>
+                          : 'Add the canonical $MUPPETS contract address to enable launch.'}</small>
                 </span>
               </div>
-              {task && !task.live && <div className="route-unavailable"><Icon name="lock" /><span><strong>Preview is ready.</strong> Launch unlocks when this route adapter is deployed.</span></div>}
               <button type="button" className="builder-primary" disabled={!canLaunch || Boolean(progress && !result)} onClick={deploy}>
                 <Icon name={task?.live && !walletAddress ? 'wallet' : access?.eligible ? 'receipt' : 'lock'} /> {task && !task.live
-                  ? 'Route not live yet'
+                  ? 'Route unavailable'
                   : !walletAddress
                     ? 'Connect wallet'
                     : accessLoading
@@ -330,7 +315,7 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
                         ? 'Launch Muppet'
                         : access?.reason === 'below_minimum'
                           ? 'Hold 100,000 $MUPPETS'
-                          : '$MUPPETS contract pending'}
+                          : '$MUPPETS address required'}
               </button>
               {progress && <div className={`transaction-progress ${result ? 'complete' : ''}`} role="status"><Icon name={result ? 'check' : 'spark'} />{progress}</div>}
               {result && config && (
@@ -358,7 +343,6 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
             <div className="preview-line" />
             <div className="preview-stats"><span><small>Key floor</small><strong>{floorPrice || '0'} ETH</strong></span><span><small>vault</small><strong>{task?.share_prefix ?? 'mAsset'}</strong></span></div>
           </div>
-          <p className="preview-footnote">The pet is cosmetic. Only a live market can launch.</p>
         </aside>
       </section>
     </div>

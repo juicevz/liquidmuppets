@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { formatUnits, type Address } from 'viem'
+import { formatEther, formatUnits, type Address } from 'viem'
 import { Icon } from '../components/Icon'
 import { getPet } from '../data/pets'
 import { useProtocol } from '../hooks/useProtocol'
@@ -21,7 +21,7 @@ import {
   type ChainAgent,
 } from '../lib/protocol'
 import type { StrategyTaskId } from '../types'
-import { fetchActivity, type ActivityItem } from '../lib/api'
+import { fetchActivity, fetchRwaReserve, type ActivityItem, type RwaReserveState } from '../lib/api'
 
 interface MarketplacePageProps {
   walletAddress?: string
@@ -36,6 +36,7 @@ export function MarketplacePage({ walletAddress, onConnect }: MarketplacePagePro
   const [filter, setFilter] = useState<TaskFilter>('all')
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState<bigint | null>(null)
+  const [rwaReserve, setRwaReserve] = useState<RwaReserveState | null>(null)
   const agents = snapshot?.agents ?? []
   const selected = agents.find((agent) => agent.id === selectedId) ?? null
   const listedKeys = agents.reduce((sum, agent) => sum + agent.key.listed, 0n)
@@ -50,6 +51,21 @@ export function MarketplacePage({ walletAddress, onConnect }: MarketplacePagePro
         && (!normalized || `${agent.name} ${agent.key.symbol} ${task?.label ?? ''}`.toLowerCase().includes(normalized))
     })
   }, [agents, filter, query, tasks])
+
+  useEffect(() => {
+    let active = true
+    const load = () => {
+      fetchRwaReserve()
+        .then((state) => { if (active) setRwaReserve(state) })
+        .catch(() => undefined)
+    }
+    load()
+    const timer = window.setInterval(load, 30_000)
+    return () => {
+      active = false
+      window.clearInterval(timer)
+    }
+  }, [])
 
   return (
     <div className="app-page marketplace-page live-marketplace-page">
@@ -67,7 +83,14 @@ export function MarketplacePage({ walletAddress, onConnect }: MarketplacePagePro
       </section>
 
       {error && <div className="protocol-error" role="alert"><Icon name="alert" />{error}<button type="button" onClick={refresh}>Retry</button></div>}
-      {!config?.factory && !loading && <div className="deployment-pending"><Icon name="lock" /><span><strong>Contracts are not available yet.</strong> The marketplace will open when verified deployment addresses reach the API.</span></div>}
+      {!config?.factory && !loading && <div className="deployment-pending"><Icon name="lock" /><span><strong>Contracts are unavailable.</strong> Check the API connection and retry.</span></div>}
+
+      <RwaReserveModule
+        state={rwaReserve}
+        address={config?.feeRwaReserve}
+        explorerUrl={config?.explorerUrl}
+        feeBps={snapshot?.feeBps ?? 300}
+      />
 
       <section className="market-controls">
         <div className="category-tabs" role="group" aria-label="Filter by type of task">
@@ -111,6 +134,70 @@ export function MarketplacePage({ walletAddress, onConnect }: MarketplacePagePro
 
       {selected && config && <LiveAgentDrawer agent={selected} config={config} feeBps={snapshot?.feeBps ?? 300} tasks={tasks} walletAddress={walletAddress} onConnect={onConnect} onClose={() => setSelectedId(null)} onRefresh={refresh} />}
     </div>
+  )
+}
+
+function RwaReserveModule({
+  state,
+  address,
+  explorerUrl,
+  feeBps,
+}: {
+  state: RwaReserveState | null
+  address?: `0x${string}` | null
+  explorerUrl?: string
+  feeBps: number
+}) {
+  const routes = state?.routes ?? []
+  const holdings = routes.filter((route) => BigInt(route.balanceRaw) > 0n)
+  const routeCount = state?.routeCount ?? routes.length
+  const purchases = state?.purchaseCount ?? 0
+  const totalSpent = state?.totalNativeSpentWei ? Number(formatEther(BigInt(state.totalNativeSpentWei))) : 0
+  const usdgSpent = state?.totalUsdgSpentRaw ? Number(formatUnits(BigInt(state.totalUsdgSpentRaw), 6)) : 0
+  const reserveAddress = state?.address ?? address
+  const loaded = state !== null
+
+  return (
+    <details className="rwa-reserve-module">
+      <summary aria-label="How the marketplace fee reserve works">
+        <span className="rwa-reserve-title">
+          <i aria-hidden="true" />
+          <span><small>fee reserve</small><strong>Key trades buy Stock Tokens</strong></span>
+        </span>
+        <span className="rwa-reserve-stats">
+          <span><small>routes</small><strong>{loaded ? routeCount : '...'}</strong></span>
+          <span><small>purchases</small><strong>{loaded ? purchases : '...'}</strong></span>
+          <span><small>spent</small><strong>{loaded ? `${totalSpent.toFixed(4)} ETH` : '...'}</strong></span>
+        </span>
+        <span className="rwa-reserve-question" aria-hidden="true">?</span>
+      </summary>
+      <div className="rwa-reserve-body">
+        <div className="rwa-reserve-copy">
+          <h2>The marketplace builds an onchain RWA bag.</h2>
+          <p>Every settled Key trade sends its {feeBps / 100}% market fee to this reserve. Once the balance reaches 0.0001 ETH, the private keeper converts it through USDG and rotates into the next eligible Robinhood Stock Token.</p>
+          <p>Each route needs live pool liquidity, an active token oracle, and a fresh Chainlink price. The contract skips anything that fails those checks and caps execution slippage at 3%.</p>
+          {reserveAddress && explorerUrl && <a href={`${explorerUrl}/address/${reserveAddress}`} target="_blank" rel="noreferrer">Open reserve contract <Icon name="arrow" /></a>}
+        </div>
+        <div className="rwa-reserve-live">
+          <div className="rwa-reserve-live-head"><span>reserve holdings</span><strong>{usdgSpent.toFixed(4)} USDG routed</strong></div>
+          <div className="rwa-holdings">
+            {holdings.length > 0
+              ? holdings.map((route) => (
+                <a href={`${explorerUrl}/token/${route.token}?a=${reserveAddress}`} target="_blank" rel="noreferrer" key={route.token}>
+                  <span>{route.symbol}</span>
+                  <strong>{Number(formatUnits(BigInt(route.balanceRaw), 18)).toLocaleString(undefined, { maximumFractionDigits: 6 })}</strong>
+                </a>
+              ))
+              : <span className="rwa-holdings-empty">{loaded ? 'The next market fee starts the following route.' : 'Reading reserve state from chain.'}</span>}
+          </div>
+          <div className="rwa-route-strip" aria-label={`${routeCount} enabled Stock Token routes`}>
+            {routes.map((route) => <span className={BigInt(route.balanceRaw) > 0n ? 'held' : ''} key={route.token}>{route.symbol}</span>)}
+          </div>
+          <p>The first 0.01 ETH purchase was dev-funded bootstrap liquidity. Marketplace fees are tracked separately onchain.</p>
+          {state?.stale && <p>Showing the last confirmed reserve state from block {state.blockNumber} while the RPC refreshes.</p>}
+        </div>
+      </div>
+    </details>
   )
 }
 
@@ -233,11 +320,6 @@ function LiveAgentDrawer({ agent, config, feeBps, tasks, walletAddress, onConnec
       : agent.taskId === 2
         ? 'Stage launch reserve'
         : 'Allocate stable route'
-  const routeNote = agent.taskId === 0
-    ? 'USDG enters one immutable Morpho Blue market. APY is variable, can fall to zero, and withdrawal depends on available Morpho liquidity.'
-    : agent.taskId === 1
-      ? 'This is real concentrated liquidity. It can lose value versus holding WETH. EZManager currently charges 0.4% on entry, execution has up to 3% slippage, and returns are never guaranteed.'
-      : 'This cycle only isolates WETH for a future reviewed launch route. It does not enter a token pool, collect fees, or promise yield.'
   const sharePrice = agent.vault.totalSupply === 0n
     ? 1
     : Number(formatUnits(
@@ -318,9 +400,8 @@ function LiveAgentDrawer({ agent, config, feeBps, tasks, walletAddress, onConnec
         </section>
 
         <section className="drawer-section execution-panel">
-          <div className="drawer-section-head"><span>how this task moves money</span><small>creator signs, policy enforces</small></div>
+          <div className="drawer-section-head"><span>how this task moves money</span></div>
           <div className="execution-path"><span>idle {agent.vault.assetSymbol}</span><Icon name="arrow" /><span>{task?.production_route}</span><Icon name="arrow" /><span>vault share price</span></div>
-          <ul className="execution-gates">{task?.safety_gates.map((gate) => <li key={gate.label}><strong>{gate.label}</strong><span>{gate.value}</span></li>)}</ul>
           <div className="execution-actions">
             <button type="button" className="run-cycle-button" disabled={Boolean(busy) || !isCreator || (!shouldRecenter && agent.vault.idleAssets === 0n)} onClick={() => {
               const wallet = requireWallet()
@@ -335,12 +416,10 @@ function LiveAgentDrawer({ agent, config, feeBps, tasks, walletAddress, onConnec
               const wallet = requireWallet(); if (wallet) void perform('Strategy recall', () => recallAgent(config, wallet.provider, wallet.account, agent))
             }}>Recall to vault</button>
           </div>
-          {task && <p className="execution-state-note">{task.execution_note}</p>}
-          <p className="honest-test-note">{routeNote} Contracts are tested but not independently audited.</p>
         </section>
 
         <section className="drawer-section key-overview-panel">
-          <div className="drawer-section-head"><span>${agent.key.symbol} market</span><small>Key ≠ vault share</small></div>
+          <div className="drawer-section-head"><span>${agent.key.symbol} market</span></div>
           <div className="key-overview-primary">
             <div><small>floor</small><strong>{formatEthValue(agent.key.floorWei)}</strong></div>
             <div><small>top bid</small><strong>{formatEthValue(agent.key.topBidWei)}</strong></div>
@@ -362,7 +441,6 @@ function LiveAgentDrawer({ agent, config, feeBps, tasks, walletAddress, onConnec
             {(keyAction === 'list' || keyAction === 'offer') && <label><span>unit price</span><div><input value={keyPrice} onChange={(event) => setKeyPrice(event.target.value)} inputMode="decimal" /><b>ETH</b></div></label>}
           </div>
           <button type="button" className="key-action" disabled={Boolean(busy) || (keyAction === 'buy' && agent.key.floorWei === null) || (keyAction === 'sell' && agent.key.topBidWei === null)} onClick={() => void executeKeyAction()}>{busy || `${keyAction} ${quantity || '0'} ${agent.key.symbol}`}</button>
-          <div className="fee-note"><Icon name="key" /><span>Keys control access and market demand. {agent.vault.symbol} shares own the vault claim.</span></div>
         </section>
 
         {(notice || actionError) && <div className={`transaction-notice ${actionError ? 'error' : ''}`} role="status">{actionError || notice}</div>}

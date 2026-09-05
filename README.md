@@ -8,18 +8,21 @@ Public interface: [https://liquidmuppets.io](https://liquidmuppets.io)
 
 X: [@AMBF](https://x.com/AMBF)
 
+Current status: controlled mainnet beta. Existing Muppets can be funded, allocated, traded and redeemed. New creator launches remain locked until the canonical `$MUPPETS` address is configured. If the 100,000-token rule must be enforced by the protocol rather than only the app and API, the current factory must also be replaced with a gated version.
+
 ## Live mainnet scope
 
 - Robinhood Chain ID `4663`
 - seven cosmetic pet appearances, independent from task permissions
 - three selectable task configurations
-- a market selector that separates live routes from Stock Token, company-basket, and community routes under review
+- one deployed money route for each task, with no unavailable route cards in the app
 - native Agent Key asks, bids, partial fills, buys, sells and permanent binding
-- 3% marketplace fee on filled value only
+- 3% marketplace fee routed into an onchain Stock Token reserve
+- 26 oracle-bounded Stock Token purchase routes
 - public activity built from contract logs
 - optional app handles claimed with a wallet signature and no gas
 - app and API balance gate requiring `100,000 $MUPPETS` to launch a new agent
-- no deployer or keeper key in the browser, API, or VPS
+- no deployer key in the browser, API, or VPS; the limited keeper key is accepted only through the host-encrypted vault and loaded only by the private service
 
 The routes are deliberately different:
 
@@ -38,11 +41,12 @@ Current deployment block: `52653314`.
 - `LiquidMuppetsFactory`: [`0x570F0FEBFE8b33F37D01f7153F0F85E59FfcE460`](https://robinhoodchain.blockscout.com/address/0x570F0FEBFE8b33F37D01f7153F0F85E59FfcE460)
 - `PolicyExecutor`: [`0x948c21BAC4eB147a0c5Cd8E722fb49dD7eCc7fAc`](https://robinhoodchain.blockscout.com/address/0x948c21BAC4eB147a0c5Cd8E722fb49dD7eCc7fAc)
 - `KeyMarketplace`: [`0x255573d6Cb2F8Ebb73677f6Ab9b3D98c2458B2cb`](https://robinhoodchain.blockscout.com/address/0x255573d6Cb2F8Ebb73677f6Ab9b3D98c2458B2cb)
+- `FeeRwaReserve`: [`0xF10DA007314bB3e7B34FE06bB5c590190dcE9765`](https://robinhoodchain.blockscout.com/address/0xF10DA007314bB3e7B34FE06bB5c590190dcE9765)
 - `MorphoBlueAdapter`: [`0x169EfD23f67811709C0Db823f7c82fcF2732781d`](https://robinhoodchain.blockscout.com/address/0x169EfD23f67811709C0Db823f7c82fcF2732781d)
 - `EZManagerRangeAdapter`: [`0xc6b531e504Ebb718dCd66Df45c9aC63564a0C96d`](https://robinhoodchain.blockscout.com/address/0xc6b531e504Ebb718dCd66Df45c9aC63564a0C96d)
 - `LaunchReserveAdapter`: [`0x956127B0B586B9427182FCd9325efe032E9B5181`](https://robinhoodchain.blockscout.com/address/0x956127B0B586B9427182FCd9325efe032E9B5181)
 
-The deployer, current owner, and treasury are the dedicated address `0x30dF6f545FcD732c659626b8C8aFd63Ff8aE3d5f`. Deployment receipts and runtime bytecode were checked through RPC. Source verification for this deployment is still pending. The retired zero-agent deployment is preserved in `contracts/deployments/robinhood-mainnet-v1.json`.
+The deployer and current owner are the dedicated address `0x30dF6f545FcD732c659626b8C8aFd63Ff8aE3d5f`. The limited keeper is `0xA5960A69E57F4EbC924503bC829f1E6670BfBA51`. Marketplace treasury payments now go directly to `FeeRwaReserve`. Deployment receipts and runtime bytecode were checked through RPC. Source verification for this deployment is still pending. The retired zero-agent deployment is preserved in `contracts/deployments/robinhood-mainnet-v1.json`.
 
 ## Assets and venues
 
@@ -60,7 +64,7 @@ The deployer, current owner, and treasury are the dedicated address `0x30dF6f545
 task asset
   -> StrategyVault
   -> transferable ERC-4626 shares to depositor
-  -> creator signs a bounded strategy cycle
+  -> creator or private keeper requests a bounded strategy cycle
   -> PolicyExecutor checks authorization, pause, expiry, cooldown and caps
   -> the task's immutable adapter executes
   -> vault accounting reads idle assets plus adapter position value
@@ -70,6 +74,9 @@ creator receives a fixed Agent Key supply
   -> lowest active ask becomes the floor
   -> users buy, list, bid, sell, or permanently bind whole Keys
   -> 3% fee applies only when value changes hands
+  -> fee enters FeeRwaReserve as native ETH
+  -> private keeper converts ETH to USDG after the 0.0001 ETH threshold
+  -> reserve buys the next eligible Stock Token and holds it onchain
 ```
 
 Vault shares own the capital claim. Agent Keys are a separate market and access asset. A Key cannot redeem vault assets, and its market price does not change vault share value.
@@ -83,6 +90,14 @@ ETH range has an 85% allocation limit and 6 hour cooldown. The adapter uses an o
 Launch reserve has a 10% allocation limit and 30 minute cooldown. Accounting is isolated by vault and the adapter can only hold and return WETH. It has no administrator withdrawal path.
 
 Full vault redemption recalls the complete adapter position and pays the assets actually realized. This prevents residual adapter dust from being treated as redeemable value, but it does not prevent market loss or venue illiquidity.
+
+## Stock Token fee reserve
+
+The fee reserve rotates across 26 enabled Robinhood Stock Token routes: AAPL, AMD, AMZN, ASML, BABA, CRCL, DELL, GME, GOOGL, INTC, META, MSFT, MSTR, MU, NVDA, PLTR, QQQ, SGOV, SLV, SNDK, SPCX, SPY, TSLA, TSM, USAR, and USO.
+
+Each route uses a direct USDG pool and a Robinhood Chain Chainlink feed. A cycle skips disabled routes, empty pool liquidity, paused token oracles, nonpositive or incomplete feed rounds, and prices older than three days. Execution uses a 3% maximum slippage bound, a 0.0001 ETH threshold, a 0.01 ETH per-cycle cap, and a 30 minute cooldown.
+
+The first dev-funded cycle spent `0.01 ETH`, routed `24.587800 USDG`, and bought `0.076456289003050387 AAPL`. It is recorded separately from marketplace fees. Stock Tokens are tokenized debt securities and do not grant shareholder rights in the underlying company.
 
 ## Public activity
 
@@ -104,7 +119,7 @@ Three developer fixtures exercise each task without demo data:
 - `range fox`, ETH range, with a real EZManager position
 - `launch sage`, launch reserve, with an isolated WETH allocation
 
-Each has a live 20-Key ask at `0.001 ETH` per Key and one permanently bound Key. These are clearly developer-created fixtures. No self-buy or circular resale was broadcast to manufacture trading activity. A real buy and resale needs a second wallet acting as the buyer.
+Each has a live 20-Key ask at `0.001 ETH` per Key, one permanently bound Key, and a live 5-Key dev bid at `0.0008 ETH` per Key. These are clearly developer-created fixtures. No self-buy or circular resale was broadcast to manufacture trading activity.
 
 ## Repository
 
@@ -157,9 +172,10 @@ forge build
 forge test -vv
 forge test --match-contract MorphoBlueAdapterForkTest --fork-url https://rpc.mainnet.chain.robinhood.com -vv
 forge test --match-contract EZManagerRangeAdapterForkTest --fork-url https://rpc.mainnet.chain.robinhood.com -vv
+forge test --match-contract FeeRwaReserveForkTest --fork-url https://rpc.mainnet.chain.robinhood.com -vv
 ```
 
-The fork suites enter and redeem the current Morpho route, and open, atomically recenter, and redeem a current EZManager range.
+The fork suites enter and redeem the current Morpho route, open, atomically recenter, and redeem a current EZManager range, and buy an oracle-bounded AAPL Stock Token through the live reserve route.
 
 ## Deployment
 
@@ -171,12 +187,13 @@ forge script script/DeployMainnet.s.sol:DeployMainnet --rpc-url https://rpc.main
 forge script script/DeployMainnet.s.sol:DeployMainnet --rpc-url https://rpc.mainnet.chain.robinhood.com --broadcast -vvv
 ```
 
-The frontend uses atomic release directories under `/var/www/liquidmuppets/releases/` with `/var/www/liquidmuppets/current` as the active symlink. The API runs as the unprivileged `liquidmuppets` user from `/opt/liquidmuppets-api/current`, reads `/etc/liquidmuppets/api.env`, and writes SQLite under `/var/lib/liquidmuppets`.
+The frontend uses atomic release directories under `/var/www/liquidmuppets/releases/` with `/var/www/liquidmuppets/current` as the active symlink. The API runs as the unprivileged `liquidmuppets` user from `/opt/liquidmuppets-api/current`, reads public runtime values from `/etc/liquidmuppets/api.env` and `/etc/liquidmuppets/runtime-public.env`, reads the keeper secret only from mode-0600 `/etc/liquidmuppets/keeper.env`, and writes SQLite under `/var/lib/liquidmuppets`.
 
 ## API
 
 - `GET /api/v1/health`
 - `GET /api/v1/contracts`
+- `GET /api/v1/rwa-reserve`
 - `GET /api/v1/access/{wallet}`
 - `GET /api/v1/strategies`
 - `POST /api/v1/strategies/preview`
@@ -185,20 +202,25 @@ The frontend uses atomic release directories under `/var/www/liquidmuppets/relea
 - `POST /api/v1/profiles/claim`
 - `GET /api/v1/profiles/{wallet}`
 - `POST /api/v1/keeper/run`
+- `POST /api/v1/keeper/rwa/run`
 - `GET /api/v1/keeper/runs`
 
-Keeper endpoints remain available for future automation, but mainnet ships with public triggering and automatic signing disabled.
+Public keeper triggering is disabled. The production scheduler is active every five minutes. It validates that its encrypted key derives to A5 and that A5 is authorized by both `PolicyExecutor` and `FeeRwaReserve`, records skipped decisions, and signs only when an action passes the current policy and route checks.
 
 ## Risk boundary
 
 - `$MUPPETS` launch access is enforced by the app and API, not the current factory contract
-- the canonical `$MUPPETS` address is still pending, so the shipped app currently locks agent launch for every wallet
+- the canonical `$MUPPETS` address has not been supplied, so the shipped app currently locks agent launch for every wallet
+- an unbypassable 100,000 `$MUPPETS` rule requires a gated factory migration because the current factory predates the rule
 - contracts are tested but not independently audited
 - stable APY is variable and can be zero
 - Morpho withdrawals depend on market liquidity
 - concentrated liquidity can underperform holding WETH and incurs swap, LP, and impermanent-loss risk
 - launch reserve produces no yield and has no approved token-pool route yet
+- Stock Token purchases depend on pool liquidity and 24/5 price feeds; stale or paused routes are skipped
 - USDG, WETH, USDe, their oracles, Morpho, Uniswap, EZManager, and Robinhood Chain add external risk
-- the owner controls task configuration, pause, and marketplace fee settings within contract limits
+- the owner controls task configuration, reserve pause and routes, and marketplace fee settings within contract limits
+- while the fee reserve is paused, the owner can rescue its native ETH or held tokens to a chosen receiver
 - the current owner is a dedicated EOA, not a multisig
+- source verification for the current deployment is still pending
 - per-vault caps reduce exposure but do not make deposits risk-free

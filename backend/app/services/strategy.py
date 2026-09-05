@@ -60,23 +60,23 @@ TASKS: dict[int, StrategyTask] = {
         label="Launch pool",
         deposit_asset="WETH",
         share_prefix="mLAUNCH",
-        production_route="isolated WETH launch reserve; no token pool is approved yet",
+        production_route="isolated WETH launch reserve",
         testnet_route="isolated WETH launch reserve",
         target_allocation_bps=1_000,
         protocol_fee_bps=0,
         live=True,
         execution_mode="reserve",
-        execution_note=(
-            "Launches and deposits are live; up to 10% can be staged as WETH, but it earns no pool fees yet."
-        ),
+        execution_note="Up to 10% can be staged as recallable WETH in the isolated reserve.",
         safety_gates=[
             SafetyGate(label="idle reserve", value="at least 90% WETH"),
             SafetyGate(label="staging cap", value="10% of vault assets"),
             SafetyGate(label="vault cap", value="0.25 WETH per vault while unaudited"),
-            SafetyGate(label="pool state", value="none approved; staged WETH remains withdrawable"),
+            SafetyGate(label="asset behavior", value="no external pool execution"),
         ],
     ),
 }
+
+ALLOCATION_TOLERANCE_BPS = 10
 
 
 @dataclass(frozen=True)
@@ -120,8 +120,18 @@ def preview_strategy(request: StrategyPreviewRequest) -> StrategyPreviewResponse
             _score_candidates(task.id, request.candidates, request.vault_value_usd),
         )
 
+    allocation_gap = target - request.deployed_assets
+    tolerance = max(1, request.total_assets * ALLOCATION_TOLERANCE_BPS // 10_000)
+    if allocation_gap <= tolerance:
+        return _hold(
+            task,
+            target,
+            "target allocation is within 0.1% tolerance",
+            _score_candidates(task.id, request.candidates, request.vault_value_usd),
+        )
+
     max_action_bps = 1_000 if task.id == 2 else task.target_allocation_bps
-    amount = min(request.idle_assets, target - request.deployed_assets, request.total_assets * max_action_bps // 10_000)
+    amount = min(request.idle_assets, allocation_gap, request.total_assets * max_action_bps // 10_000)
     if amount == 0:
         return _hold(
             task,
@@ -138,7 +148,7 @@ def preview_strategy(request: StrategyPreviewRequest) -> StrategyPreviewResponse
             amount=amount,
             target_deployed_assets=target,
             selected_pool_id="launch-reserve",
-            reason="WETH can be staged in the isolated launch reserve; no token pool is active",
+            reason="WETH can be staged in the isolated launch reserve",
             candidates=scored,
         )
     accepted = [item for item in scored if item.accepted]

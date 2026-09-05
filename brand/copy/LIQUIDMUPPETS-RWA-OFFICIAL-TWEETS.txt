@@ -1,0 +1,136 @@
+liquidmuppets RWA update tweets
+account: @liquidmuppets
+prepared: september 5, 2026
+
+these are ready to post from the official account. 01 is the recommended update post. the rest mix simple product statements, proof, and replies without pretending the open creator launch is unlocked.
+
+01
+
+liquidmuppets has a Stock Token reserve now.
+
+every settled Key trade sends its 3% fee onchain. a private keeper converts eligible batches from ETH to USDG, then buys the next available Robinhood Stock Token.
+
+26 routes. first holding: AAPL.
+
+https://liquidmuppets.io
+
+02
+
+trade Keys. grow the reserve.
+
+Key fills feed it. the keeper buys in bounded batches. every holding stays visible onchain.
+
+03
+
+the fee path:
+
+Key fill → 3% fee → FeeRwaReserve → USDG → Stock Token
+
+the reserve rotates across 26 eligible routes instead of picking one forever.
+
+04
+
+the keeper checks every five minutes.
+
+it only signs when the reserve is above 0.0001 ETH, the cooldown has passed, the oracle is active, the price is fresh, and the pool has liquidity.
+
+public triggering stays off.
+
+05
+
+the first reserve buy is onchain: 0.076456289003050387 AAPL Stock Token from a 0.01 ETH developer bootstrap.
+
+it is labelled separately from marketplace fees. clean accounting is part of the product.
+
+06
+
+26 live reserve routes:
+
+AAPL, AMD, AMZN, ASML, BABA, CRCL, DELL, GME, GOOGL, INTC, META, MSFT, MSTR, MU, NVDA, PLTR, QQQ, SGOV, SLV, SNDK, SPCX, SPY, TSLA, TSM, USAR and USO.
+
+07
+
+the reserve does not buy a route just because its ticker exists.
+
+each cycle checks the Stock Token oracle, Chainlink feed age, direct USDG pool liquidity, cooldown, spend cap and slippage bound before execution.
+
+08
+
+the maximum reserve purchase is 0.01 ETH per cycle with 3% maximum execution slippage.
+
+small batches. explicit checks. public balances.
+
+09
+
+the muppets have a Stock Token bag now.
+
+the first position is AAPL. AMD is next in the rotation once real Key fees cross the purchase threshold and every route check passes.
+
+10
+
+what happens to a liquidmuppets marketplace fee?
+
+it lands directly in FeeRwaReserve. it does not pass through the frontend or the keeper wallet. the keeper can trigger a bounded purchase, but it cannot rewrite the route.
+
+11
+
+two markets, kept separate:
+
+vault shares track deposited capital and strategy value.
+
+Agent Keys trade around each Muppet.
+
+filled Key trades fund the shared Stock Token reserve.
+
+12
+
+each Muppet still has one fixed task: stable yield, ETH range, or launch reserve.
+
+the new RWA reserve sits at the marketplace level. it is funded by filled Key-market fees, not by taking assets from user strategy vaults.
+
+13
+
+scheduled does not mean unchecked.
+
+PolicyExecutor still enforces signer authorization, pause state, expiry, cooldowns and allocation caps. the keeper gets a narrow permission, not a blank wallet.
+
+14
+
+liquidmuppets is open as a controlled mainnet beta. existing Muppets can be funded, allocated, traded and redeemed now.
+
+new creator launches unlock after the canonical $MUPPETS address is installed.
+
+https://liquidmuppets.io
+
+15
+
+which route should the reserve reach first after AAPL?
+
+AMD, NVDA, GME, SPY, TSLA, or let the contract keep rotating without opinions.
+
+16
+
+contracts, balances, routes and the first purchase are public.
+
+reserve: https://robinhoodchain.blockscout.com/address/0xF10DA007314bB3e7B34FE06bB5c590190dcE9765
+
+docs: https://liquidmuppets.io/docs
+
+17
+
+Stock Tokens provide tokenized exposure. they are not shares and do not grant shareholder rights in the underlying company.
+
+the fun part is the Muppet. the accounting still has to be exact.
+
+18
+
+mainnet update:
+
+3 funded agent vaults
+3 live Key asks
+3 live Key bids
+26 Stock Token routes
+1 AAPL reserve holding
+1 private policy-bounded keeper
+
+all of it readable from chain.

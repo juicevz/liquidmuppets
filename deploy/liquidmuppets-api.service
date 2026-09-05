@@ -9,6 +9,7 @@ User=liquidmuppets
 Group=liquidmuppets
 WorkingDirectory=/opt/liquidmuppets-api/current
 EnvironmentFile=/etc/liquidmuppets/api.env
+EnvironmentFile=-/etc/liquidmuppets/runtime-public.env
 EnvironmentFile=-/etc/liquidmuppets/keeper.env
 ExecStart=/opt/liquidmuppets-api/current/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1
 Restart=on-failure

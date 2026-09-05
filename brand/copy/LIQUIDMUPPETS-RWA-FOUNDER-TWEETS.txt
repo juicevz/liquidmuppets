@@ -1,0 +1,118 @@
+liquidmuppets RWA update tweets
+account: @AMBF
+prepared: september 5, 2026
+
+these are written for the founder page. they are shorter, more personal, and a little drier than the official account. 01, 02, 05, and 10 make a strong first sequence.
+
+01
+
+gave the muppets a Stock Token portfolio.
+
+02
+
+Key fees buy Stock Tokens now. that is the update.
+
+03
+
+wanted protocol fees to have a visible job.
+
+now every filled Key trade feeds an onchain reserve that rotates through 26 Robinhood Stock Tokens.
+
+04
+
+first thing the muppets bought was 0.076456289 AAPL.
+
+respectable taste for a frog.
+
+05
+
+the keeper checked three vaults and the reserve today, then sent zero transactions because everything was already on target.
+
+the best automated tx is occasionally no tx.
+
+06
+
+automatic is easy to write in a tweet. bounded automatic took the actual work.
+
+threshold, cooldown, oracle age, pool liquidity, slippage cap, signer policy, then execution.
+
+07
+
+the app has cartoon pets. the backend has opinions about stale oracle rounds.
+
+balance.
+
+08
+
+i like onchain products where revenue becomes something you can point at.
+
+filled Key fees land in the reserve. the reserve buys Stock Tokens. the balances stay public.
+
+09
+
+there are 26 eligible tickers in the rotation and i still made the first buy AAPL.
+
+the contract will be less sentimental from here.
+
+10
+
+liquidmuppets is ready for a controlled mainnet beta.
+
+the open creator launch is waiting on one real input: the final $MUPPETS contract address. after that i can move the 100k gate into a new factory so it cannot be bypassed.
+
+11
+
+no fake volume, no mystery treasury screenshot.
+
+three funded agents, three asks, three bids, one AAPL reserve position, all labelled and readable from chain.
+
+12
+
+the whole liquidmuppets idea in four lines:
+
+pet gives it identity
+task gives it limits
+vault shares own the capital
+Keys create the market around it
+
+now Key fees build the shared Stock Token reserve.
+
+13
+
+the most useful separation in the product:
+
+user vault money never funds the RWA reserve.
+
+only the 3% fee from a settled Key trade goes there.
+
+14
+
+spent longer making the keeper refuse bad transactions than making it send good ones.
+
+feels like the correct ratio.
+
+15
+
+26 Stock Token routes live in the reserve.
+
+AAPL is held now. AMD is next. the route still gets skipped if its oracle or liquidity checks fail.
+
+the rotation does not care about timeline sentiment.
+
+16
+
+the product page says what works now. the docs say what can go wrong. the chain decides whether any of us are telling the truth.
+
+https://liquidmuppets.io
+
+17
+
+i wanted the app to feel playful and the money path to feel boring.
+
+seven pets on the front. hard caps and immutable adapters underneath.
+
+18
+
+open question for the timeline: would you rather back one Muppet with one very legible task, or a larger agent that can move across ten routes?
+
+i know my answer but i want the replies.

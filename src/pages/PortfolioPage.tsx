@@ -32,7 +32,7 @@ export function PortfolioPage({ walletAddress, onConnect }: PortfolioPageProps) 
       {error && <div className="protocol-error" role="alert"><Icon name="alert" />{error}</div>}
 
       <section className="portfolio-overview live-portfolio-overview">
-        <div className="portfolio-summary"><span>tracked positions</span><strong>{positions.length}</strong><div><span>from connected wallet</span></div></div>
+        <div className="portfolio-summary"><span>positions</span><strong>{positions.length}</strong></div>
         <div className="portfolio-stat"><span>liquid Keys</span><strong>{liquidKeys.toString()}</strong><small>transferable or listable</small></div>
         <div className="portfolio-stat"><span>bound Keys</span><strong>{boundKeys.toString()}</strong><small>permanent access record</small></div>
         <div className="portfolio-stat"><span>agents created</span><strong>{created.length}</strong><small>factory records</small></div>

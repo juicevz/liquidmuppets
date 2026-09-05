@@ -55,9 +55,7 @@ def test_launch_strategy_stages_only_ten_percent_in_reserve() -> None:
 
 
 def test_accounting_mismatch_fails_closed() -> None:
-    response = preview_strategy(
-        StrategyPreviewRequest(task_id=0, total_assets=100, idle_assets=80, deployed_assets=30)
-    )
+    response = preview_strategy(StrategyPreviewRequest(task_id=0, total_assets=100, idle_assets=80, deployed_assets=30))
     assert response.action == "hold"
     assert response.reason == "vault accounting is inconsistent"
 
@@ -79,6 +77,20 @@ def test_eth_range_uses_the_live_fixed_route_without_candidates() -> None:
     assert response.action == "allocate"
     assert response.amount == 850_000
     assert response.selected_pool_id == "ezmanager-weth-usdg-100"
+
+
+def test_strategy_holds_for_dust_sized_allocation_gap() -> None:
+    response = preview_strategy(
+        StrategyPreviewRequest(
+            task_id=1,
+            total_assets=1_000_000,
+            idle_assets=150_500,
+            deployed_assets=849_500,
+        )
+    )
+    assert response.action == "hold"
+    assert response.amount == 0
+    assert response.reason == "target allocation is within 0.1% tolerance"
 
 
 def test_stable_strategy_rejects_market_below_five_times_vault_value() -> None:

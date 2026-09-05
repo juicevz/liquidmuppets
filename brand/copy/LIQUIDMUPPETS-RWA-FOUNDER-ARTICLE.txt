@@ -1,0 +1,51 @@
+title: i gave the muppets a Stock Token reserve
+
+protocol fees usually reach a treasury and become someone else's spreadsheet.
+
+i wanted liquidmuppets fees to do something people could see without trusting a monthly update from me. every settled Agent Key trade now sends its 3% fee directly into an onchain reserve. when the balance is large enough, a private keeper converts an eligible batch into USDG and buys the next Robinhood Stock Token in a 26-route rotation.
+
+the short version is better:
+
+trade Keys. grow the reserve.
+
+the longer version took most of the week.
+
+automatic needed limits
+
+i did not want a funded wallet waking up every few minutes with broad permission to improvise. the keeper is a separate A5 wallet. its encrypted key stays on the private service host. public triggering is disabled, and the contracts decide what it may execute.
+
+the scheduler checks every five minutes. the RWA cycle needs at least 0.0001 ETH and cannot spend more than 0.01 ETH at once. it respects a 30 minute cooldown and a 3% maximum slippage bound. every Stock Token route also needs pool liquidity, an active token oracle, and a fresh, complete Chainlink round.
+
+if those checks fail, nothing happens. that is still a successful keeper run. during the first live scheduled checks, all three strategy vaults were already on target and the fee reserve was below its threshold. the keeper recorded four no-op decisions and spent no gas.
+
+i am increasingly fond of software that knows when to sit still.
+
+the first bag
+
+i funded one 0.01 ETH bootstrap cycle from the developer wallet to prove the complete path. the reserve converted it to 24.587800 USDG and bought 0.076456289003050387 AAPL Stock Token.
+
+that purchase is labelled as developer funding. it is not mixed into the marketplace-fee counter. when real Key trades settle, their fees will increase that counter and future eligible batches will continue through the rotation.
+
+AAPL is the first holding. AMD is next. after that the contract works through 24 more routes, including NVDA, GME, META, MSFT, MSTR, QQQ, SPY, TSLA, TSM, SGOV, SLV, and USO. a ticker still gets skipped if its route is not healthy when its turn arrives.
+
+three separate pieces
+
+the update makes more sense if the rest of liquidmuppets stays clear.
+
+each Muppet has one task-bound ERC-4626 vault. vault shares own the capital claim. the Agent Key is a separate fixed-supply asset with asks, bids, partial fills, resales, and permanent binding. now the marketplace has a third object: the shared Stock Token reserve funded only by settled Key-trade fees.
+
+user strategy deposits do not feed the RWA reserve. reserve holdings do not give Key owners a claim on those assets. Key price does not enter vault accounting. i still want the fun on the surface and the accounting underneath to be almost offensively literal.
+
+what is actually ready
+
+the existing-agent loop is live as a controlled mainnet beta. three funded Muppets cover the stable, range, and launch-reserve tasks. they have live vault positions, asks, bids, and public activity. the private keeper is running. the fee reserve is deployed, funded once for proof, and visible in the app.
+
+one important input is still missing before i call creator launch fully open: the final $MUPPETS contract address. the app currently fails closed for every new launch. once the token exists, i can configure the address and move the 100,000-token rule into a new factory if we want the gate enforced onchain instead of only in the app and api.
+
+i also want verified contract source, an independent review, and multisig ownership before asking people to treat this like mature infrastructure. the current owner can pause the reserve and rescue its holdings while paused. those are not decorative checklist items.
+
+for now, the beta is small, the balances are real, and the receipts are public. the first Muppet portfolio position is AAPL. it could have been worse.
+
+https://liquidmuppets.io
+
+https://github.com/juicevz/liquidmuppets

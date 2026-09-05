@@ -18,7 +18,7 @@ const docsPetPortraits = [
   goldDocsPortrait,
 ]
 
-type DocsVisualKind = 'loop' | 'pets' | 'route' | 'vault' | 'policy' | 'keys' | 'steps'
+type DocsVisualKind = 'loop' | 'pets' | 'route' | 'rwa' | 'vault' | 'policy' | 'keys' | 'steps'
 
 interface DocsSection {
   number: string
@@ -42,7 +42,7 @@ const docsSections: DocsSection[] = [
     body: 'Every public page remains open. Launching a new agent through the app requires at least 100,000 $MUPPETS in the connected wallet. The API checks the canonical token balance on Robinhood Chain and the browser checks it again immediately before the first launch transaction.',
     details: [
       'the balance remains in the wallet and is not spent, locked or burned',
-      'the canonical token address is still pending, so launch currently fails closed',
+      'the canonical token address has not been supplied, so launch currently fails closed',
       'the deployed factory predates this access rule; direct contract calls are not token-gated until a gated factory migration',
     ],
   },
@@ -61,13 +61,15 @@ const docsSections: DocsSection[] = [
   },
   {
     number: '05',
-    title: 'Stock Token and community markets',
-    body: 'After choosing a task, the launch flow now shows its market universe. The current immutable route is marked live. Stock Token ranges, a company basket, and community-token pools are marked route review and cannot continue to launch until their own adapters and policies are deployed.',
+    title: 'Marketplace fee reserve',
+    body: 'Every settled Key trade sends the 3% marketplace fee directly to FeeRwaReserve. At 0.0001 ETH, the private keeper can convert native ETH to USDG and buy the next eligible Robinhood Stock Token. The contract rotates across 26 enabled routes and caps each cycle at 0.01 ETH.',
     details: [
-      'range candidates: NVDA, GME, SPCX and SPY Stock Tokens paired with USDG',
-      'basket candidate: NVDA, MSFT and GOOGL with separate feed, weight and drift limits',
-      'community candidates require contract identity, pool age, liquidity, volume, exit-depth and oracle review',
+      'the first 0.01 ETH bootstrap bought 0.076456289003050387 AAPL Stock Token',
+      'each route requires live USDG pool liquidity, a fresh Chainlink price, and oraclePaused() = false',
+      'AAPL, AMD, AMZN, ASML, BABA, CRCL, DELL, GME, GOOGL, INTC, META, MSFT, MSTR, MU, NVDA, PLTR, QQQ, SGOV, SLV, SNDK, SPCX, SPY, TSLA, TSM, USAR and USO are enabled',
+      'Stock Tokens are tokenized debt securities and do not grant shareholder rights in the underlying company',
     ],
+    visual: 'rwa',
   },
   {
     number: '06',
@@ -79,8 +81,8 @@ const docsSections: DocsSection[] = [
   {
     number: '07',
     title: 'The backend algorithm',
-    body: 'The creator signs each allocation from the app. PolicyExecutor applies the task cap, daily cap, cooldown and expiry. Stable yield then checks Morpho health. ETH range opens a fixed-width position through EZManager. Launch reserve only isolates WETH.',
-    details: ['Morpho supply must remain at least 10,000,000 USDG and utilization at or below 95%', 'range recenter closes and reopens atomically, so it cannot stop halfway', 'no deployer or keeper key is stored in the browser or public API'],
+    body: 'Creators can still sign their own actions. The private A5 keeper is active on a five minute schedule for bounded strategy allocations and fee-reserve purchases. It records every decision, but signs only when the onchain policy and route checks produce an executable action. Public keeper triggering stays disabled.',
+    details: ['Morpho supply must remain at least 10,000,000 USDG and utilization at or below 95%', 'range recenter closes and reopens atomically, so it cannot stop halfway', 'the keeper key stays host-encrypted and never enters the browser or public API'],
     visual: 'policy',
   },
   {
@@ -91,7 +93,7 @@ const docsSections: DocsSection[] = [
   {
     number: '09',
     title: 'Agent Keys and their market',
-    body: 'Each Muppet has a fixed-supply, zero-decimal ERC-20 Agent Key. The creator receives the supply and chooses the first ask. The actual floor is always the cheapest active ask. The native marketplace supports partial asks, bids, buys and sells and charges 3% only when a trade fills.',
+    body: 'Each Muppet has a fixed-supply, zero-decimal ERC-20 Agent Key. The creator receives the supply and chooses the first ask. The actual floor is always the cheapest active ask. The native marketplace supports partial asks, bids, buys and sells. Its 3% fill fee goes to the Stock Token reserve.',
     details: ['Key ownership is not vault ownership', 'Key price does not change vault share price', 'current utility is trading and permanent onchain binding'],
     visual: 'keys',
   },
@@ -103,7 +105,7 @@ const docsSections: DocsSection[] = [
   {
     number: '11',
     title: 'How to use the live loop',
-    body: 'Connect an EVM wallet on Robinhood Chain mainnet and hold 100,000 $MUPPETS to unlock launch. Choose any pet and task, then select that task\'s live market. Set a Key supply and first floor, then deposit the task asset. The creator runs the bounded cycle. Anyone can inspect, buy, list, bid, sell or bind a Key. Portfolio reads balances from chain.',
+    body: 'Connect an EVM wallet on Robinhood Chain mainnet. Existing Muppets can be funded, allocated, traded and redeemed now. New launches unlock after the canonical $MUPPETS address is installed and the connected wallet holds 100,000 tokens. Choose a pet and task, set a Key supply and first floor, then deposit the task asset.',
     visual: 'steps',
   },
   {
@@ -120,6 +122,9 @@ const docsSections: DocsSection[] = [
       'factory · 0x570F0FEBFE8b33F37D01f7153F0F85E59FfcE460',
       'policy · 0x948c21BAC4eB147a0c5Cd8E722fb49dD7eCc7fAc',
       'Key market · 0x255573d6Cb2F8Ebb73677f6Ab9b3D98c2458B2cb',
+      'fee RWA reserve · 0xF10DA007314bB3e7B34FE06bB5c590190dcE9765',
+      'keeper · 0xA5960A69E57F4EbC924503bC829f1E6670BfBA51',
+      'the owner can pause the fee reserve and rescue held assets while it is paused',
       'Morpho adapter · 0x169EfD23f67811709C0Db823f7c82fcF2732781d',
       'range adapter · 0xc6b531e504Ebb718dCd66Df45c9aC63564a0C96d',
       'launch reserve · 0x956127B0B586B9427182FCd9325efe032E9B5181',
@@ -215,6 +220,17 @@ function VaultShareVisual() {
   )
 }
 
+function RwaReserveVisual() {
+  const routes = ['AAPL', 'AMD', 'AMZN', 'ASML', 'BABA', 'CRCL', 'DELL', 'GME', 'GOOGL', 'INTC', 'META', 'MSFT', 'MSTR', 'MU', 'NVDA', 'PLTR', 'QQQ', 'SGOV', 'SLV', 'SNDK', 'SPCX', 'SPY', 'TSLA', 'TSM', 'USAR', 'USO']
+  return (
+    <VisualFrame title="FEE RESERVE" status="26 ROUTES" className="docs-rwa-visual">
+      <div className="docs-rwa-path"><span>Key fill fee</span><b>→</b><span>ETH to USDG</span><b>→</b><span>Stock Token</span></div>
+      <div className="docs-rwa-routes">{routes.map((route) => <span className={route === 'AAPL' ? 'held' : ''} key={route}>{route}</span>)}</div>
+      <p className="docs-visual-note">AAPL held now · next route AMD · 3% maximum execution slippage</p>
+    </VisualFrame>
+  )
+}
+
 function PolicyVisual() {
   const checks = ['authorized signer', 'cooldown ready', 'within daily cap', 'market healthy']
 
@@ -276,6 +292,7 @@ function DocsVisual({ kind }: { kind: DocsVisualKind }) {
   if (kind === 'loop') return <ProductLoopVisual />
   if (kind === 'pets') return <PetAppearanceVisual />
   if (kind === 'route') return <MoneyRouteVisual />
+  if (kind === 'rwa') return <RwaReserveVisual />
   if (kind === 'vault') return <VaultShareVisual />
   if (kind === 'policy') return <PolicyVisual />
   if (kind === 'keys') return <KeyMarketVisual />
@@ -288,7 +305,7 @@ export function DocsPage() {
       <header className="docs-heading">
         <p>LIQUIDMUPPETS / DOCUMENTATION</p>
         <h1>Everything about LIQUIDMUPPETS.</h1>
-        <span>The money path, $MUPPETS launch gate, Key market, keeper decisions and onchain limits.</span>
+        <span>The money path, Stock Token reserve, $MUPPETS launch gate, Key market and onchain limits.</span>
       </header>
 
       <div className="docs-layout">
@@ -315,7 +332,7 @@ export function DocsPage() {
           ))}
           <footer>
             <strong>Read this before funding</strong>
-            <p>This is live mainnet software using real assets. APY is not promised. Morpho withdrawals depend on market liquidity, ranges can lose against holding WETH, and launch reserve earns nothing until a reviewed pool route exists. The owner is a dedicated deployment wallet rather than a multisig. Use small amounts until the contracts receive independent review.</p>
+            <p>This is live mainnet software using real assets. APY is not promised. Morpho withdrawals depend on market liquidity, ranges can lose against holding WETH, and Stock Token purchases depend on oracle and pool liquidity. The owner is a dedicated deployment wallet rather than a multisig. Use small amounts until the contracts receive independent review.</p>
           </footer>
         </article>
       </div>

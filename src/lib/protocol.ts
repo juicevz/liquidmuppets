@@ -379,11 +379,11 @@ export async function launchAgent(
   input: LaunchInput,
   onProgress?: (message: string) => void,
 ): Promise<LaunchResult> {
-  if (!config.factory || !config.keyMarketplace) throw new Error('Mainnet contracts are not configured yet.')
+  if (!config.factory || !config.keyMarketplace) throw new Error('Mainnet contract addresses are required.')
   const client = createProtocolClient(config)
   const gate = config.accessGate
   if (!gate.configured || !gate.tokenAddress) {
-    throw new Error('The $MUPPETS launch gate is not configured yet.')
+    throw new Error('The canonical $MUPPETS address is required for launch.')
   }
   const [gateDecimals, gateBalance] = await Promise.all([
     client.readContract({ address: gate.tokenAddress, abi: erc20Abi, functionName: 'decimals' }),

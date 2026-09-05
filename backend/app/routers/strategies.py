@@ -16,4 +16,3 @@ def strategies() -> list[StrategyTask]:
 @router.post("/strategies/preview", response_model=StrategyPreviewResponse)
 def strategy_preview(payload: StrategyPreviewRequest) -> StrategyPreviewResponse:
     return preview_strategy(payload)
-

@@ -46,3 +46,30 @@ def run_keeper(payload: KeeperRunRequest, request: Request) -> KeeperRunResponse
 def keeper_runs(request: Request, limit: int = Query(default=50, ge=1, le=200)) -> list[dict[str, object]]:
     database: Database = request.app.state.database
     return database.list_keeper_runs(limit)
+
+
+@router.post("/keeper/rwa/run")
+def run_rwa_keeper(request: Request) -> dict[str, object]:
+    chain = request.app.state.chain
+    database = request.app.state.database
+    try:
+        amount, tx_hash, status, reason = chain.run_rwa_cycle()
+    except PermissionError as error:
+        raise HTTPException(status_code=403, detail=str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    except Exception as error:
+        raise HTTPException(status_code=502, detail=f"chain call failed: {type(error).__name__}") from error
+
+    database.add_keeper_run(
+        KeeperRunRecord(
+            vault=chain.settings.fee_rwa_reserve_address,
+            task_id=3,
+            action="rwa-purchase" if tx_hash else "hold",
+            amount=str(amount),
+            reason=reason,
+            status=status,
+            tx_hash=tx_hash,
+        )
+    )
+    return {"amount": str(amount), "reason": reason, "tx_hash": tx_hash, "status": status}

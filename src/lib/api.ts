@@ -9,6 +9,7 @@ export interface ProtocolConfig {
   factory: `0x${string}` | null
   policyExecutor: `0x${string}` | null
   keyMarketplace: `0x${string}` | null
+  feeRwaReserve: `0x${string}` | null
   testUSDG: `0x${string}` | null
   testWETH: `0x${string}` | null
   stablePool: `0x${string}` | null
@@ -127,6 +128,53 @@ export interface ActivityItem {
 
 export function fetchActivity(limit = 40): Promise<ActivityItem[]> {
   return request(`/activity?limit=${limit}`)
+}
+
+export interface RwaReserveRoute {
+  index: number
+  symbol: string
+  token: `0x${string}`
+  feed: `0x${string}`
+  pool: `0x${string}`
+  poolFee: number
+  maxOracleAge: number
+  enabled: boolean
+  balanceRaw: string
+}
+
+export interface RwaReserveState {
+  configured: boolean
+  address: `0x${string}` | null
+  routeCount?: number
+  purchaseCount?: number
+  nextRouteIndex?: number
+  totalNativeSpentWei?: string
+  totalUsdgSpentRaw?: string
+  totalFeesReceivedWei?: string
+  minimumCycleWei?: string
+  maximumCycleWei?: string
+  cooldownSeconds?: number
+  slippageBps?: number
+  lastCycleAt?: number
+  paused?: boolean
+  availableCycleWei?: string
+  nativeBalanceWei?: string
+  blockNumber?: number
+  stale?: boolean
+  routes?: RwaReserveRoute[]
+}
+
+export async function fetchRwaReserve(): Promise<RwaReserveState> {
+  let lastError: unknown
+  for (const delayMs of [0, 600, 1_600]) {
+    if (delayMs > 0) await new Promise((resolve) => window.setTimeout(resolve, delayMs))
+    try {
+      return await request('/rwa-reserve', { cache: 'no-store' })
+    } catch (error) {
+      lastError = error
+    }
+  }
+  throw lastError
 }
 
 export interface KeeperResult {

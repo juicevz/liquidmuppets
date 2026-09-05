@@ -19,10 +19,7 @@ def _event(name: str, inputs: list[tuple[str, str, bool]]) -> dict[str, Any]:
         "anonymous": False,
         "type": "event",
         "name": name,
-        "inputs": [
-            {"name": field, "type": kind, "indexed": indexed}
-            for field, kind, indexed in inputs
-        ],
+        "inputs": [{"name": field, "type": kind, "indexed": indexed} for field, kind, indexed in inputs],
     }
 
 
@@ -108,13 +105,25 @@ EVENT_ABIS = [
         ],
     ),
     _event("KeyBound", [("holder", "address", True), ("quantity", "uint256", False)]),
+    _event(
+        "StockTokenPurchased",
+        [
+            ("purchaseId", "uint256", True),
+            ("routeIndex", "uint256", True),
+            ("token", "address", True),
+            ("nativeSpent", "uint256", False),
+            ("usdgSpent", "uint256", False),
+            ("tokenReceived", "uint256", False),
+        ],
+    ),
 ]
 
 
 def _event_topic(abi: dict[str, Any]) -> bytes:
     inputs = cast(list[dict[str, Any]], abi["inputs"])
-    signature = f'{abi["name"]}({",".join(str(item["type"]) for item in inputs)})'
+    signature = f"{abi['name']}({','.join(str(item['type']) for item in inputs)})"
     return bytes(Web3.keccak(text=signature))
+
 
 ERC20_METADATA_ABI = [
     {"type": "function", "name": "symbol", "stateMutability": "view", "inputs": [], "outputs": [{"type": "string"}]},
@@ -138,9 +147,7 @@ class ActivityService:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self.web3 = Web3(Web3.HTTPProvider(settings.rpc_url, request_kwargs={"timeout": 12}))
-        self._event_by_topic = {
-            _event_topic(abi): abi for abi in EVENT_ABIS
-        }
+        self._event_by_topic = {_event_topic(abi): abi for abi in EVENT_ABIS}
         self._lock = Lock()
         self._cache_at = 0.0
         self._cache: list[dict[str, object]] = []
@@ -162,6 +169,8 @@ class ActivityService:
         base_addresses = [factory_address, Web3.to_checksum_address(self.settings.key_marketplace_address)]
         if self.settings.policy_executor_address:
             base_addresses.append(Web3.to_checksum_address(self.settings.policy_executor_address))
+        if self.settings.fee_rwa_reserve_address:
+            base_addresses.append(Web3.to_checksum_address(self.settings.fee_rwa_reserve_address))
         logs = list(
             self.web3.eth.get_logs(
                 {
@@ -172,9 +181,7 @@ class ActivityService:
             )
         )
         tracked_addresses = [
-            Web3.to_checksum_address(address)
-            for agent in agents
-            for address in (agent.vault, agent.key)
+            Web3.to_checksum_address(address) for agent in agents for address in (agent.vault, agent.key)
         ]
         if tracked_addresses:
             logs.extend(
@@ -340,6 +347,13 @@ class ActivityService:
                 return None
             actor, action, direction = str(args["holder"]), "bound", "positive"
             quantity = str(args["quantity"])
+        elif event == "StockTokenPurchased":
+            token = Web3.to_checksum_address(args["token"])
+            token_contract = self.web3.eth.contract(address=token, abi=ERC20_METADATA_ABI)
+            symbol = str(token_contract.functions.symbol().call())
+            actor, action, direction = address, "reserve bought", "positive"
+            value = _format_amount(int(args["tokenReceived"]), 18)
+            value_symbol = symbol
         else:
             return None
         return {

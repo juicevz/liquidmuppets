@@ -32,8 +32,9 @@ READ_ONLY_RPC_METHODS = frozenset(
     }
 )
 RPC_RETRY_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
-RPC_RETRY_DELAYS = (0.0, 0.15, 0.4)
+RPC_RETRY_DELAYS = (0.0, 0.2, 0.6, 1.2, 2.5)
 RPC_CACHE_SECONDS = 15
+RPC_UPSTREAM_BATCH_SIZE = 10
 
 
 @router.get("/health", response_model=HealthResponse)
@@ -49,6 +50,7 @@ def health(request: Request) -> HealthResponse:
         rpc_connected=connected,
         latest_block=block,
         contracts_configured=chain.contracts_configured,
+        rwa_reserve_configured=chain.rwa_reserve_configured,
         keeper_configured=chain.keeper_configured,
     )
 
@@ -65,6 +67,7 @@ def contracts(request: Request) -> dict[str, object]:
         "factory": settings.factory_address or None,
         "policyExecutor": settings.policy_executor_address or None,
         "keyMarketplace": settings.key_marketplace_address or None,
+        "feeRwaReserve": settings.fee_rwa_reserve_address or None,
         "testUSDG": settings.test_usdg_address or None,
         "testWETH": settings.test_weth_address or None,
         "stablePool": settings.stable_pool_address or None,
@@ -90,6 +93,15 @@ def contracts(request: Request) -> dict[str, object]:
     }
 
 
+@router.get("/rwa-reserve")
+def rwa_reserve(request: Request) -> dict[str, object]:
+    try:
+        state: dict[str, object] = request.app.state.chain.read_rwa_reserve()
+        return state
+    except Exception as error:
+        raise HTTPException(status_code=502, detail=f"RWA reserve read failed: {type(error).__name__}") from error
+
+
 @router.post("/rpc")
 def rpc_proxy(request: Request, payload: Annotated[Any, Body()]) -> Response:
     calls = payload if isinstance(payload, list) else [payload]
@@ -112,30 +124,59 @@ def rpc_proxy(request: Request, payload: Annotated[Any, Body()]) -> Response:
             if cached is not None:
                 return Response(content=cached[1], media_type="application/json")
 
-        last_error: httpx.HTTPError | None = None
-        for attempt, delay in enumerate(RPC_RETRY_DELAYS):
-            if delay:
-                sleep(delay)
-            try:
-                upstream = request.app.state.rpc_client.post(request.app.state.settings.rpc_url, json=payload)
-                if upstream.status_code in RPC_RETRY_STATUS_CODES and attempt < len(RPC_RETRY_DELAYS) - 1:
-                    continue
-                upstream.raise_for_status()
-                if cacheable and _rpc_response_succeeded(upstream):
-                    request.app.state.rpc_cache[cache_key] = (monotonic() + RPC_CACHE_SECONDS, upstream.content)
-                return Response(content=upstream.content, media_type="application/json")
-            except httpx.HTTPError as error:
-                last_error = error
-                if not isinstance(error, httpx.RequestError) or attempt == len(RPC_RETRY_DELAYS) - 1:
-                    break
+        try:
+            if isinstance(payload, list) and len(payload) > RPC_UPSTREAM_BATCH_SIZE:
+                rows: list[object] = []
+                for start in range(0, len(payload), RPC_UPSTREAM_BATCH_SIZE):
+                    chunk = payload[start : start + RPC_UPSTREAM_BATCH_SIZE]
+                    upstream = _post_rpc_with_retries(
+                        request.app.state.rpc_client,
+                        request.app.state.settings.rpc_url,
+                        chunk,
+                    )
+                    body = upstream.json()
+                    if not isinstance(body, list):
+                        raise ValueError("upstream returned a non-batch response")
+                    rows.extend(body)
+                content = json.dumps(rows, separators=(",", ":")).encode()
+            else:
+                upstream = _post_rpc_with_retries(
+                    request.app.state.rpc_client,
+                    request.app.state.settings.rpc_url,
+                    payload,
+                )
+                content = upstream.content
+            if cacheable and _rpc_content_succeeded(content):
+                request.app.state.rpc_cache[cache_key] = (monotonic() + RPC_CACHE_SECONDS, content)
+            return Response(content=content, media_type="application/json")
+        except (httpx.HTTPError, ValueError) as error:
+            raise HTTPException(status_code=502, detail="upstream RPC request failed") from error
 
-    raise HTTPException(status_code=502, detail="upstream RPC request failed") from last_error
+
+def _post_rpc_with_retries(client: httpx.Client, url: str, payload: Any) -> httpx.Response:
+    last_error: httpx.HTTPError | None = None
+    for attempt, delay in enumerate(RPC_RETRY_DELAYS):
+        if delay:
+            sleep(delay)
+        try:
+            response = client.post(url, json=payload)
+            if response.status_code in RPC_RETRY_STATUS_CODES and attempt < len(RPC_RETRY_DELAYS) - 1:
+                continue
+            response.raise_for_status()
+            return response
+        except httpx.HTTPError as error:
+            last_error = error
+            if not isinstance(error, httpx.RequestError) or attempt == len(RPC_RETRY_DELAYS) - 1:
+                break
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("RPC retry loop did not execute")
 
 
-def _rpc_response_succeeded(response: httpx.Response) -> bool:
+def _rpc_content_succeeded(content: bytes) -> bool:
     try:
-        body = response.json()
-    except ValueError:
+        body = json.loads(content)
+    except (UnicodeDecodeError, ValueError):
         return False
     rows = body if isinstance(body, list) else [body]
     return bool(rows) and all(isinstance(row, dict) and "error" not in row for row in rows)

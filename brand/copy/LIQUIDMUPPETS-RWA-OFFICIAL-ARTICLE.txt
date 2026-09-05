@@ -1,0 +1,65 @@
+title: Key fees now build the liquidmuppets Stock Token reserve
+
+onchain marketplaces collect fees every day. the destination is often a treasury address and the story stops there.
+
+liquidmuppets now gives its marketplace fees a visible job. every settled Agent Key trade sends the 3% fee directly to an onchain reserve. a private policy-bounded keeper checks the reserve every five minutes and, when every execution condition passes, converts an eligible ETH batch to USDG and buys the next Robinhood Stock Token in rotation.
+
+the purchased assets stay in FeeRwaReserve. its balance, route list, limits, and purchase history are public.
+
+how the fee path works
+
+the complete route is:
+
+filled Key ask or bid
+→ 3% native ETH fee
+→ FeeRwaReserve
+→ WETH / USDG swap
+→ USDG / Stock Token swap
+→ Stock Token held by the reserve
+
+listing a Key does not create revenue. placing an unfilled bid does not create revenue. the fee reaches the reserve only when value changes hands through a settled marketplace trade.
+
+the keeper never takes custody of the fee. it holds a limited signing key that can call the reserve, while the contract keeps the assets and enforces the route. public keeper triggering is disabled.
+
+26 enabled routes
+
+the reserve currently rotates through AAPL, AMD, AMZN, ASML, BABA, CRCL, DELL, GME, GOOGL, INTC, META, MSFT, MSTR, MU, NVDA, PLTR, QQQ, SGOV, SLV, SNDK, SPCX, SPY, TSLA, TSM, USAR, and USO.
+
+an available ticker is not automatically an executable route. each enabled route has a direct USDG pool and a Robinhood Chain Chainlink feed. before a purchase, the reserve requires pool liquidity, an active token oracle, a positive and complete feed round, and a price no older than three days.
+
+each cycle also has a 0.0001 ETH minimum, a 0.01 ETH maximum, a 30 minute cooldown, and a 3% maximum execution slippage bound. if a route fails its checks, the contract skips it. if the reserve is below threshold, the keeper records a no-op and sends no transaction.
+
+the first holding
+
+the first completed cycle used a clearly labelled 0.01 ETH developer bootstrap. it routed 24.587800 USDG and bought 0.076456289003050387 AAPL Stock Token. this transaction proved the full route before marketplace revenue enters it.
+
+that bootstrap is not reported as fee revenue. total marketplace fees remain a separate onchain counter and increase only when Key trades settle into the reserve.
+
+where this fits
+
+liquidmuppets keeps three economic objects separate.
+
+vault shares represent the depositor's capital claim on one Muppet strategy. Agent Keys have their own market and permanent binding mechanic. the shared Stock Token reserve receives marketplace fees.
+
+strategy deposits never fund the RWA reserve. Key prices never change vault accounting. reserve holdings never become a claim attached to a Key. the relationship is simpler: filled Key trades create fees, and those fees build a public platform reserve.
+
+current status
+
+the existing-agent loop is operational as a controlled Robinhood Chain mainnet beta. three developer Muppets exercise stable yield, ETH range, and launch reserve. their vault funding, strategy positions, Key asks, Key bids, and bindings are live.
+
+new creator launches remain locked until the canonical $MUPPETS contract address is configured. protocol-level enforcement of the 100,000-token launch rule also requires a gated factory migration. the contracts are tested but unaudited, source verification is pending, and the current owner is a dedicated EOA rather than a multisig.
+
+Stock Tokens are tokenized debt securities. they do not grant shareholder rights in the underlying companies. routes may lose liquidity, pause, or use prices that become stale. the reserve checks those conditions before execution, but it cannot remove market or smart-contract risk. the owner can pause the reserve and rescue held assets while it is paused.
+
+app: https://liquidmuppets.io
+
+docs: https://liquidmuppets.io/docs
+
+reserve: https://robinhoodchain.blockscout.com/address/0xF10DA007314bB3e7B34FE06bB5c590190dcE9765
+
+code: https://github.com/juicevz/liquidmuppets
+
+references:
+https://docs.robinhood.com/chain/stock-tokens/
+https://docs.chain.link/data-feeds/tokenized-equity-feeds/robinhood
+https://api.robinhood.com/rhj/assets

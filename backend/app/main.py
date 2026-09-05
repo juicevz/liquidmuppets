@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from threading import Lock
@@ -15,6 +16,8 @@ from app.routers import access, activity, keeper, profiles, strategies, system
 from app.services.activity import ActivityService
 from app.services.chain import ChainService
 from app.services.token_gate import TokenGateService
+
+logger = logging.getLogger(__name__)
 
 
 def create_app(app_settings: Settings = settings) -> FastAPI:
@@ -32,7 +35,11 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
         live_app.state.rpc_cache_lock = Lock()
         stop = asyncio.Event()
         keeper_task = None
-        if app_settings.auto_keeper_enabled and chain.keeper_configured:
+        if (
+            app_settings.auto_keeper_enabled
+            and app_settings.keeper_private_key
+            and app_settings.keeper_expected_address
+        ):
             keeper_task = asyncio.create_task(_auto_keeper_loop(chain, database, app_settings, stop))
         try:
             yield
@@ -80,10 +87,16 @@ async def _auto_keeper_loop(
     stop: asyncio.Event,
 ) -> None:
     while not stop.is_set():
-        for vault in await asyncio.to_thread(chain.list_vaults):
+        try:
+            vaults = await asyncio.to_thread(chain.list_vaults)
+        except Exception as error:
+            logger.warning("scheduled keeper could not list vaults: %s", type(error).__name__)
+            vaults = []
+        for vault in vaults:
             try:
                 state, preview, tx_hash, status = await asyncio.to_thread(chain.run_keeper, vault, public_request=False)
-            except Exception:
+            except Exception as error:
+                logger.warning("scheduled vault cycle skipped for %s: %s", vault, type(error).__name__)
                 continue
             database.add_keeper_run(
                 KeeperRunRecord(
@@ -96,6 +109,23 @@ async def _auto_keeper_loop(
                     tx_hash=tx_hash,
                 )
             )
+        if app_settings.fee_rwa_reserve_address:
+            try:
+                amount, tx_hash, status, reason = await asyncio.to_thread(chain.run_rwa_cycle, public_request=False)
+            except Exception as error:
+                logger.warning("scheduled RWA cycle skipped: %s", type(error).__name__)
+            else:
+                database.add_keeper_run(
+                    KeeperRunRecord(
+                        vault=app_settings.fee_rwa_reserve_address,
+                        task_id=3,
+                        action="rwa-purchase" if tx_hash is not None else "hold",
+                        amount=str(amount),
+                        reason=reason,
+                        status=f"auto-{status}",
+                        tx_hash=tx_hash,
+                    )
+                )
         try:
             await asyncio.wait_for(stop.wait(), timeout=max(15, app_settings.auto_keeper_interval_seconds))
         except TimeoutError:

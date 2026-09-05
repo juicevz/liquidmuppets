@@ -52,6 +52,29 @@ def test_contract_config_uses_same_origin_read_proxy(tmp_path: Path) -> None:
     }
 
 
+def test_contract_config_exposes_fee_reserve(tmp_path: Path) -> None:
+    reserve = "0xF10DA007314bB3e7B34FE06bB5c590190dcE9765"
+    app = create_app(
+        Settings(
+            database_path=tmp_path / "test.sqlite3",
+            rpc_url="http://127.0.0.1:1",
+            fee_rwa_reserve_address=reserve,
+        )
+    )
+    with TestClient(app) as client:
+        response = client.get("/api/v1/contracts")
+    assert response.status_code == 200
+    assert response.json()["feeRwaReserve"] == reserve
+
+
+def test_public_rwa_keeper_trigger_is_disabled(tmp_path: Path) -> None:
+    app = create_app(Settings(database_path=tmp_path / "test.sqlite3", rpc_url="http://127.0.0.1:1"))
+    with TestClient(app) as client:
+        response = client.post("/api/v1/keeper/rwa/run")
+    assert response.status_code == 403
+    assert response.json()["detail"] == "public keeper runs are disabled"
+
+
 def test_token_gate_fails_closed_until_contract_is_configured(tmp_path: Path) -> None:
     app = create_app(
         Settings(
@@ -136,9 +159,7 @@ def test_rpc_proxy_retries_a_transient_upstream_failure(tmp_path: Path, monkeypa
     assert attempts == 2
 
 
-def test_rpc_proxy_caches_identical_reads_and_allows_a_fresh_read(
-    tmp_path: Path, monkeypatch: MonkeyPatch
-) -> None:
+def test_rpc_proxy_caches_identical_reads_and_allows_a_fresh_read(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     attempts = 0
 
     def fake_post(url: str, **_kwargs: object) -> httpx.Response:
@@ -163,6 +184,40 @@ def test_rpc_proxy_caches_identical_reads_and_allows_a_fresh_read(
 
     assert first.status_code == cached.status_code == fresh.status_code == 200
     assert attempts == 2
+
+
+def test_rpc_proxy_splits_large_batches_before_upstream(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    batch_sizes: list[int] = []
+
+    def fake_post(url: str, **kwargs: object) -> httpx.Response:
+        payload = kwargs["json"]
+        assert isinstance(payload, list)
+        batch_sizes.append(len(payload))
+        request = httpx.Request("POST", url)
+        return httpx.Response(
+            200,
+            json=[{"jsonrpc": "2.0", "id": row["id"], "result": "0x01"} for row in payload],
+            request=request,
+        )
+
+    app = create_app(Settings(database_path=tmp_path / "test.sqlite3", rpc_url="https://rpc.invalid"))
+    payload = [
+        {
+            "jsonrpc": "2.0",
+            "id": index,
+            "method": "eth_call",
+            "params": [{"to": "0x0000000000000000000000000000000000000000", "data": "0x"}, "latest"],
+        }
+        for index in range(25)
+    ]
+
+    with TestClient(app) as client:
+        monkeypatch.setattr(app.state.rpc_client, "post", fake_post)
+        response = client.post("/api/v1/rpc", json=payload)
+
+    assert response.status_code == 200
+    assert len(response.json()) == 25
+    assert batch_sizes == [10, 10, 5]
 
 
 def test_wallet_profile_requires_the_wallet_signature(tmp_path: Path) -> None:

@@ -97,6 +97,7 @@ class HealthResponse(BaseModel):
     rpc_connected: bool
     latest_block: int | None
     contracts_configured: bool
+    rwa_reserve_configured: bool
     keeper_configured: bool
 
 

@@ -151,7 +151,7 @@ results.ethRangeSelectable = await page.getByRole('button', { name: /ETH range/i
 results.ethRangeExplained = await page.getByText(/Converts WETH through the canonical/i).count() === 1
 await page.getByRole('button', { name: /Launch pool/i }).click()
 results.launchPoolSelectable = await page.getByRole('button', { name: /Launch pool/i }).getAttribute('aria-pressed') === 'true'
-results.launchPoolExplained = await page.getByText(/Keeps a small, isolated WETH reserve/i).count() === 1
+results.launchPoolExplained = await page.getByText(/Keeps a small WETH position/i).count() === 1
 await page.getByRole('button', { name: /ETH range/i }).click()
 await page.getByRole('button', { name: /Continue/ }).click()
 await page.getByText('Choose where this pet can work.').waitFor()
@@ -159,12 +159,7 @@ results.marketUniverseOptions = await page.locator('.strategy-market-grid button
 results.marketReviewOptions = await page.locator('.strategy-market-grid .market-review').count()
 results.liveMarketDefault = await page.getByRole('button', { name: /ETH market/i }).getAttribute('aria-pressed') === 'true'
 results.marketPairs = await page.locator('.strategy-market-pair').allTextContents()
-await page.getByRole('button', { name: /NVIDIA market/i }).click()
-results.marketReviewExplained = await page.getByText(/current factory cannot deploy this market yet/i).count() === 1
-results.stockTokenBoundary = await page.getByText(/not shares in the underlying company/i).count() === 1
-results.reviewRouteBlocksContinue = await page.getByRole('button', { name: /Continue/ }).isDisabled()
-await page.getByRole('button', { name: /ETH market/i }).click()
-results.liveMarketReady = await page.getByText(/ready in current factory/i).count() === 1
+results.marketChecks = await page.locator('.strategy-market-detail li').count()
 results.liveRouteAllowsContinue = !(await page.getByRole('button', { name: /Continue/ }).isDisabled())
 await page.screenshot({ path: new URL('create-market-universe.png', screenshotDir).pathname, fullPage: false })
 await page.getByRole('button', { name: /Continue/ }).click()
@@ -190,6 +185,13 @@ results.listedPercent = await page.locator('.key-market-summary').getByText(/pet
 results.marketRows = await page.locator('.key-market-row').count()
 results.marketCards = await page.locator('.live-agent-card').count()
 results.marketEmpty = await page.locator('.market-empty, .deployment-pending').count()
+results.rwaReserveModule = await page.locator('.rwa-reserve-module').count() === 1
+await page.locator('.rwa-reserve-module summary').click()
+await page.locator('.rwa-route-strip span').first().waitFor({ timeout: 20_000 })
+results.rwaRouteCount = await page.locator('.rwa-route-strip span').count()
+results.rwaAaplHolding = await page.locator('.rwa-holdings a').filter({ hasText: 'AAPL' }).count() === 1
+results.rwaReserveContract = (await page.getByRole('link', { name: /Open reserve contract/i }).getAttribute('href'))?.includes('0xF10DA007314bB3e7B34FE06bB5c590190dcE9765')
+results.rwaBootstrapDisclosure = await page.getByText(/dev-funded bootstrap liquidity/i).count() === 1
 await page.locator('.public-activity-item').first().waitFor({ timeout: 10_000 })
 results.activityRows = await page.locator('.public-activity-item').count()
 results.activityHasDevHandle = await page.locator('.public-activity-item').getByText('@liquidmuppets_dev').count() > 0
@@ -199,9 +201,11 @@ if (results.marketRows > 0) {
   await page.locator('.key-market-row').first().click()
   await page.getByRole('dialog').waitFor()
   results.drawerVaultPanel = await page.getByRole('dialog').getByText(/ERC-4626 share/i).count() === 1
-  results.drawerTaskPath = await page.getByRole('dialog').getByText(/creator signs, policy enforces/i).count() === 1
+  results.drawerTaskPath = await page.getByRole('dialog').locator('.execution-path').count() === 1
+  results.drawerTinyStatusRemoved = await page.getByRole('dialog').getByText(/creator signs, policy enforces/i).count() === 0
   results.drawerKeyTabs = await page.getByRole('dialog').locator('.key-tabs button').count()
-  results.drawerHonestYield = await page.getByRole('dialog').getByText(/APY is variable/i).count() === 1
+  results.drawerRiskNoteRemoved = await page.getByRole('dialog').getByText(/APY is variable|concentrated liquidity|reviewed launch route/i).count() === 0
+  results.drawerKeyQualifierRemoved = await page.getByRole('dialog').locator('.fee-note, .honest-test-note, .execution-state-note').count() === 0
   results.drawerOverflow = await page.getByRole('dialog').evaluate((node) => node.scrollWidth > node.clientWidth)
   await page.screenshot({ path: new URL('marketplace-live-drawer.png', screenshotDir).pathname, fullPage: false })
   await page.getByRole('button', { name: 'Close agent details' }).click()
@@ -223,7 +227,7 @@ results.docsTitle = await page.title()
 results.docsSections = await page.locator('.docs-layout article > section').count()
 results.docsTokenGate = await page.getByRole('heading', { name: '$MUPPETS launch access' }).count() === 1
 results.docsSevenPets = await page.getByRole('heading', { name: 'Seven pets, three live tasks' }).count() === 1
-results.docsMarketUniverse = await page.getByRole('heading', { name: 'Stock Token and community markets' }).count() === 1
+results.docsFeeReserve = await page.getByRole('heading', { name: 'Marketplace fee reserve' }).count() === 1
 results.docsAlgorithm = await page.getByRole('heading', { name: 'The backend algorithm' }).count() === 1
 results.docsBoundary = await page.getByText(/real USDG, WETH, Morpho, Uniswap and EZManager/i).count() === 1
 results.docsLiveContracts = await page.getByText(/0x570F0FEBFE8b33F37D01f7153F0F85E59FfcE460/i).count() === 1
@@ -316,6 +320,18 @@ results.mobileDocsOverflow = await mobilePage.evaluate(() => document.documentEl
 await mobile.close()
 await mobileBrowser.close()
 
+const narrowBrowser = await chromium.launch({ headless: true, args: ['--disable-gpu'] })
+const narrow = await narrowBrowser.newContext({ viewport: { width: 320, height: 720 } })
+const narrowPage = await narrow.newPage()
+watch(narrowPage, '320px')
+await narrowPage.goto(`${baseUrl}/app`, { waitUntil: 'networkidle' })
+results.narrowAppOverflow = await narrowPage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
+results.narrowHeaderVisible = await narrowPage.locator('.mobile-app-nav').isVisible()
+await narrowPage.goto(`${baseUrl}/docs`, { waitUntil: 'networkidle' })
+results.narrowDocsOverflow = await narrowPage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
+await narrow.close()
+await narrowBrowser.close()
+
 results.consoleErrors = consoleErrors
 console.log(JSON.stringify(results, null, 2))
 
@@ -325,10 +341,17 @@ const marketStateValid = results.marketRows > 0
     && results.activityRows > 0
     && results.activityHasDevHandle
     && results.activityValuesStyled
+    && results.rwaReserveModule
+    && results.rwaRouteCount === 26
+    && results.rwaAaplHolding
+    && results.rwaReserveContract
+    && results.rwaBootstrapDisclosure
     && results.drawerVaultPanel
     && results.drawerTaskPath
+    && results.drawerTinyStatusRemoved
     && results.drawerKeyTabs === 5
-    && results.drawerHonestYield
+    && results.drawerRiskNoteRemoved
+    && results.drawerKeyQualifierRemoved
     && !results.drawerOverflow
   : results.marketEmpty > 0
 
@@ -376,14 +399,11 @@ const failed =
   || !results.ethRangeExplained
   || !results.launchPoolSelectable
   || !results.launchPoolExplained
-  || results.marketUniverseOptions !== 5
-  || results.marketReviewOptions !== 4
+  || results.marketUniverseOptions !== 1
+  || results.marketReviewOptions !== 0
   || !results.liveMarketDefault
-  || JSON.stringify(results.marketPairs) !== JSON.stringify(['WETH / USDG', 'NVDA / USDG', 'GME / USDG', 'SPCX / USDG', 'SPY / USDG'])
-  || !results.marketReviewExplained
-  || !results.stockTokenBoundary
-  || !results.reviewRouteBlocksContinue
-  || !results.liveMarketReady
+  || JSON.stringify(results.marketPairs) !== JSON.stringify(['WETH / USDG'])
+  || results.marketChecks !== 3
   || !results.liveRouteAllowsContinue
   || !results.floorField
   || !results.keySupplyField
@@ -401,11 +421,11 @@ const failed =
   || results.docsSections !== 13
   || !results.docsTokenGate
   || !results.docsSevenPets
-  || !results.docsMarketUniverse
+  || !results.docsFeeReserve
   || !results.docsAlgorithm
   || !results.docsBoundary
   || !results.docsLiveContracts
-  || results.docsVisuals !== 7
+  || results.docsVisuals !== 8
   || results.docsPetCards !== 7
   || results.docsPetNames.join(',') !== 'blue,sage,stone,fox,plum,frog,gold'
   || !results.docsPetNamesUnclipped
@@ -424,6 +444,9 @@ const failed =
   || results.mobileMarketColumns !== 1
   || results.mobileDocsOverflow
   || !results.mobileNavVisible
+  || results.narrowAppOverflow
+  || results.narrowDocsOverflow
+  || !results.narrowHeaderVisible
   || results.degradedTaskPickerCount !== 3
   || !results.degradedTaskWarning
   || consoleErrors.length > 0
