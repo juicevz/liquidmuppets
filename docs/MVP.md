@@ -128,14 +128,20 @@ Some adapter oracle interfaces return a value without an update timestamp. In th
 5. Select stable yield, ETH range, or launch reserve.
 6. Confirm the deployed market for that task.
 7. Set the Agent Key name, symbol, fixed whole-Key supply, and first ask.
-8. Sign the factory transaction. The factory deploys an Agent Key and capped ERC-4626 StrategyVault, registers its policy, and opens the first listing.
-9. Approve and deposit the task asset. The wallet receives transferable vault shares.
+8. Confirm vault and Key creation, Key approval, and the first ask. The browser records each submitted receipt so an interrupted launch can resume at the first unfinished step.
+9. Use the post-launch command center to preview the exact ERC-4626 shares, approve the task asset, and fund the vault. The wallet receives transferable vault shares.
 10. The creator or private keeper requests the task cycle. PolicyExecutor enforces the route and limits before the vault can call its immutable adapter.
 11. Depositors can redeem their shares. Full redemption recalls the complete adapter position and pays the assets actually realized.
 12. Key holders can buy, list, bid, sell, or permanently bind whole Keys through the native marketplace.
 13. Every filled Key trade sends its 3% fee to the Stock Token reserve. The private keeper executes a purchase after the threshold and cooldown checks pass.
 
-The browser signs and submits user transactions through the injected wallet. The FastAPI service reads public state and metadata. It does not custody funds or hold the deployer key.
+The browser signs and submits user transactions through the injected wallet. The FastAPI service reads public state and metadata. It does not custody funds or hold the deployer key. Launch recovery stores only public inputs, addresses, statuses and transaction hashes in the current browser, scoped to the connected wallet, chain and factory.
+
+### Post-launch command center
+
+Once the three launch receipts confirm, `/app/create` immediately exposes the new vault's funding controls, its `previewDeposit` result, the connected wallet's task-asset balance, an estimate for the next five minute keeper check, the public performance link and an X share action. The preview comes from the deployed ERC-4626 contract and can change with vault state before execution. Keeper timing is an estimate from the latest recorded decision; each check can still act or hold under policy.
+
+If creation, approval or listing is interrupted, `Resume launch` first checks any saved submitted transaction. It sends only the first missing or reverted stage. Browser storage is a convenience rather than a cross-device ledger, so clearing site data removes that local recovery record while the onchain receipts remain authoritative.
 
 ## Policy and contract boundaries
 
@@ -196,6 +202,8 @@ The API reads deployment configuration from environment variables and validates 
 - check all live vaults and the fee reserve every five minutes, record every decision, and sign only executable actions
 
 SQLite stores public profile claims, challenges, and keeper-run metadata. A claimed handle is normalized and unique. Challenges expire after 10 minutes and cannot be reused.
+
+Launch recovery and the post-launch command state are frontend-only. They are not added to SQLite and do not add a custodial backend path.
 
 Failure handling is explicit: RPC or decode failures return an API error, activity polling shows a reconnecting state, contract transactions surface wallet errors, and policy or adapter checks revert the whole onchain action.
 

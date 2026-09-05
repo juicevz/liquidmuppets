@@ -21,6 +21,8 @@ Current status: controlled mainnet beta. Existing Muppets can be funded, allocat
 - 26 oracle-bounded Stock Token purchase routes
 - public activity built from contract logs
 - a shareable public performance URL for every Muppet, backed by five minute checkpoints
+- a post-launch command center with vault funding, an onchain share preview, keeper timing, performance link and X sharing
+- browser-local recovery for the three launch transactions, keyed to the connected wallet, chain and factory
 - optional app handles claimed with a wallet signature and no gas
 - app and API balance gate requiring `15,000 $MUPPETS` to launch a new agent
 - canonical `$MUPPETS` token configured at `0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189`
@@ -131,6 +133,22 @@ The first checkpoint is the baseline. The service does not reconstruct a pretend
 
 Checkpoints are stored in SQLite every five minutes. Deposit and withdrawal totals advance from ERC-4626 events emitted between consecutive checkpoint blocks. Chart history is downsampled only for the response and always preserves the first and latest checkpoint.
 
+## Launch recovery and command center
+
+The launch flow records each submitted transaction hash before waiting for confirmation: vault and Key creation, Key approval, then the first ask. If the wallet rejects a later step, a transaction reverts, confirmation reading times out, or the page reloads, `/app/create` restores the matching browser-local record and offers `Resume launch`. Resume checks any existing receipt before it sends the first missing transaction, so it does not blindly create another Muppet or repeat a pending listing.
+
+This recovery record is scoped to the chain ID, factory address and connected wallet. It contains the public launch inputs, contract addresses and transaction hashes only. It contains no signature, private key or token approval secret, and it does not move automatically to another browser or device.
+
+After all three receipts confirm, the same page becomes the post-launch command center. It:
+
+- reads `previewDeposit` from the deployed ERC-4626 vault and shows the exact expected shares before funding
+- shows the connected wallet's live task-asset balance, then submits the asset approval and vault deposit through that wallet
+- estimates the next five minute keeper check from the latest recorded decision, while stating that policy can still act or hold
+- links directly to the Muppet's public performance page, vault, Agent Key and launch receipts
+- opens a prepared X share intent for the public performance URL
+
+The share preview is a current onchain conversion, not a promised return. The public performance page still begins at its first recorded checkpoint and does not invent earlier APY.
+
 ## Seeded mainnet state
 
 Three developer fixtures exercise each task without demo data:
@@ -232,6 +250,7 @@ Public keeper triggering is disabled. The production scheduler is active every f
 
 - `$MUPPETS` launch access is enforced by the app and API, not the current factory contract
 - app launch fails closed if the canonical `$MUPPETS` contract or its Robinhood Chain balance read is unavailable
+- interrupted launch recovery is stored only in the current browser; users should keep wallet receipts if they switch devices or clear site data
 - an unbypassable 15,000 `$MUPPETS` rule requires a gated factory migration because the current factory predates the rule
 - contracts are tested but not independently audited
 - stable APY is variable and can be zero

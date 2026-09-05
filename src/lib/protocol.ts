@@ -69,6 +69,7 @@ const vaultAbi = [
   { type: 'function', name: 'idleAssets', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'deployedAssets', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'convertToAssets', stateMutability: 'view', inputs: [{ type: 'uint256' }], outputs: [{ type: 'uint256' }] },
+  { type: 'function', name: 'previewDeposit', stateMutability: 'view', inputs: [{ type: 'uint256' }], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'deposit', stateMutability: 'nonpayable', inputs: [{ type: 'uint256' }, { type: 'address' }], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'redeem', stateMutability: 'nonpayable', inputs: [{ type: 'uint256' }, { type: 'address' }, { type: 'address' }], outputs: [{ type: 'uint256' }] },
 ] as const
@@ -353,7 +354,7 @@ async function loadOffers(client: PublicClient, market: Address): Promise<OfferR
   }))
 }
 
-interface LaunchInput {
+export interface LaunchInput {
   petId: number
   taskId: StrategyTaskId
   name: string
@@ -372,61 +373,159 @@ export interface LaunchResult {
   listingTx: Hash
 }
 
+export interface LaunchCheckpoint {
+  createTx?: Hash
+  createConfirmed?: boolean
+  agentId?: bigint
+  vault?: Address
+  key?: Address
+  approveTx?: Hash
+  approveConfirmed?: boolean
+  listingTx?: Hash
+  listingConfirmed?: boolean
+}
+
+export interface LaunchExecutionOptions {
+  checkpoint?: LaunchCheckpoint
+  onProgress?: (message: string) => void
+  onCheckpoint?: (checkpoint: LaunchCheckpoint) => void
+}
+
 export async function launchAgent(
   config: ProtocolConfig,
   provider: WalletProvider,
   account: Address,
   input: LaunchInput,
-  onProgress?: (message: string) => void,
+  options: LaunchExecutionOptions = {},
 ): Promise<LaunchResult> {
   if (!config.factory || !config.keyMarketplace) throw new Error('Mainnet contract addresses are required.')
   const client = createProtocolClient(config)
-  const gate = config.accessGate
-  if (!gate.configured || !gate.tokenAddress) {
-    throw new Error('The canonical $MUPPETS address is required for launch.')
+  let checkpoint: LaunchCheckpoint = { ...options.checkpoint }
+  const updateCheckpoint = (patch: Partial<LaunchCheckpoint>) => {
+    checkpoint = { ...checkpoint, ...patch }
+    options.onCheckpoint?.({ ...checkpoint })
   }
-  const [gateDecimals, gateBalance] = await Promise.all([
-    client.readContract({ address: gate.tokenAddress, abi: erc20Abi, functionName: 'decimals' }),
-    client.readContract({ address: gate.tokenAddress, abi: erc20Abi, functionName: 'balanceOf', args: [account] }),
-  ])
-  const gateMinimum = parseUnits(gate.minimum, gateDecimals)
-  if (gateBalance < gateMinimum) {
-    throw new Error(`Hold at least ${Number(gate.minimum).toLocaleString('en-US')} $${gate.tokenSymbol} to launch a Muppet.`)
+
+  let created = checkpoint.createConfirmed && checkpoint.agentId !== undefined && checkpoint.vault && checkpoint.key
+    ? { agentId: checkpoint.agentId, vault: checkpoint.vault, key: checkpoint.key }
+    : null
+
+  if (!created && checkpoint.createTx) {
+    options.onProgress?.('Recovering the vault and Agent Key transaction…')
+    const receipt = await waitForSubmittedTransaction(client, checkpoint.createTx)
+    if (receipt.status === 'success') {
+      created = decodeAgentCreated(receipt, config.factory)
+      updateCheckpoint({ ...created, createConfirmed: true })
+    } else {
+      updateCheckpoint({
+        createTx: undefined,
+        createConfirmed: false,
+        agentId: undefined,
+        vault: undefined,
+        key: undefined,
+        approveTx: undefined,
+        approveConfirmed: false,
+        listingTx: undefined,
+        listingConfirmed: false,
+      })
+    }
   }
+
+  if (!created) {
+    const gate = config.accessGate
+    if (!gate.configured || !gate.tokenAddress) {
+      throw new Error('The canonical $MUPPETS address is required for launch.')
+    }
+    const [gateDecimals, gateBalance] = await Promise.all([
+      client.readContract({ address: gate.tokenAddress, abi: erc20Abi, functionName: 'decimals' }),
+      client.readContract({ address: gate.tokenAddress, abi: erc20Abi, functionName: 'balanceOf', args: [account] }),
+    ])
+    const gateMinimum = parseUnits(gate.minimum, gateDecimals)
+    if (gateBalance < gateMinimum) {
+      throw new Error(`Hold at least ${Number(gate.minimum).toLocaleString('en-US')} $${gate.tokenSymbol} to launch a Muppet.`)
+    }
+    const floorWei = parseEther(input.floorPriceEth)
+    options.onProgress?.('Creating the vault and Agent Key…')
+    const createReceipt = await sendAndWait(provider, client, account, config.factory, encodeFunctionData({
+      abi: factoryAbi,
+      functionName: 'createAgent',
+      args: [input.petId, input.taskId, input.name, input.keySymbol.toUpperCase(), BigInt(input.keySupply), floorWei],
+    }), undefined, (hash) => updateCheckpoint({ createTx: hash, createConfirmed: false }))
+    created = decodeAgentCreated(createReceipt, config.factory)
+    updateCheckpoint({ ...created, createTx: createReceipt.transactionHash, createConfirmed: true })
+  }
+
   const floorWei = parseEther(input.floorPriceEth)
-  onProgress?.('Creating the vault and Agent Key…')
-  const createReceipt = await sendAndWait(provider, client, account, config.factory, encodeFunctionData({
-    abi: factoryAbi,
-    functionName: 'createAgent',
-    args: [input.petId, input.taskId, input.name, input.keySymbol.toUpperCase(), BigInt(input.keySupply), floorWei],
-  }))
-  const created = decodeAgentCreated(createReceipt, config.factory)
-  onProgress?.('Approving the initial Key listing…')
-  const approveReceipt = await sendAndWait(provider, client, account, created.key, encodeFunctionData({
-    abi: erc20Abi,
-    functionName: 'approve',
-    args: [config.keyMarketplace, BigInt(input.listingQuantity)],
-  }))
-  onProgress?.('Opening the first ask at your base price…')
-  const listingReceipt = await sendAndWait(provider, client, account, config.keyMarketplace, encodeFunctionData({
-    abi: marketAbi,
-    functionName: 'createListing',
-    args: [created.key, BigInt(input.listingQuantity), floorWei],
-  }))
+  if (checkpoint.approveTx && !checkpoint.approveConfirmed) {
+    options.onProgress?.('Recovering the Key approval transaction…')
+    const receipt = await waitForSubmittedTransaction(client, checkpoint.approveTx)
+    if (receipt.status === 'success') updateCheckpoint({ approveConfirmed: true })
+    else updateCheckpoint({ approveTx: undefined, approveConfirmed: false, listingTx: undefined, listingConfirmed: false })
+  }
+  if (!checkpoint.approveConfirmed) {
+    options.onProgress?.('Approving the initial Key listing…')
+    const approveReceipt = await sendAndWait(provider, client, account, created.key, encodeFunctionData({
+      abi: erc20Abi,
+      functionName: 'approve',
+      args: [config.keyMarketplace, BigInt(input.listingQuantity)],
+    }), undefined, (hash) => updateCheckpoint({ approveTx: hash, approveConfirmed: false }))
+    updateCheckpoint({ approveTx: approveReceipt.transactionHash, approveConfirmed: true })
+  }
+
+  if (checkpoint.listingTx && !checkpoint.listingConfirmed) {
+    options.onProgress?.('Recovering the first ask transaction…')
+    const receipt = await waitForSubmittedTransaction(client, checkpoint.listingTx)
+    if (receipt.status === 'success') updateCheckpoint({ listingConfirmed: true })
+    else updateCheckpoint({ listingTx: undefined, listingConfirmed: false })
+  }
+  if (!checkpoint.listingConfirmed) {
+    options.onProgress?.('Opening the first ask at your base price…')
+    const listingReceipt = await sendAndWait(provider, client, account, config.keyMarketplace, encodeFunctionData({
+      abi: marketAbi,
+      functionName: 'createListing',
+      args: [created.key, BigInt(input.listingQuantity), floorWei],
+    }), undefined, (hash) => updateCheckpoint({ listingTx: hash, listingConfirmed: false }))
+    updateCheckpoint({ listingTx: listingReceipt.transactionHash, listingConfirmed: true })
+  }
+
+  if (!checkpoint.createTx || !checkpoint.approveTx || !checkpoint.listingTx) {
+    throw new Error('The launch completed without a complete transaction record. Refresh and resume to recover it.')
+  }
   return {
     ...created,
-    createTx: createReceipt.transactionHash,
-    approveTx: approveReceipt.transactionHash,
-    listingTx: listingReceipt.transactionHash,
+    createTx: checkpoint.createTx,
+    approveTx: checkpoint.approveTx,
+    listingTx: checkpoint.listingTx,
   }
 }
 
-export async function depositToVault(config: ProtocolConfig, provider: WalletProvider, account: Address, agent: ChainAgent, amount: string): Promise<Hash[]> {
+export async function previewVaultDeposit(config: ProtocolConfig, agent: ChainAgent, amount: string): Promise<bigint> {
+  const assets = parseUnits(amount, agent.vault.assetDecimals)
+  if (assets <= 0n) throw new Error('Enter an amount greater than zero.')
+  return createProtocolClient(config).readContract({
+    address: agent.vault.address,
+    abi: vaultAbi,
+    functionName: 'previewDeposit',
+    args: [assets],
+  })
+}
+
+export async function depositToVault(
+  config: ProtocolConfig,
+  provider: WalletProvider,
+  account: Address,
+  agent: ChainAgent,
+  amount: string,
+  onProgress?: (message: string) => void,
+): Promise<Hash[]> {
   const client = createProtocolClient(config)
   const assets = parseUnits(amount, agent.vault.assetDecimals)
+  if (assets <= 0n) throw new Error('Enter an amount greater than zero.')
+  onProgress?.(`Approving ${agent.vault.assetSymbol} for the vault…`)
   const approve = await sendAndWait(provider, client, account, agent.vault.assetAddress, encodeFunctionData({
     abi: erc20Abi, functionName: 'approve', args: [agent.vault.address, assets],
   }))
+  onProgress?.(`Depositing ${agent.vault.assetSymbol} and minting vault shares…`)
   const deposit = await sendAndWait(provider, client, account, agent.vault.address, encodeFunctionData({
     abi: vaultAbi, functionName: 'deposit', args: [assets, account],
   }))
@@ -566,10 +665,12 @@ async function sendAndWait(
   to: Address,
   data: `0x${string}`,
   value?: bigint,
+  onSubmitted?: (hash: Hash) => void,
 ): Promise<TransactionReceipt> {
   const transaction: Record<string, string> = { from: account, to, data }
   if (value !== undefined) transaction.value = toHex(value)
   const hash = await provider.request({ method: 'eth_sendTransaction', params: [transaction] }) as Hash
+  onSubmitted?.(hash)
   const receiptClient = createPublicClient({
     chain: client.chain,
     transport: custom(provider, { retryCount: 1, retryDelay: 250 }),
@@ -587,6 +688,17 @@ async function sendAndWait(
     throw new Error(`Transaction ${hash.slice(0, 10)}… reverted onchain. No changes from this confirmation were applied.`)
   }
   return receipt
+}
+
+async function waitForSubmittedTransaction(client: PublicClient, hash: Hash): Promise<TransactionReceipt> {
+  try {
+    return await client.waitForTransactionReceipt({ hash, confirmations: 1, timeout: 20_000 })
+  } catch (reason) {
+    throw new Error(
+      `Transaction ${hash.slice(0, 10)}… is already submitted, but its confirmation is not readable yet. Check the receipt, then use Resume launch. No duplicate transaction was sent.`,
+      { cause: reason },
+    )
+  }
 }
 
 export function formatAsset(value: bigint, decimals: number, digits = 4): string {

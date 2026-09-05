@@ -105,7 +105,13 @@ const docsSections: DocsSection[] = [
   {
     number: '11',
     title: 'How to use the live loop',
-    body: 'Connect an EVM wallet on Robinhood Chain mainnet. Existing Muppets can be funded, allocated, traded and redeemed now. New launches unlock when the connected wallet holds 15,000 $MUPPETS. Choose a pet and task, set a Key supply and first floor, then deposit the task asset.',
+    body: 'Connect an EVM wallet on Robinhood Chain mainnet. New launches unlock when the connected wallet holds 15,000 $MUPPETS. Confirm vault and Key creation, Key approval, and the first ask. The post-launch command center then previews vault shares, funds the vault, shows keeper timing, and links to the public record and X sharing.',
+    details: [
+      'each submitted launch receipt is saved in this browser so Resume launch can continue at the first unfinished stage',
+      'recovery is scoped to this wallet, chain and factory and stores public transaction metadata only',
+      'expected shares come from the deployed ERC-4626 previewDeposit call before funding',
+      'the next keeper time is an estimate; policy can still act or hold',
+    ],
     visual: 'steps',
   },
   {
@@ -281,10 +287,10 @@ function KeyMarketVisual() {
 
 function LiveStepsVisual() {
   const steps = [
-    ['01', 'launch', 'pet + task + market'],
-    ['02', 'fund', 'USDG or WETH'],
-    ['03', 'run', 'policy checked'],
-    ['04', 'track', 'live chain reads'],
+    ['01', 'confirm', 'three saved receipts'],
+    ['02', 'fund', 'onchain share preview'],
+    ['03', 'keeper', 'policy acts or holds'],
+    ['04', 'share', 'public performance'],
   ]
 
   return (

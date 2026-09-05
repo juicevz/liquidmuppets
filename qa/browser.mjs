@@ -20,6 +20,66 @@ async function useKnownHandle(context) {
   await context.addInitScript(() => window.localStorage.setItem('liquidmuppets-handle', '@browserqa'))
 }
 
+async function loadLaunchCommandFixture() {
+  const [configResponse, performanceResponse] = await Promise.all([
+    fetch(`${baseUrl}/api/v1/contracts`, { cache: 'no-store' }),
+    fetch(`${baseUrl}/api/v1/agents/0/performance`, { cache: 'no-store' }),
+  ])
+  if (!configResponse.ok || !performanceResponse.ok) throw new Error('Could not load the live command-center fixture.')
+  const config = await configResponse.json()
+  const performance = await performanceResponse.json()
+  const wallet = performance.agent.creator
+  const sessionKey = `liquidmuppets-launch:${config.chainId}:${config.factory.toLowerCase()}:${wallet.toLowerCase()}`
+  return {
+    wallet,
+    sessionKey,
+    session: JSON.stringify({
+      version: 1,
+      chainId: config.chainId,
+      factory: config.factory,
+      wallet,
+      input: {
+        petId: performance.agent.pet_id,
+        taskId: performance.agent.task_id,
+        name: performance.agent.name,
+        keySymbol: performance.key_market.symbol ?? 'MFROG',
+        keySupply: Number(performance.key_market.supply_raw ?? 100),
+        listingQuantity: 20,
+        floorPriceEth: '0.001',
+      },
+      checkpoint: {
+        createTx: '0x50e08ead849fc119d1b7bb8eb7dc2bdb3bebee3930b5d6478a044bc1b496e367',
+        createConfirmed: true,
+        agentId: String(performance.agent.id),
+        vault: performance.agent.vault,
+        key: performance.agent.key,
+        approveTx: '0x6c39204fda0ec2f7d84e6a058568c00e3d649bb9437eaf30cba84b66095b0171',
+        approveConfirmed: true,
+        listingTx: '0xd340e3bf3f843470a712e9397edf5dc367b7e148a4f9f1f3f12e58d0fd73145b',
+        listingConfirmed: true,
+      },
+      updatedAt: new Date().toISOString(),
+    }),
+  }
+}
+
+async function useLaunchCommandFixture(context, fixture) {
+  await context.addInitScript(({ wallet, sessionKey, session }) => {
+    Object.defineProperty(window, 'ethereum', {
+      configurable: true,
+      value: {
+        request: async ({ method }) => {
+          if (method === 'eth_accounts' || method === 'eth_requestAccounts') return [wallet]
+          if (method === 'wallet_switchEthereumChain') return null
+          throw new Error(`Browser QA wallet does not implement ${method}`)
+        },
+      },
+    })
+    window.localStorage.setItem('liquidmuppets-handle', '@browserqa')
+    window.localStorage.setItem(sessionKey, session)
+  }, fixture)
+}
+
 async function revealLanding(page) {
   const items = page.locator('[data-reveal]')
   const count = await items.count()
@@ -45,6 +105,7 @@ await ultra.close()
 await ultraBrowser.close()
 
 const browser = await chromium.launch({ headless: true, args: ['--disable-gpu'] })
+const launchCommandFixture = await loadLaunchCommandFixture()
 const desktop = await browser.newContext({ viewport: { width: 1440, height: 980 } })
 await useKnownHandle(desktop)
 let page = await desktop.newPage()
@@ -205,6 +266,48 @@ results.launchTokenAddressLink = await muppetsContractLink.count() === 1
   && (await muppetsContractLink.getAttribute('href')) === `https://robinhoodchain.blockscout.com/address/${expectedMuppetsToken}`
 
 await page.close()
+const commandCenter = await browser.newContext({ viewport: { width: 1440, height: 980 } })
+await useLaunchCommandFixture(commandCenter, launchCommandFixture)
+const commandPage = await commandCenter.newPage()
+watch(commandPage, 'command-center')
+await commandPage.goto(`${baseUrl}/app/create`, { waitUntil: 'domcontentloaded' })
+await commandPage.getByRole('heading', { name: 'Muppet live. Put it to work.' }).waitFor({ timeout: 60_000 })
+results.commandCenterHeading = await commandPage.getByRole('heading', { name: 'Muppet live. Put it to work.' }).count() === 1
+results.commandReceiptStages = await commandPage.locator('.launch-stage').count()
+results.commandConfirmedStages = await commandPage.locator('.launch-stage.confirmed').count()
+await commandPage.locator('.command-fund-preview strong').first().waitFor({ timeout: 60_000 })
+await commandPage.waitForFunction(() => {
+  const value = document.querySelector('.command-fund-preview strong')?.textContent
+  return typeof value === 'string' && value.length > 0 && value !== 'reading onchain'
+}, undefined, { timeout: 30_000 })
+results.commandFundAction = await commandPage.getByRole('button', { name: /Fund vault now/i }).count() === 1
+results.commandSharePreview = !((await commandPage.locator('.command-fund-preview strong').first().innerText()).includes('unavailable'))
+results.commandKeeperTiming = await commandPage.getByText('next automatic check', { exact: true }).count() === 1
+results.commandPerformanceHref = await commandPage.getByRole('link', { name: /Open performance/i }).getAttribute('href')
+results.commandShareHref = await commandPage.getByRole('link', { name: /Share on X/i }).getAttribute('href')
+results.commandRecoveryDisclosure = await commandPage.getByText(/public transaction metadata only/i).count() === 1
+results.commandCenterOverflow = await commandPage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
+await commandPage.screenshot({ path: new URL('post-launch-command-center.png', screenshotDir).pathname, fullPage: true })
+await commandCenter.close()
+
+const partialSession = JSON.parse(launchCommandFixture.session)
+partialSession.checkpoint = {
+  createTx: partialSession.checkpoint.createTx,
+  createConfirmed: false,
+}
+const recovery = await browser.newContext({ viewport: { width: 1440, height: 980 } })
+await useLaunchCommandFixture(recovery, { ...launchCommandFixture, session: JSON.stringify(partialSession) })
+const recoveryPage = await recovery.newPage()
+watch(recoveryPage, 'launch-recovery')
+await recoveryPage.goto(`${baseUrl}/app/create`, { waitUntil: 'domcontentloaded' })
+await recoveryPage.getByRole('button', { name: /Resume launch/i }).waitFor({ timeout: 60_000 })
+results.launchRecoveryAction = await recoveryPage.getByRole('button', { name: /Resume launch/i }).count() === 1
+results.launchRecoverySubmitted = await recoveryPage.locator('.launch-stage.submitted').count()
+results.launchRecoveryWaiting = await recoveryPage.locator('.launch-stage.waiting').count()
+results.launchRecoveryCopy = await recoveryPage.getByText(/continues at the first unfinished confirmation/i).count() === 1
+await recoveryPage.screenshot({ path: new URL('launch-recovery.png', screenshotDir).pathname, fullPage: false })
+await recovery.close()
+
 page = await desktop.newPage()
 watch(page, 'market')
 await page.goto(`${baseUrl}/app`, { waitUntil: 'networkidle' })
@@ -372,6 +475,18 @@ await mobilePage.getByRole('heading', { name: 'range fox' }).waitFor({ timeout: 
 results.mobilePerformanceOverflow = await mobilePage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
 results.mobilePerformanceKeyVisible = await mobilePage.getByRole('heading', { name: 'Agent Key market' }).count() === 1
 await mobile.close()
+
+const mobileCommand = await mobileBrowser.newContext({ viewport: { width: 320, height: 720 } })
+await useLaunchCommandFixture(mobileCommand, launchCommandFixture)
+const mobileCommandPage = await mobileCommand.newPage()
+watch(mobileCommandPage, 'command-center-320px')
+await mobileCommandPage.goto(`${baseUrl}/app/create`, { waitUntil: 'domcontentloaded' })
+await mobileCommandPage.getByRole('heading', { name: 'Muppet live. Put it to work.' }).waitFor({ timeout: 60_000 })
+await mobileCommandPage.locator('.command-fund-preview').waitFor({ timeout: 60_000 })
+results.mobileCommandCenterOverflow = await mobileCommandPage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
+results.mobileCommandColumns = await mobileCommandPage.locator('.command-center-grid').evaluate((node) => getComputedStyle(node).gridTemplateColumns.split(' ').length)
+await mobileCommandPage.screenshot({ path: new URL('post-launch-command-center-320.png', screenshotDir).pathname, fullPage: true })
+await mobileCommand.close()
 await mobileBrowser.close()
 
 const narrowBrowser = await chromium.launch({ headless: true, args: ['--disable-gpu'] })
@@ -473,6 +588,20 @@ const failed =
   || !results.launchTokenGate
   || !results.launchGateConnect
   || !results.launchTokenAddressLink
+  || !results.commandCenterHeading
+  || results.commandReceiptStages !== 3
+  || results.commandConfirmedStages !== 3
+  || !results.commandFundAction
+  || !results.commandSharePreview
+  || !results.commandKeeperTiming
+  || results.commandPerformanceHref !== '/app/muppet/0'
+  || !results.commandShareHref?.startsWith('https://x.com/intent/post?')
+  || !results.commandRecoveryDisclosure
+  || results.commandCenterOverflow
+  || !results.launchRecoveryAction
+  || results.launchRecoverySubmitted !== 1
+  || results.launchRecoveryWaiting !== 2
+  || !results.launchRecoveryCopy
   || results.marketHeading !== 'Pet marketplace.'
   || !results.marketChainNumberRemoved
   || !results.listedPercent
@@ -521,6 +650,8 @@ const failed =
   || results.mobilePerformanceOverflow
   || !results.mobilePerformanceKeyVisible
   || !results.mobileNavVisible
+  || results.mobileCommandCenterOverflow
+  || results.mobileCommandColumns !== 1
   || results.narrowAppOverflow
   || results.narrowDocsOverflow
   || results.narrowPerformanceOverflow
