@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from threading import Lock
-from time import monotonic
+from time import monotonic, sleep
 from typing import Any, cast
 
 from web3 import Web3
@@ -12,6 +13,8 @@ from web3._utils.events import get_event_data
 
 from app.config import Settings
 from app.services.chain import FACTORY_ABI
+
+logger = logging.getLogger(__name__)
 
 
 def _event(name: str, inputs: list[tuple[str, str, bool]]) -> dict[str, Any]:
@@ -152,37 +155,83 @@ class ActivityService:
         self._lock = Lock()
         self._cache_at = 0.0
         self._cache: list[dict[str, object]] = []
-        self._cache_is_stale = False
+        self._last_success_at: float | None = None
+        self._last_refresh_failed = False
+        self._agents: list[AgentMeta] = []
+        self._block_timestamps: dict[int, datetime] = {}
+        self._token_symbols: dict[str, str] = {}
+
+    @property
+    def cache_status(self) -> str:
+        if self._last_success_at is None:
+            return "unavailable"
+        if not self._last_refresh_failed:
+            return "available"
+        age = monotonic() - self._last_success_at
+        return "cached" if age < max(1, self.settings.activity_stale_after_seconds) else "stale"
 
     @property
     def cache_is_stale(self) -> bool:
-        return self._cache_is_stale
+        return self.cache_status == "stale"
 
     def list_activity(self, limit: int = 40) -> list[dict[str, object]]:
         limit = max(1, min(limit, 200))
         with self._lock:
-            if monotonic() - self._cache_at > 20:
+            if self._refresh_due():
                 self._refresh_cache()
             return self._cache[:limit]
 
     def list_agent_activity(self, agent_id: int, limit: int = 100) -> list[dict[str, object]]:
         limit = max(1, min(limit, 200))
         with self._lock:
-            if monotonic() - self._cache_at > 20:
+            if self._refresh_due():
                 self._refresh_cache()
             return [row for row in self._cache if row.get("agent_id") == agent_id][:limit]
 
+    def _refresh_due(self) -> bool:
+        interval = (
+            self.settings.activity_retry_interval_seconds
+            if self._last_refresh_failed
+            else self.settings.activity_refresh_interval_seconds
+        )
+        return monotonic() - self._cache_at > max(1, interval)
+
     def _refresh_cache(self) -> None:
-        try:
-            rows = self._read_chain_activity()
-        except Exception:
-            if not self._cache:
-                raise
-            self._cache_is_stale = True
-        else:
-            self._cache = rows
-            self._cache_is_stale = False
+        started = monotonic()
+        last_error: Exception | None = None
+        for attempt, delay in enumerate((0.0, 0.35, 1.0)):
+            if delay:
+                sleep(delay)
+            try:
+                rows = self._read_chain_activity()
+            except Exception as error:
+                last_error = error
+                if attempt == 2 or not _retryable_rpc_error(error):
+                    break
+            else:
+                self._cache = rows
+                self._last_success_at = monotonic()
+                self._last_refresh_failed = False
+                self._cache_at = monotonic()
+                logger.info(
+                    "activity refresh completed rows=%s elapsed_seconds=%.2f",
+                    len(rows),
+                    monotonic() - started,
+                )
+                return
+
+        self._last_refresh_failed = True
         self._cache_at = monotonic()
+        status_code = _rpc_status_code(last_error)
+        logger.warning(
+            "activity refresh failed error_type=%s status_code=%s elapsed_seconds=%.2f cache_status=%s",
+            type(last_error).__name__ if last_error else "unknown",
+            status_code if status_code is not None else "unknown",
+            monotonic() - started,
+            self.cache_status,
+        )
+        if self._last_success_at is None and last_error is not None:
+            raise last_error
 
     def _read_chain_activity(self) -> list[dict[str, object]]:
         if not self.settings.factory_address or not self.settings.key_marketplace_address:
@@ -222,7 +271,6 @@ class ActivityService:
         listing_keys: dict[int, str] = {}
         offer_keys: dict[int, str] = {}
         decoded: list[dict[str, object]] = []
-        timestamps: dict[int, datetime] = {}
         for log in sorted(logs, key=lambda row: (int(row["blockNumber"]), int(row["logIndex"]))):
             if not log["topics"]:
                 continue
@@ -237,10 +285,10 @@ class ActivityService:
             elif name == "OfferCreated":
                 offer_keys[int(args["id"])] = str(args["key"]).lower()
             block_number = int(log["blockNumber"])
-            timestamp = timestamps.get(block_number)
+            timestamp = self._block_timestamps.get(block_number)
             if timestamp is None:
                 timestamp = datetime.fromtimestamp(int(self.web3.eth.get_block(block_number)["timestamp"]), UTC)
-                timestamps[block_number] = timestamp
+                self._block_timestamps[block_number] = timestamp
             item = self._activity_item(
                 name,
                 args,
@@ -264,9 +312,10 @@ class ActivityService:
         return list(reversed(decoded))
 
     def _load_agents(self, factory: Any) -> list[AgentMeta]:
-        agents: list[AgentMeta] = []
         count = int(factory.functions.agentCount().call())
-        for agent_id in range(count):
+        if len(self._agents) > count:
+            self._agents = []
+        for agent_id in range(len(self._agents), count):
             record = factory.functions.getAgent(agent_id).call()
             vault = Web3.to_checksum_address(record[1])
             key = Web3.to_checksum_address(record[2])
@@ -285,7 +334,7 @@ class ActivityService:
             asset = Web3.to_checksum_address(vault_contract.functions.asset().call())
             key_contract = self.web3.eth.contract(address=key, abi=ERC20_METADATA_ABI)
             asset_contract = self.web3.eth.contract(address=asset, abi=ERC20_METADATA_ABI)
-            agents.append(
+            self._agents.append(
                 AgentMeta(
                     agent_id=agent_id,
                     name=str(record[7]),
@@ -298,7 +347,7 @@ class ActivityService:
                     asset_decimals=int(asset_contract.functions.decimals().call()),
                 )
             )
-        return agents
+        return list(self._agents)
 
     def _activity_item(
         self,
@@ -374,8 +423,11 @@ class ActivityService:
             quantity = str(args["quantity"])
         elif event == "StockTokenPurchased":
             token = Web3.to_checksum_address(args["token"])
-            token_contract = self.web3.eth.contract(address=token, abi=ERC20_METADATA_ABI)
-            symbol = str(token_contract.functions.symbol().call())
+            symbol = self._token_symbols.get(token.lower())
+            if symbol is None:
+                token_contract = self.web3.eth.contract(address=token, abi=ERC20_METADATA_ABI)
+                symbol = str(token_contract.functions.symbol().call())
+                self._token_symbols[token.lower()] = symbol
             actor, action, direction = address, "reserve bought", "positive"
             value = _format_amount(int(args["tokenReceived"]), 18)
             value_symbol = symbol
@@ -404,3 +456,17 @@ def _format_amount(value: int, decimals: int) -> str:
 def _hex_hash(value: Any) -> str:
     rendered = value.hex()
     return rendered if rendered.startswith("0x") else f"0x{rendered}"
+
+
+def _rpc_status_code(error: Exception | None) -> int | None:
+    response = getattr(error, "response", None)
+    status_code = getattr(response, "status_code", None)
+    return status_code if isinstance(status_code, int) else None
+
+
+def _retryable_rpc_error(error: Exception) -> bool:
+    status_code = _rpc_status_code(error)
+    if status_code == 429 or (status_code is not None and status_code >= 500):
+        return True
+    error_name = type(error).__name__.lower()
+    return "timeout" in error_name or "connection" in error_name

@@ -14120,6 +14120,10 @@ button.header-social-link {
   color: #df9587;
 }
 
+.pulse-heading-state .source-cached {
+  color: #d5b86f;
+}
+
 .pulse-boundary-note {
   display: flex;
   align-items: flex-start;

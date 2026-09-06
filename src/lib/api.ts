@@ -286,7 +286,7 @@ export interface CreatorProfileResponse {
   profile_claimed_at: string | null
   tracking_started_at: string | null
   captured_at: string | null
-  activity_status: 'available' | 'stale' | 'unavailable'
+  activity_status: 'available' | 'cached' | 'stale' | 'unavailable'
   receipt_count: number | null
   asset_totals: CreatorAssetTotal[]
   agents: CreatorAgentRecord[]
@@ -327,7 +327,7 @@ export interface PulseResponse {
   explorer_url: string
   latest_chain_record_at: string | null
   limit: number
-  source_status: { chain: 'available' | 'stale' | 'unavailable'; keeper: 'available' }
+  source_status: { chain: 'available' | 'cached' | 'stale' | 'unavailable'; keeper: 'available' }
   items: PulseItem[]
 }
 

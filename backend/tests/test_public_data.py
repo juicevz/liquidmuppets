@@ -84,6 +84,7 @@ def test_creator_profile_groups_native_assets_and_deduplicates_receipts(tmp_path
             {"creator": CREATOR, "agent_id": 0, "tx_hash": TX_HASH},
             {"creator": CREATOR, "agent_id": 0, "tx_hash": TX_HASH},
         ]
+        activity.cache_status = "cached"
         app.state.public_data.activity = activity
 
         response = client.get(f"/api/v1/creators/{CREATOR}")
@@ -103,6 +104,7 @@ def test_creator_profile_groups_native_assets_and_deduplicates_receipts(tmp_path
     assert len(body["agents"]) == 3
     assert body["agents"][0]["receipt_count"] == 1
     assert body["receipt_count"] == 1
+    assert body["activity_status"] == "cached"
 
 
 def test_pulse_merges_keeper_reason_and_keeps_holds_without_receipts(tmp_path: Path) -> None:
@@ -132,6 +134,7 @@ def test_pulse_merges_keeper_reason_and_keeps_holds_without_receipts(tmp_path: P
             )
         )
         activity = MagicMock()
+        activity.cache_status = "available"
         activity.list_activity.return_value = [
             {
                 "id": f"{TX_HASH}-0",

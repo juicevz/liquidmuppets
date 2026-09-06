@@ -152,7 +152,7 @@ A claimed app handle is displayed as a wallet-signed label. It does not verify a
 - range actions, vault activity, Agent Key speculation and Stock Token reserve purchases remain separately labeled and filterable
 - creator filtering follows the Muppet creator, so deposits or keeper actions for that creator's vault remain on the creator record even when another wallet was the immediate actor
 
-The chain decoder keeps its last successful short-lived cache during a transient RPC error. Pulse exposes chain-source availability separately and can continue showing persisted keeper decisions while receipt decoding reconnects.
+The chain decoder refreshes at most once per minute during normal operation and caches immutable agent metadata, token symbols and event-block timestamps. Retryable RPC failures receive bounded retries. A recent successful snapshot is reported as `cached` without a page-level warning; it becomes `stale` after five minutes and remains visibly labeled until a refresh succeeds. Persisted keeper decisions remain available throughout.
 
 ## User flow
 

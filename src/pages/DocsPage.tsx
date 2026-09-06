@@ -155,6 +155,7 @@ const docsSections: DocsSection[] = [
       'keeper holds are visible with their reason and say that no transaction was signed',
       'vault, range, keeper, Agent Key and Stock Token records can be filtered without mixing their economics',
       'a creator profile uses the same feed filtered to Muppets launched by that wallet',
+      'brief RPC rate limits use a recent cache quietly; data older than five minutes is labeled stale',
     ],
   },
   {

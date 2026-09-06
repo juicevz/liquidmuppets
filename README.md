@@ -153,6 +153,8 @@ The profile shows a wallet-signed app handle when one exists. The handle proves 
 
 When a keeper transaction matches a decoded chain receipt, Pulse shows one event enriched with the keeper reason instead of duplicating it. A hold has no transaction link and says no transaction was signed. The endpoint supports `category`, `creator`, `agent_id`, and `limit` filters. Agent Key records remain visibly separate from vault performance, and Stock Token reserve activity remains its own category.
 
+The chain decoder refreshes at most once per minute during normal operation and caches immutable agent metadata, token symbols and event-block timestamps instead of rereading them on every visitor request. Rate limits and other retryable RPC failures get bounded retries. A recent successful snapshot is reported as `cached` without a page-level alert; it becomes `stale` after five minutes and remains visibly labeled until a refresh succeeds.
+
 ## Launch recovery and command center
 
 The launch flow records each submitted transaction hash before waiting for confirmation: vault and Key creation, Key approval, then the first ask. If the wallet rejects a later step, a transaction reverts, confirmation reading times out, or the page reloads, `/app/create` restores the matching browser-local record and offers `Resume launch`. Resume checks any existing receipt before it sends the first missing transaction, so it does not blindly create another Muppet or repeat a pending listing.

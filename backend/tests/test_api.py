@@ -1,4 +1,5 @@
 from pathlib import Path
+from time import monotonic
 from unittest.mock import MagicMock
 
 import httpx
@@ -113,13 +114,40 @@ def test_activity_api_filters_receipts_by_agent(tmp_path: Path) -> None:
     app.state.activity.list_agent_activity.assert_called_once_with(2, 100)
 
 
-def test_activity_uses_stale_receipts_during_a_transient_rpc_error(monkeypatch: MonkeyPatch) -> None:
-    service = ActivityService(Settings(rpc_url="https://rpc.invalid"))
+def test_activity_uses_recent_cache_during_a_transient_rpc_error(monkeypatch: MonkeyPatch) -> None:
+    service = ActivityService(Settings(rpc_url="https://rpc.invalid", activity_stale_after_seconds=300))
     service._cache = [{"agent_id": 1, "action": "deposited"}]
+    service._last_success_at = monotonic()
     monkeypatch.setattr(service, "_read_chain_activity", MagicMock(side_effect=RuntimeError("rate limited")))
 
     assert service.list_agent_activity(1) == [{"agent_id": 1, "action": "deposited"}]
+    assert service.cache_status == "cached"
+    assert service.cache_is_stale is False
+
+
+def test_activity_marks_an_old_cache_stale_after_a_refresh_error(monkeypatch: MonkeyPatch) -> None:
+    service = ActivityService(Settings(rpc_url="https://rpc.invalid", activity_stale_after_seconds=60))
+    service._cache = [{"agent_id": 1, "action": "deposited"}]
+    service._last_success_at = monotonic() - 61
+    monkeypatch.setattr(service, "_read_chain_activity", MagicMock(side_effect=RuntimeError("rate limited")))
+
+    assert service.list_agent_activity(1) == [{"agent_id": 1, "action": "deposited"}]
+    assert service.cache_status == "stale"
     assert service.cache_is_stale is True
+
+
+def test_activity_retries_a_rate_limit_and_recovers(monkeypatch: MonkeyPatch) -> None:
+    service = ActivityService(Settings(rpc_url="https://rpc.invalid"))
+    request = httpx.Request("POST", "https://rpc.invalid")
+    response = httpx.Response(429, request=request)
+    rate_limit = httpx.HTTPStatusError("rate limited", request=request, response=response)
+    read_chain = MagicMock(side_effect=[rate_limit, [{"agent_id": 1, "action": "deposited"}]])
+    monkeypatch.setattr(service, "_read_chain_activity", read_chain)
+    monkeypatch.setattr("app.services.activity.sleep", MagicMock())
+
+    assert service.list_agent_activity(1) == [{"agent_id": 1, "action": "deposited"}]
+    assert service.cache_status == "available"
+    assert read_chain.call_count == 2
 
 
 def test_public_rwa_keeper_trigger_is_disabled(tmp_path: Path) -> None:

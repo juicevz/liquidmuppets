@@ -37,8 +37,7 @@ class PublicDataService:
         receipt_hashes: dict[int, set[str]] = defaultdict(set)
         try:
             activity_rows = self.activity.list_activity(200)
-            if getattr(self.activity, "cache_is_stale", False) is True:
-                activity_status = "stale"
+            activity_status = _activity_cache_status(self.activity)
         except Exception:
             activity_status = "unavailable"
             activity_rows = []
@@ -127,8 +126,7 @@ class PublicDataService:
         chain_status = "available"
         try:
             chain_rows = self.activity.list_activity(200)
-            if getattr(self.activity, "cache_is_stale", False) is True:
-                chain_status = "stale"
+            chain_status = _activity_cache_status(self.activity)
         except Exception:
             chain_status = "unavailable"
             chain_rows = []
@@ -300,6 +298,11 @@ def _timestamp_key(value: object) -> datetime:
         return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
     except ValueError:
         return datetime.min.replace(tzinfo=UTC)
+
+
+def _activity_cache_status(activity: ActivityService) -> str:
+    status = getattr(activity, "cache_status", "available")
+    return status if isinstance(status, str) and status in {"available", "cached", "stale"} else "available"
 
 
 def _category_for_action(action: str) -> str:

@@ -59,7 +59,7 @@ export function SystemPulsePage() {
           <p>Deposits, withdrawals, allocations, keeper decisions, range changes, Agent Key trades, and Stock Token purchases in one readable feed.</p>
         </div>
         <div className="pulse-heading-state">
-          <span><small>chain decoder</small><strong className={pulse?.source_status.chain !== 'available' ? 'source-down' : ''}>{pulse?.source_status.chain ?? 'reading'}</strong></span>
+          <span><small>chain decoder</small><strong className={pulse?.source_status.chain === 'cached' ? 'source-cached' : pulse?.source_status.chain !== 'available' ? 'source-down' : ''}>{pulse?.source_status.chain ?? 'reading'}</strong></span>
           <span><small>keeper record</small><strong>{pulse?.source_status.keeper ?? 'reading'}</strong></span>
           <span><small>latest chain record</small><strong>{pulse?.latest_chain_record_at ? timeAgo(pulse.latest_chain_record_at) : 'none yet'}</strong></span>
         </div>
@@ -83,8 +83,8 @@ export function SystemPulsePage() {
       </div>
 
       {error && <div className="pulse-error" role="alert"><Icon name="alert" />{error}</div>}
-      {pulse?.source_status.chain !== 'available' && (
-        <div className="pulse-error" role="status"><Icon name="alert" />{pulse?.source_status.chain === 'stale' ? 'Chain receipt refresh failed. The last successful receipt cache remains visible.' : 'Chain receipts are reconnecting. Recorded keeper decisions remain visible.'}</div>
+      {(pulse?.source_status.chain === 'stale' || pulse?.source_status.chain === 'unavailable') && (
+        <div className="pulse-error" role="status"><Icon name="alert" />{pulse.source_status.chain === 'stale' ? 'Chain receipts are delayed. The last successful cache remains visible.' : 'Chain receipts are reconnecting. Recorded keeper decisions remain visible.'}</div>
       )}
 
       <section className="pulse-ledger" aria-labelledby="pulse-ledger-title">

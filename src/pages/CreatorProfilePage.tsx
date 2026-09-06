@@ -143,7 +143,7 @@ export function CreatorProfilePage({ creatorAddress }: CreatorProfilePageProps) 
 
         <aside className="creator-pulse-preview">
           <header><div><small>creator-filtered</small><h2>System Pulse</h2></div><a href="/app/pulse">all records <Icon name="arrow" /></a></header>
-          {pulse?.source_status.chain !== 'available' && <p className="creator-pulse-warning">{pulse?.source_status.chain === 'stale' ? 'Showing the last successful chain receipt cache.' : 'Chain receipts are reconnecting. Keeper records may still appear.'}</p>}
+          {(pulse?.source_status.chain === 'stale' || pulse?.source_status.chain === 'unavailable') && <p className="creator-pulse-warning">{pulse.source_status.chain === 'stale' ? 'Showing a delayed chain receipt cache.' : 'Chain receipts are reconnecting. Keeper records may still appear.'}</p>}
           <SystemPulse items={pulse?.items.slice(0, 2) ?? []} explorerUrl={profile.explorer_url} compact />
         </aside>
       </div>
@@ -171,7 +171,7 @@ function CreatorAgentRow({ record, activityStatus }: { record: CreatorAgentRecor
       <div><small>adjusted change</small><strong className={tone(record.current.flow_adjusted_change_bps)}>{formatBasisPoints(record.current.flow_adjusted_change_bps)}</strong></div>
       <div><small>deployed</small><strong>{formatDeployedPercent(record.current.deployed_assets_raw, record.current.total_assets_raw)}</strong></div>
       <div><small>market</small><strong className={`health-${record.market.health.status}`}>{record.market.health.status}</strong></div>
-      <div><small>evidence</small><strong>{record.checkpoint_count} checkpoints · {activityStatus === 'unavailable' ? 'receipts reconnecting' : `${record.receipt_count} ${activityStatus === 'stale' ? 'cached ' : ''}receipts`}</strong></div>
+      <div><small>evidence</small><strong>{record.checkpoint_count} checkpoints · {activityStatus === 'unavailable' ? 'receipts reconnecting' : `${record.receipt_count} ${(activityStatus === 'cached' || activityStatus === 'stale') ? 'cached ' : ''}receipts`}</strong></div>
       <a href={performancePath(record.agent.id)}>full performance <Icon name="arrow" /></a>
     </article>
   )

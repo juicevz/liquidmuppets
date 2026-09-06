@@ -49,6 +49,9 @@ class Settings:
     auto_keeper_enabled: bool = _bool("AUTO_KEEPER_ENABLED", False)
     auto_keeper_interval_seconds: int = int(getenv("AUTO_KEEPER_INTERVAL_SECONDS", "60"))
     performance_checkpoint_interval_seconds: int = int(getenv("PERFORMANCE_CHECKPOINT_INTERVAL_SECONDS", "300"))
+    activity_refresh_interval_seconds: int = int(getenv("ACTIVITY_REFRESH_INTERVAL_SECONDS", "60"))
+    activity_retry_interval_seconds: int = int(getenv("ACTIVITY_RETRY_INTERVAL_SECONDS", "15"))
+    activity_stale_after_seconds: int = int(getenv("ACTIVITY_STALE_AFTER_SECONDS", "300"))
     database_path: Path = Path(getenv("DATABASE_PATH", "/tmp/liquidmuppets.sqlite3"))
     cors_origins: tuple[str, ...] = tuple(
         origin.strip()

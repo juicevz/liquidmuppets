@@ -195,7 +195,7 @@ class PulseItem(BaseModel):
 
 
 class PulseSourceStatus(BaseModel):
-    chain: Literal["available", "stale", "unavailable"]
+    chain: Literal["available", "cached", "stale", "unavailable"]
     keeper: Literal["available"]
 
 
@@ -226,7 +226,7 @@ class CreatorProfileResponse(BaseModel):
     profile_claimed_at: datetime | None
     tracking_started_at: datetime | None
     captured_at: datetime | None
-    activity_status: Literal["available", "stale", "unavailable"]
+    activity_status: Literal["available", "cached", "stale", "unavailable"]
     receipt_count: int | None
     asset_totals: list[CreatorAssetTotal]
     agents: list[dict[str, Any]]
