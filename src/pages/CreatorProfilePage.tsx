@@ -144,7 +144,7 @@ export function CreatorProfilePage({ creatorAddress }: CreatorProfilePageProps) 
         <aside className="creator-pulse-preview">
           <header><div><small>creator-filtered</small><h2>System Pulse</h2></div><a href="/app/pulse">all records <Icon name="arrow" /></a></header>
           {pulse?.source_status.chain !== 'available' && <p className="creator-pulse-warning">{pulse?.source_status.chain === 'stale' ? 'Showing the last successful chain receipt cache.' : 'Chain receipts are reconnecting. Keeper records may still appear.'}</p>}
-          <SystemPulse items={pulse?.items.slice(0, 10) ?? []} explorerUrl={profile.explorer_url} compact />
+          <SystemPulse items={pulse?.items.slice(0, 4) ?? []} explorerUrl={profile.explorer_url} compact />
         </aside>
       </div>
 
