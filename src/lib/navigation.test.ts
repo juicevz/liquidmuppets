@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { pathForView, performanceAgentIdFromPath, performancePath, viewFromPath } from './navigation'
+import {
+  creatorAddressFromPath,
+  creatorPath,
+  pathForView,
+  performanceAgentIdFromPath,
+  performancePath,
+  viewFromPath,
+} from './navigation'
 
 describe('viewFromPath', () => {
   it('maps every public concept route', () => {
@@ -9,6 +16,8 @@ describe('viewFromPath', () => {
     expect(viewFromPath('/app/portfolio')).toBe('portfolio')
     expect(viewFromPath('/app/create')).toBe('create')
     expect(viewFromPath('/app/muppet/42')).toBe('performance')
+    expect(viewFromPath('/app/creator/0x1111111111111111111111111111111111111111')).toBe('creator')
+    expect(viewFromPath('/app/pulse')).toBe('pulse')
     expect(viewFromPath('/docs')).toBe('docs')
   })
 
@@ -27,5 +36,13 @@ describe('viewFromPath', () => {
     expect(performanceAgentIdFromPath('/app/muppet/7')).toBe(7)
     expect(performanceAgentIdFromPath('/app/muppet/7/')).toBe(7)
     expect(performanceAgentIdFromPath('/app/muppet/nope')).toBeNull()
+  })
+
+  it('builds and parses public creator paths', () => {
+    const wallet = '0x1111111111111111111111111111111111111111'
+    expect(creatorPath(wallet)).toBe(`/app/creator/${wallet}`)
+    expect(creatorAddressFromPath(`/app/creator/${wallet}`)).toBe(wallet)
+    expect(creatorAddressFromPath(`/app/creator/${wallet}/`)).toBe(wallet)
+    expect(creatorAddressFromPath('/app/creator/not-a-wallet')).toBeNull()
   })
 })

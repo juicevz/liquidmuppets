@@ -22,6 +22,8 @@ Current status: controlled mainnet beta. Existing Muppets can be funded, allocat
 - public activity built from contract logs
 - a shareable public performance URL for every Muppet, backed by five minute checkpoints
 - a performance marketplace with health, tracked change, deployment, oracle and keeper evidence plus two-Muppet comparison
+- a shareable creator profile for every wallet, with Muppets, per-asset vault totals, performance evidence and receipts
+- System Pulse, a unified public feed for decoded receipts and recorded keeper actions or holds
 - a post-launch command center with vault funding, an onchain share preview, keeper timing, performance link and X sharing
 - browser-local recovery for the three launch transactions, keyed to the connected wallet, chain and factory
 - optional app handles claimed with a wallet signature and no gas
@@ -138,6 +140,19 @@ The marketplace reads a lightweight recorded summary for every Muppet and shows 
 
 `GET /api/v1/marketplace/performance` serves the last successful summaries from SQLite, so a slow upstream RPC cannot blank the marketplace. The five minute recorder refreshes each summary from an exact checkpoint and current adapter evidence. The payload exposes both checkpoint capture time and market observation time; a failed refresh leaves the older timestamp visible rather than presenting stale evidence as fresh.
 
+## Public creator profiles and System Pulse
+
+Every wallet has a public creator route at `/app/creator/{wallet}`. The corresponding `GET /api/v1/creators/{wallet}` response lists every recorded Muppet launched by that address, its checkpoint count, performance summary, receipt count and separate Agent Key market. Vault totals are grouped by contract asset and decimals. USDG, WETH and any future assets are never summed into a fabricated portfolio value.
+
+The profile shows a wallet-signed app handle when one exists. The handle proves control of that wallet only. A profile with no claimed handle remains address-native, and a wallet with no recorded Muppets returns an honest empty profile rather than a generated history.
+
+`GET /api/v1/pulse` merges two evidence sources into one reverse-chronological record:
+
+- decoded mainnet events for launches, deposits, withdrawals, allocations, recalls, range actions, Agent Key orders and fills, binding, and Stock Token purchases
+- SQLite keeper decisions, including actions and holds with the policy reason that produced each decision
+
+When a keeper transaction matches a decoded chain receipt, Pulse shows one event enriched with the keeper reason instead of duplicating it. A hold has no transaction link and says no transaction was signed. The endpoint supports `category`, `creator`, `agent_id`, and `limit` filters. Agent Key records remain visibly separate from vault performance, and Stock Token reserve activity remains its own category.
+
 ## Launch recovery and command center
 
 The launch flow records each submitted transaction hash before waiting for confirmation: vault and Key creation, Key approval, then the first ask. If the wallet rejects a later step, a transaction reverts, confirmation reading times out, or the page reloads, `/app/create` restores the matching browser-local record and offers `Resume launch`. Resume checks any existing receipt before it sends the first missing transaction, so it does not blindly create another Muppet or repeat a pending listing.
@@ -230,7 +245,7 @@ forge script script/DeployMainnet.s.sol:DeployMainnet --rpc-url https://rpc.main
 forge script script/DeployMainnet.s.sol:DeployMainnet --rpc-url https://rpc.mainnet.chain.robinhood.com --broadcast -vvv
 ```
 
-The frontend uses atomic release directories under `/var/www/liquidmuppets/releases/` with `/var/www/liquidmuppets/current` as the active symlink. The API runs as the unprivileged `liquidmuppets` user from `/opt/liquidmuppets-api/current`, reads public runtime values from `/etc/liquidmuppets/api.env` and `/etc/liquidmuppets/runtime-public.env`, reads the keeper secret only from mode-0600 `/etc/liquidmuppets/keeper.env`, and writes profiles, keeper decisions, performance checkpoints, and marketplace performance summaries to SQLite under `/var/lib/liquidmuppets`.
+The frontend uses atomic release directories under `/var/www/liquidmuppets/releases/` with `/var/www/liquidmuppets/current` as the active symlink. The API runs as the unprivileged `liquidmuppets` user from `/opt/liquidmuppets-api/current`, reads public runtime values from `/etc/liquidmuppets/api.env` and `/etc/liquidmuppets/runtime-public.env`, reads the keeper secret only from mode-0600 `/etc/liquidmuppets/keeper.env`, and writes profiles, keeper decisions, performance checkpoints, and marketplace performance summaries to SQLite under `/var/lib/liquidmuppets`. Creator profiles and Pulse are read models over those persisted records plus decoded chain events.
 
 ## API
 
@@ -243,6 +258,8 @@ The frontend uses atomic release directories under `/var/www/liquidmuppets/relea
 - `GET /api/v1/activity` with optional `agent_id` and `limit` filters
 - `GET /api/v1/marketplace/performance`
 - `GET /api/v1/agents/{agentId}/performance`
+- `GET /api/v1/creators/{wallet}`
+- `GET /api/v1/pulse` with optional `category`, `creator`, `agent_id`, and `limit` filters
 - `POST /api/v1/profiles/challenge`
 - `POST /api/v1/profiles/claim`
 - `GET /api/v1/profiles/{wallet}`

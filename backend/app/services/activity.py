@@ -135,6 +135,7 @@ ERC20_METADATA_ABI = [
 class AgentMeta:
     agent_id: int
     name: str
+    creator: str
     task_id: int
     vault: str
     key: str
@@ -151,6 +152,11 @@ class ActivityService:
         self._lock = Lock()
         self._cache_at = 0.0
         self._cache: list[dict[str, object]] = []
+        self._cache_is_stale = False
+
+    @property
+    def cache_is_stale(self) -> bool:
+        return self._cache_is_stale
 
     def list_activity(self, limit: int = 40) -> list[dict[str, object]]:
         limit = max(1, min(limit, 200))
@@ -172,8 +178,10 @@ class ActivityService:
         except Exception:
             if not self._cache:
                 raise
+            self._cache_is_stale = True
         else:
             self._cache = rows
+            self._cache_is_stale = False
         self._cache_at = monotonic()
 
     def _read_chain_activity(self) -> list[dict[str, object]]:
@@ -281,6 +289,7 @@ class ActivityService:
                 AgentMeta(
                     agent_id=agent_id,
                     name=str(record[7]),
+                    creator=Web3.to_checksum_address(record[0]),
                     task_id=int(record[4]),
                     vault=vault,
                     key=key,
@@ -375,6 +384,7 @@ class ActivityService:
         return {
             "action": action,
             "actor": Web3.to_checksum_address(actor),
+            "creator": agent.creator if agent else None,
             "agent_id": agent.agent_id if agent else None,
             "agent_name": agent.name if agent else None,
             "key_symbol": agent.key_symbol if agent else None,

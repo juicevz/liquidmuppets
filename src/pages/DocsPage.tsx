@@ -136,6 +136,29 @@ const docsSections: DocsSection[] = [
   },
   {
     number: '14',
+    title: 'Public creator profiles',
+    body: 'Every creator wallet has a shareable /app/creator/{wallet} page. It groups all Muppets launched by that wallet, their recorded vault evidence and transaction receipts. Combined capital remains grouped by native asset, so USDG and WETH are never added into one number.',
+    details: [
+      'a wallet-signed app handle appears when one has been claimed; otherwise the exact wallet remains the identity',
+      'each Muppet links to its own performance page and keeps its original tracking start',
+      'Agent Key markets sit below a separate speculative-market boundary and never enter vault totals',
+      'new history begins with recorded checkpoints; no earlier APY or performance is invented',
+    ],
+  },
+  {
+    number: '15',
+    title: 'System Pulse',
+    body: 'System Pulse combines decoded transaction events and recorded keeper decisions into one reverse-chronological public feed. It covers launches, deposits, withdrawals, allocations, recalls, range changes, Key orders and fills, bindings, keeper actions and holds, and Stock Token reserve purchases.',
+    details: [
+      'chain events link to the exact transaction receipt and block',
+      'keeper actions inherit the recorded policy reason when a matching receipt exists',
+      'keeper holds are visible with their reason and say that no transaction was signed',
+      'vault, range, keeper, Agent Key and Stock Token records can be filtered without mixing their economics',
+      'a creator profile uses the same feed filtered to Muppets launched by that wallet',
+    ],
+  },
+  {
+    number: '16',
     title: 'Current boundary',
     body: 'The mainnet contracts use real USDG, WETH, Morpho, Uniswap and EZManager. Local and fork tests cover the adapters, full redemption and atomic recentering, but the contracts are not independently audited. Caps limit exposure and do not remove protocol, oracle, liquidity, LP or stablecoin risk.',
     details: [
@@ -327,7 +350,7 @@ export function DocsPage() {
       <header className="docs-heading">
         <p>LIQUIDMUPPETS / DOCUMENTATION</p>
         <h1>Everything about LIQUIDMUPPETS.</h1>
-        <span>The money path, public performance record, Stock Token reserve, $MUPPETS launch gate, Key market and onchain limits.</span>
+        <span>The money path, public performance and creator records, System Pulse, Stock Token reserve, $MUPPETS launch gate, Key market and onchain limits.</span>
       </header>
 
       <div className="docs-layout">

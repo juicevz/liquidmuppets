@@ -486,6 +486,7 @@ class PerformanceService:
                     },
                     "tracking_started_at": raw_history[0]["block_timestamp"],
                     "captured_at": raw_history[-1]["captured_at"],
+                    "checkpoint_count": len(raw_history),
                     "asset": {
                         "address": snapshot.asset,
                         "symbol": snapshot.asset_symbol,
@@ -974,6 +975,7 @@ def _marketplace_payload(
         "agent": response["agent"],
         "tracking_started_at": response["tracking_started_at"],
         "captured_at": response["captured_at"],
+        "checkpoint_count": response.get("checkpoint_count", 0),
         "market_observed_at": market_observed_at,
         "market_refresh_failed_at": None,
         "asset": response["asset"],
@@ -981,6 +983,20 @@ def _marketplace_payload(
         "change_method": response["change_method"],
         "market": response["market"],
         "keeper": response["keeper"],
+        "key_market": response.get(
+            "key_market",
+            {
+                "status": "unavailable",
+                "detail": "Agent Key market record is not available yet.",
+                "symbol": None,
+                "supply_raw": None,
+                "total_bound_raw": None,
+                "listed_raw": None,
+                "floor_wei": None,
+                "top_bid_wei": None,
+                "fee_bps": None,
+            },
+        ),
     }
     if _market_status(payload) == "unavailable" and previous is not None and _market_status(previous) != "unavailable":
         payload["market"] = previous["market"]

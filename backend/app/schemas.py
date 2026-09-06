@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -155,6 +155,7 @@ class ActivityItem(BaseModel):
     timestamp: datetime
     action: str
     actor: str
+    creator: str | None = None
     handle: str | None
     agent_id: int | None = None
     agent_name: str | None = None
@@ -163,3 +164,69 @@ class ActivityItem(BaseModel):
     value: str | None = None
     value_symbol: str | None = None
     direction: ActivityDirection
+
+
+PulseCategory = Literal["muppet", "vault", "keeper", "range", "keys", "reserve"]
+PulseSource = Literal["chain", "keeper"]
+
+
+class PulseItem(BaseModel):
+    id: str
+    source: PulseSource
+    category: PulseCategory
+    facets: list[PulseCategory]
+    timestamp: datetime
+    action: str
+    actor: str | None = None
+    actor_handle: str | None = None
+    creator: str | None = None
+    creator_handle: str | None = None
+    agent_id: int | None = None
+    agent_name: str | None = None
+    key_symbol: str | None = None
+    quantity: str | None = None
+    value: str | None = None
+    value_symbol: str | None = None
+    direction: ActivityDirection
+    reason: str | None = None
+    status: str | None = None
+    tx_hash: str | None = None
+    block_number: int | None = None
+
+
+class PulseSourceStatus(BaseModel):
+    chain: Literal["available", "stale", "unavailable"]
+    keeper: Literal["available"]
+
+
+class PulseResponse(BaseModel):
+    generated_at: datetime
+    explorer_url: str
+    latest_chain_record_at: datetime | None
+    limit: int
+    source_status: PulseSourceStatus
+    items: list[PulseItem]
+
+
+class CreatorAssetTotal(BaseModel):
+    address: str
+    symbol: str
+    decimals: int
+    agent_count: int
+    total_assets_raw: str
+    deployed_assets_raw: str
+    idle_assets_raw: str
+
+
+class CreatorProfileResponse(BaseModel):
+    generated_at: datetime
+    explorer_url: str
+    wallet: str
+    handle: str | None
+    profile_claimed_at: datetime | None
+    tracking_started_at: datetime | None
+    captured_at: datetime | None
+    activity_status: Literal["available", "stale", "unavailable"]
+    receipt_count: int | None
+    asset_totals: list[CreatorAssetTotal]
+    agents: list[dict[str, Any]]

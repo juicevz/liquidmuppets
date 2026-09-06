@@ -119,6 +119,7 @@ def test_activity_uses_stale_receipts_during_a_transient_rpc_error(monkeypatch: 
     monkeypatch.setattr(service, "_read_chain_activity", MagicMock(side_effect=RuntimeError("rate limited")))
 
     assert service.list_agent_activity(1) == [{"agent_id": 1, "action": "deposited"}]
+    assert service.cache_is_stale is True
 
 
 def test_public_rwa_keeper_trigger_is_disabled(tmp_path: Path) -> None:

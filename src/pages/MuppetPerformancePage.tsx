@@ -11,6 +11,7 @@ import {
   type PerformanceCheckpoint,
 } from '../lib/api'
 import { formatEthValue } from '../lib/protocol'
+import { creatorPath } from '../lib/navigation'
 
 interface MuppetPerformancePageProps {
   agentId: number | null
@@ -118,6 +119,9 @@ export function MuppetPerformancePage({ agentId }: MuppetPerformancePageProps) {
             <p>{performance.agent.task_label} · Muppet #{performance.agent.id}</p>
             <a href={`${explorerUrl}/address/${performance.agent.vault}`} target="_blank" rel="noreferrer">
               vault {short(performance.agent.vault)} <Icon name="arrow" />
+            </a>
+            <a href={creatorPath(performance.agent.creator)}>
+              creator {short(performance.agent.creator)} <Icon name="arrow" />
             </a>
           </div>
         </div>

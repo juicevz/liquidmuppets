@@ -4,6 +4,7 @@ import type { View } from '../types'
 import { shortenAddress } from '../lib/format'
 import { connectWallet, getConnectedWallet } from '../lib/wallet'
 import { claimWalletProfile, createProfileChallenge, fetchWalletProfile } from '../lib/api'
+import { creatorPath } from '../lib/navigation'
 import { getInjectedProvider } from '../lib/protocol'
 import { Brand } from './Brand'
 import { HandleModal } from './HandleModal'
@@ -14,10 +15,13 @@ import { DocsPage } from '../pages/DocsPage'
 import { MarketplacePage } from '../pages/MarketplacePage'
 import { MuppetPerformancePage } from '../pages/MuppetPerformancePage'
 import { PortfolioPage } from '../pages/PortfolioPage'
+import { CreatorProfilePage } from '../pages/CreatorProfilePage'
+import { SystemPulsePage } from '../pages/SystemPulsePage'
 
 interface AppShellProps {
   view: Exclude<View, 'landing'>
   performanceAgentId: number | null
+  creatorAddress: string | null
   onNavigate: (view: View) => void
 }
 
@@ -28,7 +32,7 @@ type WalletState =
   | { status: 'missing' }
   | { status: 'error'; message: string }
 
-export function AppShell({ view, performanceAgentId, onNavigate }: AppShellProps) {
+export function AppShell({ view, performanceAgentId, creatorAddress, onNavigate }: AppShellProps) {
   const [wallet, setWallet] = useState<WalletState>({ status: 'idle' })
   const [handle, setHandle] = useState<string | null>(null)
   const [showHandle, setShowHandle] = useState(false)
@@ -99,8 +103,11 @@ export function AppShell({ view, performanceAgentId, onNavigate }: AppShellProps
           <Brand />
         </button>
         <nav className="app-nav" aria-label="App navigation">
-          <button className={view === 'marketplace' || view === 'performance' ? 'active' : ''} onClick={() => onNavigate('marketplace')} type="button">
+          <button className={view === 'marketplace' || view === 'performance' || view === 'creator' ? 'active' : ''} onClick={() => onNavigate('marketplace')} type="button">
             Marketplace
+          </button>
+          <button className={view === 'pulse' ? 'active' : ''} onClick={() => onNavigate('pulse')} type="button">
+            Pulse
           </button>
           <button className={view === 'portfolio' ? 'active' : ''} onClick={() => onNavigate('portfolio')} type="button">
             Portfolio
@@ -114,11 +121,9 @@ export function AppShell({ view, performanceAgentId, onNavigate }: AppShellProps
         </nav>
         <div className="app-header-actions">
           <HeaderSocialLinks />
-          {wallet.status === 'connected' && (
-            <button type="button" className="header-handle" onClick={() => setShowHandle(true)}>
-              {handle ?? '@ set handle'}
-            </button>
-          )}
+          {wallet.status === 'connected' && (handle
+            ? <a className="header-handle" href={creatorPath(wallet.address)}>{handle}</a>
+            : <button type="button" className="header-handle" onClick={() => setShowHandle(true)}>@ set handle</button>)}
           <button type="button" className="wallet-button" onClick={requestWallet} disabled={wallet.status === 'connecting'}>
             <Icon name="wallet" />
             {wallet.status === 'connected'
@@ -147,10 +152,13 @@ export function AppShell({ view, performanceAgentId, onNavigate }: AppShellProps
         {view === 'create' && <CreateAgentPage creatorHandle={handle ?? '@unclaimed'} walletAddress={wallet.status === 'connected' ? wallet.address : undefined} onConnect={requestWallet} />}
         {view === 'docs' && <DocsPage />}
         {view === 'performance' && <MuppetPerformancePage agentId={performanceAgentId} />}
+        {view === 'creator' && <CreatorProfilePage creatorAddress={creatorAddress} />}
+        {view === 'pulse' && <SystemPulsePage />}
       </main>
 
       <nav className="mobile-app-nav" aria-label="Mobile app navigation">
-        <button type="button" className={view === 'marketplace' || view === 'performance' ? 'active' : ''} onClick={() => onNavigate('marketplace')}>Market</button>
+        <button type="button" className={view === 'marketplace' || view === 'performance' || view === 'creator' ? 'active' : ''} onClick={() => onNavigate('marketplace')}>Market</button>
+        <button type="button" className={view === 'pulse' ? 'active' : ''} onClick={() => onNavigate('pulse')}>Pulse</button>
         <button type="button" className={view === 'portfolio' ? 'active' : ''} onClick={() => onNavigate('portfolio')}>Portfolio</button>
         <button type="button" className={view === 'create' ? 'active' : ''} onClick={() => onNavigate('create')}>Launch</button>
         <button type="button" className={view === 'docs' ? 'active' : ''} onClick={() => onNavigate('docs')}>Docs</button>

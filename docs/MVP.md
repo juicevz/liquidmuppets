@@ -13,7 +13,7 @@ A qualifying creator chooses one of seven cosmetic pets, assigns one of three en
 
 - gated feature: launching a new Muppet through `/app/create`
 - minimum balance: `15,000 $MUPPETS`
-- public without the token: landing, docs, marketplace, activity, agent detail and portfolio reads
+- public without the token: landing, docs, marketplace, activity, Muppet performance, creator profiles, System Pulse and portfolio reads
 - balance verification: FastAPI reads `balanceOf(wallet)` from Robinhood Chain; the browser checks again before sending the first transaction
 - token address: `0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189`
 
@@ -134,9 +134,29 @@ A visitor can select up to two Muppets for a side-by-side comparison. Both colum
 
 `GET /api/v1/marketplace/performance` reads the last successful summaries from SQLite rather than performing a large set of RPC calls during a page request. The five minute checkpoint loop refreshes those rows. Each summary includes separate checkpoint and market-observation timestamps, and a failed refresh preserves the previous timestamp so freshness remains inspectable.
 
+### Public creator profiles
+
+Every creator wallet has a shareable route at `/app/creator/{wallet}` backed by `GET /api/v1/creators/{wallet}`. It lists every Muppet in the recorded marketplace summaries whose factory creator matches that wallet. Each row retains its native asset, checkpoint start, flow-adjusted change, deployed share, market health, checkpoint count and decoded transaction-receipt count.
+
+Capital is aggregated only inside an exact asset address, symbol and decimals group. Different assets are never converted or summed. Agent Key state is returned with each Muppet but rendered in a separate speculative-market section because Key prices do not enter vault accounting.
+
+A claimed app handle is displayed as a wallet-signed label. It does not verify an external social account. A wallet without a handle or launched Muppet still has a valid public address page with an honest empty state.
+
+### System Pulse
+
+`/app/pulse` is backed by `GET /api/v1/pulse`. The service merges decoded chain activity with keeper-run records, sorts them by exact UTC timestamp and exposes filters for category, creator, Muppet and result limit.
+
+- a decoded chain event keeps its transaction hash and block number
+- a keeper action with the same transaction hash enriches that chain event with the recorded reason and status instead of creating a duplicate
+- a keeper hold remains a decision-only record with its reason and no transaction receipt
+- range actions, vault activity, Agent Key speculation and Stock Token reserve purchases remain separately labeled and filterable
+- creator filtering follows the Muppet creator, so deposits or keeper actions for that creator's vault remain on the creator record even when another wallet was the immediate actor
+
+The chain decoder keeps its last successful short-lived cache during a transient RPC error. Pulse exposes chain-source availability separately and can continue showing persisted keeper decisions while receipt decoding reconnects.
+
 ## User flow
 
-1. Browse agents, markets and documentation without connecting a wallet or holding `$MUPPETS`.
+1. Browse agents, markets, public creator profiles, System Pulse and documentation without connecting a wallet or holding `$MUPPETS`.
 2. Connect an EVM wallet on Robinhood Chain mainnet.
 3. Hold at least `15,000 $MUPPETS` to unlock agent launch through the app.
 4. Pick any of the seven pet appearances.
@@ -172,7 +192,7 @@ If creation, approval or listing is interrupted, `Resume launch` first checks an
 
 An Agent Key is not a vault share, debt claim, promised return, or permission to bypass policy. Key price never enters vault accounting.
 
-## Public marketplace tape
+## Public marketplace tape and System Pulse
 
 The main marketplace includes a public activity rail sourced from contract logs starting at deployment block `52653314`. It shows the signed app handle when one exists and otherwise shows the shortened wallet.
 
@@ -186,6 +206,8 @@ Tracked actions include:
 - permanent Key binding
 
 Positive flows such as buys, deposits, launches, and allocations use green values. Negative flows such as sells, withdrawals, and recalls use red values. Unfilled asks and bids remain neutral. Every row links to its transaction receipt.
+
+The compact marketplace rail remains chain-event only. System Pulse expands that evidence into a standalone feed and adds the keeper decisions that do not always emit a transaction, especially holds. The two surfaces use the same decoded action names and wallet profile labels.
 
 The profile challenge flow uses an EIP-191 wallet signature and no gas. It proves wallet control only. It does not verify an external social handle.
 
@@ -210,6 +232,8 @@ The API reads deployment configuration from environment variables and validates 
 - return live fee-reserve totals, holdings, limits, and all 26 routes
 - decode public activity logs and enrich them with agent metadata
 - cache the activity response briefly to avoid repeated wide log scans
+- assemble public creator profiles from persisted performance summaries without summing unlike assets
+- merge keeper decisions with matching chain receipts for the filtered System Pulse feed
 - issue short-lived profile challenges and verify signed claims
 - expose strategy parameters and transaction previews without signing them
 - relay only allowlisted read-only JSON-RPC methods for the browser

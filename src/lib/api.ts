@@ -116,6 +116,7 @@ export interface ActivityItem {
   timestamp: string
   action: string
   actor: `0x${string}`
+  creator: `0x${string}` | null
   handle: string | null
   agent_id: number | null
   agent_name: string | null
@@ -243,6 +244,7 @@ export interface MarketplacePerformanceSummary {
   agent: MuppetPerformance['agent']
   tracking_started_at: string
   captured_at: string
+  checkpoint_count: number
   market_observed_at: string
   market_refresh_failed_at: string | null
   asset: MuppetPerformance['asset']
@@ -250,6 +252,7 @@ export interface MarketplacePerformanceSummary {
   change_method: MuppetPerformance['change_method']
   market: MarketEvidence
   keeper: PerformanceKeeperDecision | null
+  key_market: PerformanceKeyMarket
 }
 
 export interface MarketplacePerformanceResponse {
@@ -259,6 +262,86 @@ export interface MarketplacePerformanceResponse {
 
 export function fetchMarketplacePerformance(): Promise<MarketplacePerformanceResponse> {
   return request('/marketplace/performance', { cache: 'no-store' })
+}
+
+export interface CreatorAssetTotal {
+  address: `0x${string}`
+  symbol: string
+  decimals: number
+  agent_count: number
+  total_assets_raw: string
+  deployed_assets_raw: string
+  idle_assets_raw: string
+}
+
+export interface CreatorAgentRecord extends MarketplacePerformanceSummary {
+  receipt_count: number
+}
+
+export interface CreatorProfileResponse {
+  generated_at: string
+  explorer_url: string
+  wallet: `0x${string}`
+  handle: string | null
+  profile_claimed_at: string | null
+  tracking_started_at: string | null
+  captured_at: string | null
+  activity_status: 'available' | 'stale' | 'unavailable'
+  receipt_count: number | null
+  asset_totals: CreatorAssetTotal[]
+  agents: CreatorAgentRecord[]
+}
+
+export function fetchCreatorProfile(wallet: string): Promise<CreatorProfileResponse> {
+  return request(`/creators/${wallet}`, { cache: 'no-store' })
+}
+
+export type PulseCategory = 'muppet' | 'vault' | 'keeper' | 'range' | 'keys' | 'reserve'
+
+export interface PulseItem {
+  id: string
+  source: 'chain' | 'keeper'
+  category: PulseCategory
+  facets: PulseCategory[]
+  timestamp: string
+  action: string
+  actor: `0x${string}` | null
+  actor_handle: string | null
+  creator: `0x${string}` | null
+  creator_handle: string | null
+  agent_id: number | null
+  agent_name: string | null
+  key_symbol: string | null
+  quantity: string | null
+  value: string | null
+  value_symbol: string | null
+  direction: ActivityDirection
+  reason: string | null
+  status: string | null
+  tx_hash: `0x${string}` | null
+  block_number: number | null
+}
+
+export interface PulseResponse {
+  generated_at: string
+  explorer_url: string
+  latest_chain_record_at: string | null
+  limit: number
+  source_status: { chain: 'available' | 'stale' | 'unavailable'; keeper: 'available' }
+  items: PulseItem[]
+}
+
+export function fetchSystemPulse(options: {
+  limit?: number
+  category?: PulseCategory
+  creator?: string
+  agentId?: number
+} = {}): Promise<PulseResponse> {
+  const params = new URLSearchParams({ limit: String(options.limit ?? 100) })
+  if (options.category) params.set('category', options.category)
+  if (options.creator) params.set('creator', options.creator)
+  if (options.agentId !== undefined) params.set('agent_id', String(options.agentId))
+  return request(`/pulse?${params.toString()}`, { cache: 'no-store' })
 }
 
 export interface RwaReserveRoute {
