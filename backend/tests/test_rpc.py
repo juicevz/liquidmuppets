@@ -1,6 +1,7 @@
 from typing import cast
 from unittest.mock import MagicMock
 
+from web3.providers import JSONBaseProvider
 from web3.types import RPCEndpoint
 
 from app.services.rpc import FailoverHTTPProvider
@@ -8,6 +9,7 @@ from app.services.rpc import FailoverHTTPProvider
 
 def test_failover_provider_moves_reads_to_the_last_healthy_endpoint() -> None:
     provider = FailoverHTTPProvider(("https://primary.invalid", "https://fallback.invalid"))
+    assert isinstance(provider, JSONBaseProvider)
     primary = MagicMock()
     fallback = MagicMock()
     primary.make_request.return_value = {

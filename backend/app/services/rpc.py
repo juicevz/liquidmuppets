@@ -5,7 +5,7 @@ from collections.abc import Callable, Sequence
 from threading import Lock
 from typing import Any, TypeVar
 
-from web3.providers import BaseProvider
+from web3.providers import JSONBaseProvider
 from web3.providers.rpc import HTTPProvider
 from web3.types import RPCEndpoint, RPCResponse
 
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
-class FailoverHTTPProvider(BaseProvider):
+class FailoverHTTPProvider(JSONBaseProvider):
     """A small ordered RPC pool that keeps reads on the last healthy endpoint."""
 
     def __init__(self, urls: Sequence[str], *, timeout: float = 12) -> None:
