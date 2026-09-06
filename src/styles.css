@@ -11812,7 +11812,7 @@ select:focus-visible {
 }
 
 .radar-table {
-  min-width: 1410px;
+  min-width: 1320px;
 }
 
 .radar-table-head,
@@ -14964,7 +14964,7 @@ button.header-social-link {
 /* Public creator profiles and System Pulse */
 
 .mobile-app-nav {
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
 }
 
 .system-pulse-page,
@@ -16091,7 +16091,7 @@ button.header-social-link {
 
 @media (max-width: 760px) {
   .mobile-app-nav {
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(6, 1fr);
   }
 
   .pulse-toolbar,

@@ -358,7 +358,9 @@ results.rwaReserveContract = (await page.getByRole('link', { name: /Open reserve
 results.rwaBootstrapDisclosure = await page.getByText(/dev-funded bootstrap liquidity/i).count() === 1
 await page.locator('.public-activity-item').first().waitFor({ timeout: 10_000 })
 results.activityRows = await page.locator('.public-activity-item').count()
-results.activityHasDevHandle = await page.locator('.public-activity-item').getByText('@liquidmuppets_dev').count() > 0
+results.activityHasClaimedHandle = await page.locator('.public-activity-item .activity-actor').evaluateAll((actors) => (
+  actors.some((actor) => actor.textContent?.trim().startsWith('@'))
+))
 results.activityValuesStyled = await page.locator('.public-activity-item.activity-positive, .public-activity-item.activity-negative').count() > 0
 if (results.performanceMarketRows >= 2) {
   await page.locator('.performance-market-row').nth(0).getByRole('button', { name: /^Compare / }).click()
@@ -576,6 +578,9 @@ await mobilePage.locator('.radar-row').first().waitFor({ timeout: 60_000 })
 results.mobileMonitorOverflow = await mobilePage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
 results.mobileRadarScrollsInside = await mobilePage.locator('.radar-table-wrap').evaluate((node) => node.scrollWidth > node.clientWidth)
 results.mobileNavItems = await mobilePage.locator('.mobile-app-nav button').count()
+results.mobileNavSingleRow = await mobilePage.locator('.mobile-app-nav').evaluate((node) => (
+  getComputedStyle(node).gridTemplateRows.split(' ').length === 1
+))
 await mobilePage.screenshot({ path: new URL('market-radar-mobile.png', screenshotDir).pathname, fullPage: false })
 await mobile.close()
 
@@ -637,7 +642,7 @@ const marketStateValid = results.marketRows > 0
     && !results.comparisonOverflow
     && results.keyMarketColumns === 7
     && results.activityRows > 0
-    && results.activityHasDevHandle
+    && results.activityHasClaimedHandle
     && results.activityValuesStyled
     && results.rwaReserveModule
     && results.rwaRouteCount === 26
@@ -800,6 +805,7 @@ const failed =
   || results.mobileMonitorOverflow
   || !results.mobileRadarScrollsInside
   || results.mobileNavItems !== 6
+  || !results.mobileNavSingleRow
   || !results.mobileNavVisible
   || results.mobileCommandCenterOverflow
   || results.mobileCommandColumns !== 1
