@@ -58,7 +58,7 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
 
     app = FastAPI(
         title="LiquidMuppets Strategy API",
-        version="0.2.0",
+        version="0.3.0",
         docs_url="/api/docs",
         openapi_url="/api/openapi.json",
         lifespan=lifespan,

@@ -21,6 +21,7 @@ Current status: controlled mainnet beta. Existing Muppets can be funded, allocat
 - 26 oracle-bounded Stock Token purchase routes
 - public activity built from contract logs
 - a shareable public performance URL for every Muppet, backed by five minute checkpoints
+- a performance marketplace with health, tracked change, deployment, oracle and keeper evidence plus two-Muppet comparison
 - a post-launch command center with vault funding, an onchain share preview, keeper timing, performance link and X sharing
 - browser-local recovery for the three launch transactions, keyed to the connected wallet, chain and factory
 - optional app handles claimed with a wallet signature and no gas
@@ -133,6 +134,10 @@ The first checkpoint is the baseline. The service does not reconstruct a pretend
 
 Checkpoints are stored in SQLite every five minutes. Deposit and withdrawal totals advance from ERC-4626 events emitted between consecutive checkpoint blocks. Chart history is downsampled only for the response and always preserves the first and latest checkpoint.
 
+The marketplace reads a lightweight recorded summary for every Muppet and shows its cash-flow-adjusted change, deployed percentage, market health, oracle timestamp boundary, and latest keeper decision with its reason. Any two Muppets can be selected for a side-by-side comparison. Each column keeps the original asset, exact tracking start, and observed window visible. The app does not convert unlike assets into a common score, equalize different periods, or infer an annualized return.
+
+`GET /api/v1/marketplace/performance` serves the last successful summaries from SQLite, so a slow upstream RPC cannot blank the marketplace. The five minute recorder refreshes each summary from an exact checkpoint and current adapter evidence. The payload exposes both checkpoint capture time and market observation time; a failed refresh leaves the older timestamp visible rather than presenting stale evidence as fresh.
+
 ## Launch recovery and command center
 
 The launch flow records each submitted transaction hash before waiting for confirmation: vault and Key creation, Key approval, then the first ask. If the wallet rejects a later step, a transaction reverts, confirmation reading times out, or the page reloads, `/app/create` restores the matching browser-local record and offers `Resume launch`. Resume checks any existing receipt before it sends the first missing transaction, so it does not blindly create another Muppet or repeat a pending listing.
@@ -225,7 +230,7 @@ forge script script/DeployMainnet.s.sol:DeployMainnet --rpc-url https://rpc.main
 forge script script/DeployMainnet.s.sol:DeployMainnet --rpc-url https://rpc.mainnet.chain.robinhood.com --broadcast -vvv
 ```
 
-The frontend uses atomic release directories under `/var/www/liquidmuppets/releases/` with `/var/www/liquidmuppets/current` as the active symlink. The API runs as the unprivileged `liquidmuppets` user from `/opt/liquidmuppets-api/current`, reads public runtime values from `/etc/liquidmuppets/api.env` and `/etc/liquidmuppets/runtime-public.env`, reads the keeper secret only from mode-0600 `/etc/liquidmuppets/keeper.env`, and writes profiles, keeper decisions, and performance checkpoints to SQLite under `/var/lib/liquidmuppets`.
+The frontend uses atomic release directories under `/var/www/liquidmuppets/releases/` with `/var/www/liquidmuppets/current` as the active symlink. The API runs as the unprivileged `liquidmuppets` user from `/opt/liquidmuppets-api/current`, reads public runtime values from `/etc/liquidmuppets/api.env` and `/etc/liquidmuppets/runtime-public.env`, reads the keeper secret only from mode-0600 `/etc/liquidmuppets/keeper.env`, and writes profiles, keeper decisions, performance checkpoints, and marketplace performance summaries to SQLite under `/var/lib/liquidmuppets`.
 
 ## API
 
@@ -236,6 +241,7 @@ The frontend uses atomic release directories under `/var/www/liquidmuppets/relea
 - `GET /api/v1/strategies`
 - `POST /api/v1/strategies/preview`
 - `GET /api/v1/activity` with optional `agent_id` and `limit` filters
+- `GET /api/v1/marketplace/performance`
 - `GET /api/v1/agents/{agentId}/performance`
 - `POST /api/v1/profiles/challenge`
 - `POST /api/v1/profiles/claim`

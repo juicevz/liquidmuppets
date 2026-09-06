@@ -80,6 +80,15 @@ async function useLaunchCommandFixture(context, fixture) {
   }, fixture)
 }
 
+async function warmPublicActivity() {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const response = await fetch(`${baseUrl}/api/v1/activity?limit=40`, { cache: 'no-store' }).catch(() => null)
+    if (response?.ok) return
+    await new Promise((resolve) => setTimeout(resolve, 750))
+  }
+  throw new Error('Could not warm the public activity cache for browser QA.')
+}
+
 async function revealLanding(page) {
   const items = page.locator('[data-reveal]')
   const count = await items.count()
@@ -308,15 +317,27 @@ results.launchRecoveryCopy = await recoveryPage.getByText(/continues at the firs
 await recoveryPage.screenshot({ path: new URL('launch-recovery.png', screenshotDir).pathname, fullPage: false })
 await recovery.close()
 
+await warmPublicActivity()
 page = await desktop.newPage()
 watch(page, 'market')
 await page.goto(`${baseUrl}/app`, { waitUntil: 'networkidle' })
 await page.waitForFunction(() => !document.body.textContent?.includes('Reading chain'))
+await page.locator('.performance-market-row').first().waitFor({ timeout: 60_000 })
 results.marketHeading = await page.locator('.marketplace-page h1').innerText()
 results.marketChainNumberRemoved = !((await page.locator('.marketplace-page').innerText()).includes('4663'))
 results.listedPercent = await page.locator('.key-market-summary').getByText(/pets listed/i).count() === 1
 results.marketRows = await page.locator('.key-market-row').count()
 results.marketCards = await page.locator('.live-agent-card').count()
+results.performanceMarketRows = await page.locator('.performance-market-row').count()
+results.performanceMarketColumns = await page.locator('.performance-market-table-head > span').count()
+results.performanceMarketHealth = await page.locator('.performance-market-row .market-performance-health').count()
+results.performanceMarketOracle = await page.locator('.performance-market-row').first().getByText(/timestamp not exposed|old|not used|unavailable/i).count() > 0
+results.performanceMarketKeeper = await page.locator('.performance-market-row .keeper-value').count()
+results.performanceMarketEndpoint = await page.evaluate(async () => {
+  const response = await fetch('/api/v1/marketplace/performance', { cache: 'no-store' })
+  const body = await response.json()
+  return response.ok && Array.isArray(body.items) && body.items.length > 0
+})
 results.marketEmpty = await page.locator('.market-empty, .deployment-pending').count()
 results.rwaReserveModule = await page.locator('.rwa-reserve-module').count() === 1
 await page.locator('.rwa-reserve-module summary').click()
@@ -329,6 +350,22 @@ await page.locator('.public-activity-item').first().waitFor({ timeout: 10_000 })
 results.activityRows = await page.locator('.public-activity-item').count()
 results.activityHasDevHandle = await page.locator('.public-activity-item').getByText('@liquidmuppets_dev').count() > 0
 results.activityValuesStyled = await page.locator('.public-activity-item.activity-positive, .public-activity-item.activity-negative').count() > 0
+if (results.performanceMarketRows >= 2) {
+  await page.locator('.performance-market-row').nth(0).getByRole('button', { name: /^Compare / }).click()
+  await page.locator('.performance-market-row').nth(1).getByRole('button', { name: /^Compare / }).click()
+  await page.getByRole('heading', { name: 'Compare Muppets' }).waitFor()
+  results.comparisonSelected = await page.locator('.performance-market-row.comparison-selected').count()
+  results.comparisonCards = await page.locator('.comparison-card').count()
+  results.comparisonAssetsExplicit = await page.locator('.comparison-boundaries').getByText(/assets:/i).count() === 1
+  results.comparisonWindowsExplicit = await page.locator('.comparison-card').getByText('tracking began', { exact: true }).count() === 2
+  results.comparisonFlowAdjusted = await page.locator('.comparison-card').getByText('flow-adjusted change', { exact: true }).count() === 2
+  results.comparisonKeeperReasons = await page.locator('.comparison-card').getByText('last keeper decision', { exact: true }).count() === 2
+  results.comparisonPerformanceLinks = await page.locator('.comparison-card').getByRole('link', { name: /full record/i }).count()
+  results.comparisonNoRanking = await page.getByText(/No cross-asset ranking is calculated/i).count() === 1
+  results.comparisonOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
+  await page.screenshot({ path: new URL('performance-marketplace-comparison.png', screenshotDir).pathname, fullPage: false })
+  await page.getByRole('button', { name: 'Clear' }).click()
+}
 if (results.marketRows > 0) {
   results.keyMarketColumns = await page.locator('.key-market-board-head > span').count()
   await page.locator('.key-market-row').first().click()
@@ -381,6 +418,7 @@ results.docsTokenGate = await page.getByRole('heading', { name: '$MUPPETS launch
 results.docsSevenPets = await page.getByRole('heading', { name: 'Seven pets, three live tasks' }).count() === 1
 results.docsFeeReserve = await page.getByRole('heading', { name: 'Marketplace fee reserve' }).count() === 1
 results.docsPerformance = await page.getByRole('heading', { name: 'Public Muppet performance' }).count() === 1
+results.docsPerformanceMarketplace = await page.getByText(/select any two Muppets to compare/i).count() === 1
 results.docsAlgorithm = await page.getByRole('heading', { name: 'The backend algorithm' }).count() === 1
 results.docsBoundary = await page.getByText(/real USDG, WETH, Morpho, Uniswap and EZManager/i).count() === 1
 results.docsLiveContracts = await page.getByText(/0x570F0FEBFE8b33F37D01f7153F0F85E59FfcE460/i).count() === 1
@@ -494,6 +532,12 @@ const narrow = await narrowBrowser.newContext({ viewport: { width: 320, height: 
 const narrowPage = await narrow.newPage()
 watch(narrowPage, '320px')
 await narrowPage.goto(`${baseUrl}/app`, { waitUntil: 'networkidle' })
+await narrowPage.locator('.performance-market-row').first().waitFor({ timeout: 60_000 })
+results.narrowCompareButtonVisible = await narrowPage.locator('.performance-market-row').first().getByRole('button', { name: /^Compare / }).isVisible()
+await narrowPage.locator('.performance-market-row').nth(0).getByRole('button', { name: /^Compare / }).click()
+await narrowPage.locator('.performance-market-row').nth(1).getByRole('button', { name: /^Compare / }).click()
+await narrowPage.getByRole('heading', { name: 'Compare Muppets' }).waitFor()
+results.narrowComparisonColumns = await narrowPage.locator('.comparison-grid').evaluate((node) => getComputedStyle(node).gridTemplateColumns.split(' ').length)
 results.narrowAppOverflow = await narrowPage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
 results.narrowHeaderVisible = await narrowPage.locator('.mobile-app-nav').isVisible()
 await narrowPage.goto(`${baseUrl}/docs`, { waitUntil: 'networkidle' })
@@ -509,6 +553,21 @@ console.log(JSON.stringify(results, null, 2))
 
 const marketStateValid = results.marketRows > 0
   ? results.marketRows === results.marketCards
+    && results.performanceMarketRows === results.marketCards
+    && results.performanceMarketColumns === 8
+    && results.performanceMarketHealth === results.marketCards
+    && results.performanceMarketOracle
+    && results.performanceMarketKeeper === results.marketCards
+    && results.performanceMarketEndpoint
+    && results.comparisonSelected === 2
+    && results.comparisonCards === 2
+    && results.comparisonAssetsExplicit
+    && results.comparisonWindowsExplicit
+    && results.comparisonFlowAdjusted
+    && results.comparisonKeeperReasons
+    && results.comparisonPerformanceLinks === 2
+    && results.comparisonNoRanking
+    && !results.comparisonOverflow
     && results.keyMarketColumns === 7
     && results.activityRows > 0
     && results.activityHasDevHandle
@@ -626,6 +685,7 @@ const failed =
   || !results.docsSevenPets
   || !results.docsFeeReserve
   || !results.docsPerformance
+  || !results.docsPerformanceMarketplace
   || !results.docsAlgorithm
   || !results.docsBoundary
   || !results.docsLiveContracts
@@ -653,6 +713,8 @@ const failed =
   || results.mobileCommandCenterOverflow
   || results.mobileCommandColumns !== 1
   || results.narrowAppOverflow
+  || !results.narrowCompareButtonVisible
+  || results.narrowComparisonColumns !== 1
   || results.narrowDocsOverflow
   || results.narrowPerformanceOverflow
   || !results.narrowHeaderVisible

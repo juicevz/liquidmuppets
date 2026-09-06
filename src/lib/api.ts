@@ -239,6 +239,28 @@ export function fetchMuppetPerformance(agentId: number): Promise<MuppetPerforman
   return request(`/agents/${agentId}/performance`, { cache: 'no-store' })
 }
 
+export interface MarketplacePerformanceSummary {
+  agent: MuppetPerformance['agent']
+  tracking_started_at: string
+  captured_at: string
+  market_observed_at: string
+  market_refresh_failed_at: string | null
+  asset: MuppetPerformance['asset']
+  current: PerformanceCheckpoint
+  change_method: MuppetPerformance['change_method']
+  market: MarketEvidence
+  keeper: PerformanceKeeperDecision | null
+}
+
+export interface MarketplacePerformanceResponse {
+  generated_at: string
+  items: MarketplacePerformanceSummary[]
+}
+
+export function fetchMarketplacePerformance(): Promise<MarketplacePerformanceResponse> {
+  return request('/marketplace/performance', { cache: 'no-store' })
+}
+
 export interface RwaReserveRoute {
   index: number
   symbol: string

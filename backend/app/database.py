@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import secrets
 import sqlite3
 from collections.abc import Iterator
@@ -125,6 +126,15 @@ class Database:
                 ON performance_checkpoints (agent_id, block_number)
                 """
             )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS marketplace_performance (
+                    agent_id INTEGER PRIMARY KEY,
+                    payload TEXT NOT NULL,
+                    observed_at TEXT NOT NULL
+                )
+                """
+            )
 
     def add_keeper_run(self, record: KeeperRunRecord) -> int:
         values = asdict(record)
@@ -207,6 +217,35 @@ class Database:
                 (agent_id,),
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def upsert_marketplace_performance(self, agent_id: int, payload: dict[str, object]) -> None:
+        observed_at = str(payload["market_observed_at"])
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO marketplace_performance (agent_id, payload, observed_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(agent_id) DO UPDATE SET
+                    payload = excluded.payload,
+                    observed_at = excluded.observed_at
+                """,
+                (agent_id, json.dumps(payload, separators=(",", ":"), sort_keys=True), observed_at),
+            )
+
+    def list_marketplace_performance(self) -> list[dict[str, object]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT payload FROM marketplace_performance ORDER BY agent_id ASC"
+            ).fetchall()
+        return [json.loads(str(row["payload"])) for row in rows]
+
+    def get_marketplace_performance(self, agent_id: int) -> dict[str, object] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT payload FROM marketplace_performance WHERE agent_id = ?",
+                (agent_id,),
+            ).fetchone()
+        return json.loads(str(row["payload"])) if row else None
 
     def create_profile_challenge(self, wallet: str, handle: str) -> dict[str, str]:
         now = datetime.now(UTC)

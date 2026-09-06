@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from app.config import Settings
 from app.database import Database, PerformanceCheckpointRecord
 from app.main import create_app
-from app.services.performance import flow_adjusted_change
+from app.services.performance import _marketplace_payload, flow_adjusted_change
 
 
 def checkpoint(
@@ -63,6 +63,67 @@ def test_database_keeps_an_ordered_checkpoint_history(tmp_path: Path) -> None:
     assert second["total_assets"] == "1120"
     assert duplicate["total_assets"] == "1120"
     assert database.get_latest_performance_checkpoint(first["vault"])["block_number"] == 105
+
+
+def test_database_keeps_the_latest_marketplace_summary(tmp_path: Path) -> None:
+    database = Database(tmp_path / "performance.sqlite3")
+    database.initialize()
+    first = {
+        "agent": {"id": 7, "name": "range fox"},
+        "market_observed_at": "2026-09-05T22:00:00+00:00",
+        "current": {"flow_adjusted_change_bps": 12},
+    }
+    latest = {
+        **first,
+        "market_observed_at": "2026-09-05T22:05:00+00:00",
+        "current": {"flow_adjusted_change_bps": 18},
+    }
+
+    database.upsert_marketplace_performance(7, first)
+    database.upsert_marketplace_performance(7, latest)
+
+    assert database.list_marketplace_performance() == [latest]
+    assert database.get_marketplace_performance(7) == latest
+    assert database.get_marketplace_performance(8) is None
+
+
+def test_marketplace_summary_keeps_the_last_successful_market_observation() -> None:
+    previous = {
+        "market_observed_at": "2026-09-05T22:00:00+00:00",
+        "market": {"health": {"status": "healthy"}, "oracle": {"status": "not_used"}},
+    }
+    response = {
+        "agent": {"id": 2},
+        "tracking_started_at": "2026-09-05T21:00:00+00:00",
+        "captured_at": "2026-09-05T22:05:00+00:00",
+        "asset": {"symbol": "WETH"},
+        "current": {"flow_adjusted_change_bps": 0},
+        "change_method": {"id": "cash_flow_adjusted_since_tracking"},
+        "market": {"health": {"status": "unavailable"}},
+        "keeper": None,
+    }
+
+    summary = _marketplace_payload(response, "2026-09-05T22:05:01+00:00", previous)
+
+    assert summary["market"] == previous["market"]
+    assert summary["market_observed_at"] == previous["market_observed_at"]
+    assert summary["market_refresh_failed_at"] == "2026-09-05T22:05:01+00:00"
+
+
+def test_marketplace_performance_route_uses_recorded_summaries(tmp_path: Path) -> None:
+    database_path = tmp_path / "test.sqlite3"
+    app = create_app(Settings(database_path=database_path, rpc_url="http://127.0.0.1:1"))
+    with TestClient(app) as client:
+        summary = {
+            "agent": {"id": 2, "name": "launch sage"},
+            "market_observed_at": "2026-09-05T22:05:00+00:00",
+            "current": {"flow_adjusted_change_bps": 0},
+        }
+        app.state.database.upsert_marketplace_performance(2, summary)
+        response = client.get("/api/v1/marketplace/performance")
+
+    assert response.status_code == 200
+    assert response.json()["items"] == [summary]
 
 
 def test_performance_route_rejects_an_invalid_agent_id(tmp_path: Path) -> None:

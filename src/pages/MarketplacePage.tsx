@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { formatEther, formatUnits, type Address } from 'viem'
 import { Icon } from '../components/Icon'
+import { PerformanceMarketplace } from '../components/PerformanceMarketplace'
 import { getPet } from '../data/pets'
 import { useProtocol } from '../hooks/useProtocol'
 import { performancePath } from '../lib/navigation'
@@ -22,7 +23,14 @@ import {
   type ChainAgent,
 } from '../lib/protocol'
 import type { StrategyTaskId } from '../types'
-import { fetchActivity, fetchRwaReserve, type ActivityItem, type RwaReserveState } from '../lib/api'
+import {
+  fetchActivity,
+  fetchMarketplacePerformance,
+  fetchRwaReserve,
+  type ActivityItem,
+  type MarketplacePerformanceSummary,
+  type RwaReserveState,
+} from '../lib/api'
 
 interface MarketplacePageProps {
   walletAddress?: string
@@ -37,6 +45,11 @@ export function MarketplacePage({ walletAddress, onConnect }: MarketplacePagePro
   const [filter, setFilter] = useState<TaskFilter>('all')
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState<bigint | null>(null)
+  const [comparisonIds, setComparisonIds] = useState<number[]>([])
+  const [performanceSummaries, setPerformanceSummaries] = useState<Map<number, MarketplacePerformanceSummary>>(new Map())
+  const [performanceLoading, setPerformanceLoading] = useState(true)
+  const [performanceFailed, setPerformanceFailed] = useState(false)
+  const [performanceRefreshToken, setPerformanceRefreshToken] = useState(0)
   const [rwaReserve, setRwaReserve] = useState<RwaReserveState | null>(null)
   const agents = snapshot?.agents ?? []
   const selected = agents.find((agent) => agent.id === selectedId) ?? null
@@ -52,6 +65,60 @@ export function MarketplacePage({ walletAddress, onConnect }: MarketplacePagePro
         && (!normalized || `${agent.name} ${agent.key.symbol} ${task?.label ?? ''}`.toLowerCase().includes(normalized))
     })
   }, [agents, filter, query, tasks])
+  const agentIdsKey = agents.map((agent) => agent.id.toString()).join(',')
+  const visibleIdsKey = visible.map((agent) => agent.id.toString()).join(',')
+
+  const refreshAll = () => {
+    refresh()
+    setPerformanceRefreshToken((value) => value + 1)
+  }
+
+  const toggleComparison = (agentId: number) => {
+    setComparisonIds((current) => {
+      if (current.includes(agentId)) return current.filter((id) => id !== agentId)
+      return current.length < 2 ? [...current, agentId] : current
+    })
+  }
+
+  useEffect(() => {
+    const visibleIds = new Set(visibleIdsKey.split(',').filter(Boolean).map(Number))
+    setComparisonIds((current) => current.filter((agentId) => visibleIds.has(agentId)))
+  }, [visibleIdsKey])
+
+  useEffect(() => {
+    if (!agentIdsKey) {
+      setPerformanceLoading(false)
+      return undefined
+    }
+    let active = true
+    let running = false
+    const load = async () => {
+      if (running) return
+      running = true
+      setPerformanceLoading(true)
+      try {
+        const response = await fetchMarketplacePerformance()
+        if (!active) return
+        setPerformanceSummaries((current) => {
+          const next = new Map(current)
+          response.items.forEach((summary) => next.set(summary.agent.id, summary))
+          return next
+        })
+        setPerformanceFailed(false)
+      } catch {
+        if (active) setPerformanceFailed(true)
+      } finally {
+        if (active) setPerformanceLoading(false)
+        running = false
+      }
+    }
+    void load()
+    const timer = window.setInterval(() => void load(), 30_000)
+    return () => {
+      active = false
+      window.clearInterval(timer)
+    }
+  }, [agentIdsKey, performanceRefreshToken])
 
   useEffect(() => {
     let active = true
@@ -73,7 +140,7 @@ export function MarketplacePage({ walletAddress, onConnect }: MarketplacePagePro
       <section className="app-page-heading">
         <div>
           <h1>Pet marketplace.</h1>
-          <p>Browse pet vaults, Key asks and bids, ownership, and transaction receipts from live contracts.</p>
+          <p>Browse and compare recorded vault performance, then open the separate Agent Key market.</p>
         </div>
         <div className="market-summary key-market-summary">
           <span><small>live agents</small><strong>{agents.length}</strong></span>
@@ -99,11 +166,23 @@ export function MarketplacePage({ walletAddress, onConnect }: MarketplacePagePro
           {tasks.map((task) => <button type="button" className={filter === task.id ? 'active' : ''} onClick={() => setFilter(task.id)} key={task.id}>{task.label}</button>)}
         </div>
         <label className="market-search"><Icon name="search" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search pet, Key, or task" /></label>
-        <button type="button" className="chain-refresh" onClick={refresh} disabled={loading}><Icon name="spark" />{loading ? 'Reading chain' : 'Refresh'}</button>
+        <button type="button" className="chain-refresh" onClick={refreshAll} disabled={loading}><Icon name="spark" />{loading ? 'Reading chain' : 'Refresh'}</button>
       </section>
 
       <div className="marketplace-workspace">
         <div className="marketplace-listings">
+          {visible.length > 0 && (
+            <PerformanceMarketplace
+              agents={visible}
+              summaries={performanceSummaries}
+              loading={performanceLoading}
+              failed={performanceFailed}
+              selectedIds={comparisonIds}
+              onToggleComparison={toggleComparison}
+              onClearComparison={() => setComparisonIds([])}
+              onOpenAgent={(agent) => setSelectedId(agent.id)}
+            />
+          )}
           {visible.length > 0 && <ChainMarketBoard agents={visible} tasks={tasks} onSelect={(agent) => setSelectedId(agent.id)} />}
 
           <section className="live-agent-grid" aria-live="polite">
@@ -133,7 +212,7 @@ export function MarketplacePage({ walletAddress, onConnect }: MarketplacePagePro
         <ActivityRail explorerUrl={config?.explorerUrl} enabled={!loading} />
       </div>
 
-      {selected && config && <LiveAgentDrawer agent={selected} config={config} feeBps={snapshot?.feeBps ?? 300} tasks={tasks} walletAddress={walletAddress} onConnect={onConnect} onClose={() => setSelectedId(null)} onRefresh={refresh} />}
+      {selected && config && <LiveAgentDrawer agent={selected} config={config} feeBps={snapshot?.feeBps ?? 300} tasks={tasks} walletAddress={walletAddress} onConnect={onConnect} onClose={() => setSelectedId(null)} onRefresh={refreshAll} />}
     </div>
   )
 }
@@ -269,6 +348,7 @@ function timeAgo(timestamp: string): string {
 function ChainMarketBoard({ agents, tasks, onSelect }: { agents: ChainAgent[]; tasks: ReturnType<typeof useProtocol>['tasks']; onSelect: (agent: ChainAgent) => void }) {
   return (
     <section className="key-market-board live-key-board" aria-label="Live Agent Key markets">
+      <div className="key-market-table-title"><span><small>separate market</small><strong>Agent Key orderbook</strong></span><p>Key prices do not change vault performance or own vault assets.</p></div>
       <div className="key-market-board-head"><span>Muppet / Key</span><span>task</span><span>vault assets</span><span>floor</span><span>top bid</span><span>listed</span><span>supply</span></div>
       {agents.map((agent) => {
         const pet = getPet(agent.petId)

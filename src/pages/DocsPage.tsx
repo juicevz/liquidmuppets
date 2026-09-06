@@ -123,10 +123,12 @@ const docsSections: DocsSection[] = [
   {
     number: '13',
     title: 'Public Muppet performance',
-    body: 'Every Muppet has a shareable /app/muppet/{id} page. Five minute checkpoints record vault share price, NAV, deployed and idle capital, and deposits and withdrawals observed after tracking began. The page shows the exact route, market or pool, active ticks when a range exists, current health evidence, and the latest keeper action or hold with its reason.',
+    body: 'Every Muppet has a shareable /app/muppet/{id} page. The marketplace also places its recorded change, deployed percentage, health, oracle boundary and latest keeper decision in one performance table. Select any two Muppets to compare their evidence side by side without converting assets or equalizing different tracking periods.',
     details: [
+      'five minute checkpoints record share price, NAV, deployed and idle capital, deposits and withdrawals',
       'cash-flow-adjusted change removes recorded deposits and adds recorded withdrawals before comparing with opening NAV',
       'tracking starts with the first recorded checkpoint; no earlier curve or historical APY is invented',
+      'comparison keeps each Muppet in its native asset and displays both tracking starts explicitly',
       'when an oracle interface has no update timestamp, the page says timestamp not exposed instead of calling it fresh',
       'deposits, withdrawals, allocations and recalls link to their transaction receipts',
       'the Agent Key market stays in a separate section because Keys do not own vault assets',

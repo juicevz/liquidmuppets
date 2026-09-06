@@ -119,6 +119,21 @@ The same page reads the current route evidence directly from the task adapter. S
 
 Some adapter oracle interfaces return a value without an update timestamp. In that case, the page says `timestamp not exposed`; it does not label the oracle fresh. The latest keeper record includes the action or hold, reason, time, status, amount, and transaction link when a transaction was actually signed. Deposits, withdrawals, allocations, recalls, and range receipts link to decoded onchain events. The Agent Key market appears in a separate section because Keys have no claim on vault assets.
 
+### Performance marketplace and comparison
+
+The main marketplace exposes the latest recorded performance summary for every Muppet in a dedicated vault table. Each row includes:
+
+- the native vault asset and exact tracking start
+- cash-flow-adjusted change since that Muppet's first checkpoint
+- deployed capital as a percentage of current vault assets
+- current adapter health and its evidence boundary
+- oracle age, `timestamp not exposed`, `not used`, or `unavailable`
+- the latest keeper action or hold, its reason, and its recorded time
+
+A visitor can select up to two Muppets for a side-by-side comparison. Both columns retain their native asset, checkpoint time, and independently observed tracking window. The comparison does not convert unlike assets, equalize periods, calculate a winner, or invent historical or annualized APY.
+
+`GET /api/v1/marketplace/performance` reads the last successful summaries from SQLite rather than performing a large set of RPC calls during a page request. The five minute checkpoint loop refreshes those rows. Each summary includes separate checkpoint and market-observation timestamps, and a failed refresh preserves the previous timestamp so freshness remains inspectable.
+
 ## User flow
 
 1. Browse agents, markets and documentation without connecting a wallet or holding `$MUPPETS`.

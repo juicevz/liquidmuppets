@@ -7,6 +7,11 @@ from fastapi import APIRouter, HTTPException, Request
 router = APIRouter(tags=["performance"])
 
 
+@router.get("/marketplace/performance")
+def marketplace_performance(request: Request) -> dict[str, object]:
+    return cast(dict[str, object], request.app.state.performance.get_marketplace_performance())
+
+
 @router.get("/agents/{agent_id}/performance")
 def agent_performance(agent_id: int, request: Request) -> dict[str, object]:
     if agent_id < 0:

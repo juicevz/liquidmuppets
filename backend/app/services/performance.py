@@ -385,12 +385,19 @@ class PerformanceService:
         captured = 0
         for agent_id in range(count):
             try:
-                self.capture_agent(agent_id)
+                self.get_agent_performance(agent_id)
             except Exception as error:
                 logger.warning("performance checkpoint skipped for Muppet %s: %s", agent_id, type(error).__name__)
                 continue
             captured += 1
         return captured
+
+    def get_marketplace_performance(self) -> dict[str, object]:
+        items = self.database.list_marketplace_performance()
+        return {
+            "generated_at": datetime.now(UTC).isoformat(),
+            "items": items,
+        }
 
     def capture_agent(self, agent_id: int) -> tuple[dict[str, object], AgentSnapshot]:
         with self._lock:
@@ -459,6 +466,7 @@ class PerformanceService:
                 history = [_checkpoint_payload(row, opening) for row in _downsample(raw_history, 500)]
                 current = _checkpoint_payload(raw_history[-1], opening)
                 keeper = self.database.get_last_keeper_run(snapshot.vault)
+                market_observed_at = datetime.now(UTC).isoformat()
                 response: dict[str, object] = {
                     "network": {
                         "chain_id": self.settings.chain_id,
@@ -502,6 +510,11 @@ class PerformanceService:
                 if cached is not None:
                     return cached[1]
                 raise
+            previous_marketplace = self.database.get_marketplace_performance(agent_id)
+            self.database.upsert_marketplace_performance(
+                agent_id,
+                _marketplace_payload(response, market_observed_at, previous_marketplace),
+            )
             self._response_cache[agent_id] = (monotonic(), response)
             return response
 
@@ -950,3 +963,37 @@ def _downsample(rows: list[dict[str, object]], maximum: int) -> list[dict[str, o
         return rows
     indices = {round(index * (len(rows) - 1) / (maximum - 1)) for index in range(maximum)}
     return [rows[index] for index in sorted(indices)]
+
+
+def _marketplace_payload(
+    response: dict[str, object],
+    market_observed_at: str,
+    previous: dict[str, object] | None = None,
+) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "agent": response["agent"],
+        "tracking_started_at": response["tracking_started_at"],
+        "captured_at": response["captured_at"],
+        "market_observed_at": market_observed_at,
+        "market_refresh_failed_at": None,
+        "asset": response["asset"],
+        "current": response["current"],
+        "change_method": response["change_method"],
+        "market": response["market"],
+        "keeper": response["keeper"],
+    }
+    if _market_status(payload) == "unavailable" and previous is not None and _market_status(previous) != "unavailable":
+        payload["market"] = previous["market"]
+        payload["market_observed_at"] = previous["market_observed_at"]
+        payload["market_refresh_failed_at"] = market_observed_at
+    return payload
+
+
+def _market_status(payload: dict[str, object]) -> str:
+    market = payload.get("market")
+    if not isinstance(market, dict):
+        return "unavailable"
+    health = market.get("health")
+    if not isinstance(health, dict):
+        return "unavailable"
+    return str(health.get("status", "unavailable"))
