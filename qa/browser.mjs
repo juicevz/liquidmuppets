@@ -10,6 +10,7 @@ const consoleErrors = []
 const results = {}
 
 function watch(page, label) {
+  page.setDefaultNavigationTimeout(90_000)
   page.on('console', (message) => {
     if (message.type() === 'error') consoleErrors.push(`${label}: ${message.text()}`)
   })
@@ -419,6 +420,8 @@ results.docsSevenPets = await page.getByRole('heading', { name: 'Seven pets, thr
 results.docsFeeReserve = await page.getByRole('heading', { name: 'Marketplace fee reserve' }).count() === 1
 results.docsPerformance = await page.getByRole('heading', { name: 'Public Muppet performance' }).count() === 1
 results.docsPerformanceMarketplace = await page.getByText(/select any two Muppets to compare/i).count() === 1
+results.docsCreatorProfiles = await page.getByText(/Every creator wallet has a shareable/i).count() === 1
+results.docsSystemPulse = await page.getByText(/combines decoded transaction events and recorded keeper decisions/i).count() === 1
 results.docsAlgorithm = await page.getByRole('heading', { name: 'The backend algorithm' }).count() === 1
 results.docsBoundary = await page.getByText(/real USDG, WETH, Morpho, Uniswap and EZManager/i).count() === 1
 results.docsLiveContracts = await page.getByText(/0x570F0FEBFE8b33F37D01f7153F0F85E59FfcE460/i).count() === 1
@@ -680,12 +683,14 @@ const failed =
   || !results.portfolioConnectState
   || !results.portfolioChainNumberRemoved
   || results.docsTitle !== 'Docs | LIQUIDMUPPETS'
-  || results.docsSections !== 14
+  || results.docsSections !== 16
   || !results.docsTokenGate
   || !results.docsSevenPets
   || !results.docsFeeReserve
   || !results.docsPerformance
   || !results.docsPerformanceMarketplace
+  || !results.docsCreatorProfiles
+  || !results.docsSystemPulse
   || !results.docsAlgorithm
   || !results.docsBoundary
   || !results.docsLiveContracts
