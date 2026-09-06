@@ -12,7 +12,9 @@ from web3 import Web3
 from web3._utils.events import get_event_data
 
 from app.config import Settings
+from app.database import Database
 from app.services.chain import FACTORY_ABI
+from app.services.rpc import FailoverHTTPProvider
 
 logger = logging.getLogger(__name__)
 
@@ -148,18 +150,43 @@ class AgentMeta:
 
 
 class ActivityService:
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, database: Database | None = None) -> None:
         self.settings = settings
-        self.web3 = Web3(Web3.HTTPProvider(settings.rpc_url, request_kwargs={"timeout": 12}))
+        self.database = database
+        self.web3 = Web3(FailoverHTTPProvider(settings.rpc_urls, timeout=12))
         self._event_by_topic = {_event_topic(abi): abi for abi in EVENT_ABIS}
         self._lock = Lock()
         self._cache_at = 0.0
         self._cache: list[dict[str, object]] = []
-        self._last_success_at: float | None = None
+        self._last_success_at: datetime | None = None
         self._last_refresh_failed = False
         self._agents: list[AgentMeta] = []
         self._block_timestamps: dict[int, datetime] = {}
         self._token_symbols: dict[str, str] = {}
+        self._source = (
+            f"{settings.chain_id}:{settings.deployment_block}:"
+            f"{settings.factory_address.lower()}:{settings.key_marketplace_address.lower()}:"
+            f"{settings.legacy_factory_address.lower()}:{settings.legacy_key_marketplace_address.lower()}"
+        )
+
+    def restore_persistent_state(self) -> None:
+        if self.database is None:
+            return
+        self._restore_persistent_activity()
+
+    def _restore_persistent_activity(self) -> None:
+        if self.database is None:
+            return
+        self._cache = self.database.list_activity_events(200)
+        state = self.database.get_activity_index_state(self._source)
+        if state is None:
+            return
+        self._last_success_at = _parse_datetime(str(state["last_success_at"]))
+        error_at = _parse_datetime(str(state["last_error_at"])) if state.get("last_error_at") else None
+        self._last_refresh_failed = bool(
+            error_at is not None and self._last_success_at is not None and error_at >= self._last_success_at
+        )
+        self._cache_at = monotonic()
 
     @property
     def cache_status(self) -> str:
@@ -167,7 +194,7 @@ class ActivityService:
             return "unavailable"
         if not self._last_refresh_failed:
             return "available"
-        age = monotonic() - self._last_success_at
+        age = (datetime.now(UTC) - self._last_success_at).total_seconds()
         return "cached" if age < max(1, self.settings.activity_stale_after_seconds) else "stale"
 
     @property
@@ -180,6 +207,10 @@ class ActivityService:
             if self._refresh_due():
                 self._refresh_cache()
             return self._cache[:limit]
+
+    def refresh(self) -> None:
+        with self._lock:
+            self._refresh_cache()
 
     def list_agent_activity(self, agent_id: int, limit: int = 100) -> list[dict[str, object]]:
         limit = max(1, min(limit, 200))
@@ -206,11 +237,12 @@ class ActivityService:
                 rows = self._read_chain_activity()
             except Exception as error:
                 last_error = error
+                self._restore_persistent_activity()
                 if attempt == 2 or not _retryable_rpc_error(error):
                     break
             else:
                 self._cache = rows
-                self._last_success_at = monotonic()
+                self._last_success_at = datetime.now(UTC)
                 self._last_refresh_failed = False
                 self._cache_at = monotonic()
                 logger.info(
@@ -222,6 +254,8 @@ class ActivityService:
 
         self._last_refresh_failed = True
         self._cache_at = monotonic()
+        if self.database is not None:
+            self.database.mark_activity_index_error(self._source)
         status_code = _rpc_status_code(last_error)
         logger.warning(
             "activity refresh failed error_type=%s status_code=%s elapsed_seconds=%.2f cache_status=%s",
@@ -240,37 +274,85 @@ class ActivityService:
         factory = self.web3.eth.contract(address=factory_address, abi=FACTORY_ABI)
         agents = self._load_agents(factory)
         base_addresses = [factory_address, Web3.to_checksum_address(self.settings.key_marketplace_address)]
+        for address in (self.settings.legacy_factory_address, self.settings.legacy_key_marketplace_address):
+            if address:
+                base_addresses.append(Web3.to_checksum_address(address))
         if self.settings.policy_executor_address:
             base_addresses.append(Web3.to_checksum_address(self.settings.policy_executor_address))
         if self.settings.fee_rwa_reserve_address:
             base_addresses.append(Web3.to_checksum_address(self.settings.fee_rwa_reserve_address))
-        logs = list(
-            self.web3.eth.get_logs(
-                {
-                    "fromBlock": self.settings.deployment_block,
-                    "toBlock": "latest",
-                    "address": base_addresses,
-                }
-            )
-        )
         tracked_addresses = [
             Web3.to_checksum_address(address) for agent in agents for address in (agent.vault, agent.key)
         ]
-        if tracked_addresses:
-            logs.extend(
+        addresses = list(dict.fromkeys([*base_addresses, *tracked_addresses]))
+        latest = int(self.web3.eth.block_number)
+        safe_head = max(
+            self.settings.deployment_block,
+            latest - max(0, self.settings.activity_confirmation_blocks),
+        )
+        state = self.database.get_activity_index_state(self._source) if self.database is not None else None
+        next_block = int(str(state["next_block"])) if state is not None else self.settings.deployment_block
+        from_block = next_block
+        rewind_from_block: int | None = None
+        if state is not None:
+            rewind_from_block = max(
+                self.settings.deployment_block,
+                next_block - max(0, self.settings.activity_reorg_window_blocks),
+            )
+            from_block = rewind_from_block
+
+        by_vault = {agent.vault.lower(): agent for agent in agents}
+        by_key = {agent.key.lower(): agent for agent in agents}
+        listing_keys: dict[tuple[str, int], str] = {}
+        offer_keys: dict[tuple[str, int], str] = {}
+        if self.database is not None:
+            for market, kind, order_id, key_address, order_block in self.database.list_activity_orders():
+                if rewind_from_block is not None and order_block >= rewind_from_block:
+                    continue
+                target = listing_keys if kind == "listing" else offer_keys
+                target[(market.lower(), order_id)] = key_address.lower()
+        all_decoded: list[dict[str, object]] = []
+        chunk_size = max(1, self.settings.activity_block_chunk_size)
+        pending_rewind = rewind_from_block
+        for chunk_start in range(from_block, safe_head + 1, chunk_size):
+            chunk_end = min(safe_head, chunk_start + chunk_size - 1)
+            logs = list(
                 self.web3.eth.get_logs(
                     {
-                        "fromBlock": self.settings.deployment_block,
-                        "toBlock": "latest",
-                        "address": tracked_addresses,
+                        "fromBlock": chunk_start,
+                        "toBlock": chunk_end,
+                        "address": addresses,
                     }
                 )
             )
-        by_vault = {agent.vault.lower(): agent for agent in agents}
-        by_key = {agent.key.lower(): agent for agent in agents}
-        listing_keys: dict[int, str] = {}
-        offer_keys: dict[int, str] = {}
+            decoded, orders = self._decode_logs(logs, by_vault, by_key, listing_keys, offer_keys)
+            if self.database is None:
+                all_decoded.extend(decoded)
+            else:
+                self.database.commit_activity_index(
+                    self._source,
+                    chunk_end + 1,
+                    decoded,
+                    orders,
+                    rewind_from_block=pending_rewind,
+                )
+                pending_rewind = None
+            if chunk_end < safe_head and self.settings.activity_chunk_delay_seconds > 0:
+                sleep(self.settings.activity_chunk_delay_seconds)
+        if self.database is not None:
+            return self.database.list_activity_events(200)
+        return list(reversed(all_decoded))
+
+    def _decode_logs(
+        self,
+        logs: list[Any],
+        by_vault: dict[str, AgentMeta],
+        by_key: dict[str, AgentMeta],
+        listing_keys: dict[tuple[str, int], str],
+        offer_keys: dict[tuple[str, int], str],
+    ) -> tuple[list[dict[str, object]], list[tuple[str, str, int, str, int]]]:
         decoded: list[dict[str, object]] = []
+        orders: list[tuple[str, str, int, str, int]] = []
         for log in sorted(logs, key=lambda row: (int(row["blockNumber"]), int(row["logIndex"]))):
             if not log["topics"]:
                 continue
@@ -280,11 +362,16 @@ class ActivityService:
             event = get_event_data(self.web3.codec, abi, log)
             name = str(event["event"])
             args = dict(event["args"])
-            if name == "ListingCreated":
-                listing_keys[int(args["id"])] = str(args["key"]).lower()
-            elif name == "OfferCreated":
-                offer_keys[int(args["id"])] = str(args["key"]).lower()
+            market_address = str(log["address"]).lower()
             block_number = int(log["blockNumber"])
+            if name == "ListingCreated":
+                order_key = (market_address, int(args["id"]))
+                listing_keys[order_key] = str(args["key"]).lower()
+                orders.append((market_address, "listing", order_key[1], listing_keys[order_key], block_number))
+            elif name == "OfferCreated":
+                order_key = (market_address, int(args["id"]))
+                offer_keys[order_key] = str(args["key"]).lower()
+                orders.append((market_address, "offer", order_key[1], offer_keys[order_key], block_number))
             timestamp = self._block_timestamps.get(block_number)
             if timestamp is None:
                 timestamp = datetime.fromtimestamp(int(self.web3.eth.get_block(block_number)["timestamp"]), UTC)
@@ -306,10 +393,11 @@ class ActivityService:
                     "id": f"{_hex_hash(log['transactionHash'])}-{int(log['logIndex'])}",
                     "tx_hash": _hex_hash(log["transactionHash"]),
                     "block_number": block_number,
-                    "timestamp": timestamp,
+                    "log_index": int(log["logIndex"]),
+                    "timestamp": timestamp.isoformat(),
                 }
             )
-        return list(reversed(decoded))
+        return decoded, orders
 
     def _load_agents(self, factory: Any) -> list[AgentMeta]:
         count = int(factory.functions.agentCount().call())
@@ -356,8 +444,8 @@ class ActivityService:
         address: str,
         by_vault: dict[str, AgentMeta],
         by_key: dict[str, AgentMeta],
-        listing_keys: dict[int, str],
-        offer_keys: dict[int, str],
+        listing_keys: dict[tuple[str, int], str],
+        offer_keys: dict[tuple[str, int], str],
     ) -> dict[str, object] | None:
         agent: AgentMeta | None = None
         actor: str
@@ -377,7 +465,7 @@ class ActivityService:
             value = _format_amount(int(args["quantity"]) * int(args["unitPriceWei"]), 18)
             value_symbol = "ETH ask"
         elif event == "ListingFilled":
-            agent = by_key.get(listing_keys.get(int(args["id"]), ""))
+            agent = by_key.get(listing_keys.get((address.lower(), int(args["id"])), ""))
             actor, action, direction = str(args["buyer"]), "bought", "positive"
             quantity = str(args["quantity"])
             value, value_symbol = _format_amount(int(args["subtotalWei"]), 18), "ETH"
@@ -388,7 +476,7 @@ class ActivityService:
             value = _format_amount(int(args["quantity"]) * int(args["unitPriceWei"]), 18)
             value_symbol = "ETH"
         elif event == "OfferFilled":
-            agent = by_key.get(offer_keys.get(int(args["id"]), ""))
+            agent = by_key.get(offer_keys.get((address.lower(), int(args["id"])), ""))
             actor, action, direction = str(args["seller"]), "sold", "negative"
             quantity = str(args["quantity"])
             value, value_symbol = _format_amount(int(args["subtotalWei"]), 18), "ETH"
@@ -456,6 +544,11 @@ def _format_amount(value: int, decimals: int) -> str:
 def _hex_hash(value: Any) -> str:
     rendered = value.hex()
     return rendered if rendered.startswith("0x") else f"0x{rendered}"
+
+
+def _parse_datetime(value: str) -> datetime:
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed
 
 
 def _rpc_status_code(error: Exception | None) -> int | None:

@@ -1,6 +1,14 @@
 export type View = 'landing' | 'marketplace' | 'portfolio' | 'create' | 'docs' | 'performance' | 'creator' | 'pulse' | 'monitor'
 
-export type StrategyTaskId = 0 | 1 | 2
+export type StrategyTaskId = 0 | 1 | 2 | 3 | 4 | 5 | 6
+
+export interface StrategyRiskPreset {
+  id: 'defensive' | 'balanced' | 'active'
+  max_single_bps: number
+  max_daily_bps: number
+  max_allocation_bps: number
+  cooldown_seconds: number
+}
 
 export interface PetAppearance {
   id: number
@@ -19,9 +27,10 @@ export interface StrategyTaskDefinition {
   target_allocation_bps: number
   protocol_fee_bps: number
   live: boolean
-  execution_mode: 'active' | 'reserve'
+  execution_mode: 'active' | 'reserve' | 'review'
   execution_note: string
   safety_gates: Array<{ label: string; value: string }>
+  risk_presets: StrategyRiskPreset[]
 }
 
 export type AgentStatus = 'live' | 'paused' | 'settling' | 'simulation'

@@ -42,7 +42,7 @@ def _route(task_id: int, summaries: list[dict[str, object]]) -> MarketRadarRoute
     asset = _mapping(market.get("asset"))
     summary_asset = _mapping(representative.get("asset")) if representative else {}
     cached_count = sum(1 for row in ordered if row.get("market_refresh_failed_at") is not None)
-    status, reason = _status_reason(ordered, representative, cached_count)
+    status, reason = _status_reason(ordered, representative, cached_count, approved=task.live)
     asset_symbol = str(asset.get("symbol") or summary_asset.get("symbol") or task.deposit_asset)
     asset_address = _optional_string(asset.get("address") or summary_asset.get("address"))
     decimals = _integer(summary_asset.get("decimals"))
@@ -64,7 +64,7 @@ def _route(task_id: int, summaries: list[dict[str, object]]) -> MarketRadarRoute
         pair=_optional_string(market.get("pair")),
         pool=_optional_string(market.get("pool")),
         market_id=_optional_string(market.get("market_id")),
-        approved=True,
+        approved=task.live,
         read_only=True,
         status=status,
         reason=reason,
@@ -88,9 +88,13 @@ def _status_reason(
     summaries: list[dict[str, object]],
     representative: dict[str, object] | None,
     cached_count: int,
+    *,
+    approved: bool,
 ) -> tuple[RadarStatus, str]:
     if representative is None:
-        return "review", "Approved route has no recorded Muppet observation yet."
+        if approved:
+            return "review", "Approved route has no recorded Muppet observation yet."
+        return "review", "Candidate template is disabled until its exact route and adapter pass review."
 
     statuses = {
         str(_mapping(_mapping(row.get("market")).get("health")).get("status") or "unavailable")
@@ -146,10 +150,16 @@ def _liquidity(task_id: int, metrics: Mapping[str, object], symbol: str, decimal
             ),
             source="UniswapV3Pool.liquidity",
         )
+    if task_id == 2:
+        return RadarMetric(
+            availability="not_applicable",
+            detail="The launch route is an isolated WETH reserve and does not use an external pool.",
+            source="LaunchReserveAdapter",
+        )
     return RadarMetric(
-        availability="not_applicable",
-        detail="The launch route is an isolated WETH reserve and does not use an external pool.",
-        source="LaunchReserveAdapter",
+        availability="not_exposed",
+        detail="The candidate route has no activated adapter observation.",
+        source="FactoryV2 candidate registry",
     )
 
 
@@ -214,11 +224,27 @@ def _costs(task_id: int, metrics: Mapping[str, object]) -> RadarCosts:
 
 
 def _route_id(task_id: int) -> str:
-    return {0: "morpho-c845da65", 1: "ezmanager-weth-usdg-100", 2: "isolated-weth-launch-reserve"}[task_id]
+    return {
+        0: "morpho-c845da65",
+        1: "ezmanager-weth-usdg-100",
+        2: "isolated-weth-launch-reserve",
+        3: "candidate-aapl-usdg-500",
+        4: "candidate-nvda-usdg-500",
+        5: "candidate-spy-usdg-500",
+        6: "candidate-screened-meme-weth",
+    }[task_id]
 
 
 def _fallback_venue(task_id: int) -> str:
-    return {0: "Morpho Blue", 1: "Uniswap V3 via EZManager", 2: "isolated vault reserve"}[task_id]
+    return {
+        0: "Morpho Blue",
+        1: "Uniswap V3 via EZManager",
+        2: "isolated vault reserve",
+        3: "candidate Uniswap V3 via EZManager",
+        4: "candidate Uniswap V3 via EZManager",
+        5: "candidate Uniswap V3 via EZManager",
+        6: "unselected candidate venue",
+    }[task_id]
 
 
 def _mapping(value: object) -> Mapping[str, object]:

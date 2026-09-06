@@ -2,19 +2,19 @@
 
 LIQUIDMUPPETS is a Robinhood Chain mainnet marketplace for policy-bounded onchain agents. Public browsing remains open. Launching a new agent through the app requires at least `15,000 $MUPPETS` in the connected wallet.
 
-The `$MUPPETS` balance is reusable access utility. It remains in the wallet and is not spent, locked or burned. The canonical Robinhood Chain token is `0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189`. The existing factory predates the rule and remains directly callable; a gated factory migration is required for protocol-level enforcement.
+The `$MUPPETS` balance is reusable access utility. It remains in the wallet and is not spent, locked or burned. The canonical Robinhood Chain token is `0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189`. FactoryV2 now implements this rule onchain, but the current mainnet factory remains V1 until the published multisig migration is executed.
 
 Public interface: [https://liquidmuppets.io](https://liquidmuppets.io)
 
 X: [@AMBF](https://x.com/AMBF)
 
-Current status: controlled mainnet beta. Existing Muppets can be funded, allocated, traded and redeemed. New creator launches are available through the app to connected wallets holding at least `15,000 $MUPPETS`. If that rule must be enforced by the protocol rather than only the app and API, the current factory must also be replaced with a gated version.
+Current status: controlled mainnet beta. Existing Muppets can be funded, allocated, traded and redeemed. New creator launches are available through the app to connected wallets holding at least `15,000 $MUPPETS`. The live V1 launch path is app and API gated. FactoryV2, its migration script, its verification step, and the new reviewed-route adapter are implemented in this repository but have not been broadcast to mainnet.
 
 ## Live mainnet scope
 
 - Robinhood Chain ID `4663`
 - seven cosmetic pet appearances, independent from task permissions
-- three selectable task configurations
+- three selectable live task configurations and four visible FactoryV2 review candidates
 - one deployed money route for each task, with no unavailable route cards in the app
 - native Agent Key asks, bids, partial fills, buys, sells and permanent binding
 - 3% marketplace fee routed into an onchain Stock Token reserve
@@ -29,7 +29,8 @@ Current status: controlled mainnet beta. Existing Muppets can be funded, allocat
 - a post-launch command center with vault funding, an onchain share preview, keeper timing, performance link and X sharing
 - browser-local recovery for the three launch transactions, keyed to the connected wallet, chain and factory
 - optional app handles claimed with a wallet signature and no gas
-- app and API balance gate requiring `15,000 $MUPPETS` to launch a new agent
+- app and API balance gate requiring `15,000 $MUPPETS` to launch through the current V1 interface
+- FactoryV2 code with an onchain 15,000 `$MUPPETS` balance gate, reviewed task registry, risk presets, multisig-only ownership and a post-verification launch switch
 - canonical `$MUPPETS` token configured at `0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189`
 - no deployer key in the browser, API, or VPS; the limited keeper key is accepted only through the host-encrypted vault and loaded only by the private service
 
@@ -42,6 +43,17 @@ The routes are deliberately different:
 | Launch pool | WETH to mLAUNCH | Isolates up to 10% as a WETH reserve while no launch-token pool is approved | 0.25 WETH |
 
 Stable yield and ETH range are active venue strategies. Launch pool is selectable and functional as a staging reserve, but it does not yet trade, lend, bridge, enter a token pool, collect fees, or generate yield. Its smaller allocation is a truthful boundary, not a volume gate.
+
+FactoryV2 also carries a review catalog for the next route set:
+
+| Candidate | Exact route | Candidate cap | Evidence now | Activation boundary |
+| --- | --- | ---: | --- | --- |
+| AAPL / USDG | Uniswap 0.05% pool `0xAae0…2d6D` | 2,500 USDG | exact pool and oracle identified | EZManager does not currently approve the pool |
+| NVDA / USDG | Uniswap 0.05% pool `0xd4EB…14a3` | 2,500 USDG | venue allowlisted; open, allocate and full redemption passed on a mainnet fork | FactoryV2 source verification and Safe approval |
+| SPY / USDG | Uniswap 0.05% pool `0xa7Bb…9167` | 2,500 USDG | exact pool and oracle identified | EZManager does not currently approve the pool |
+| screened meme / WETH | no pool selected | 1,000 USDG | hard liquidity, age, volume, oracle and exit criteria are defined | an exact asset and pool must pass review |
+
+Review candidates cannot be launched. They are displayed so the missing evidence is public instead of being represented as a live strategy.
 
 ## Deployed contracts
 
@@ -56,6 +68,14 @@ Current deployment block: `52653314`.
 - `LaunchReserveAdapter`: [`0x956127B0B586B9427182FCd9325efe032E9B5181`](https://robinhoodchain.blockscout.com/address/0x956127B0B586B9427182FCd9325efe032E9B5181)
 
 The deployer and current owner are the dedicated address `0x30dF6f545FcD732c659626b8C8aFd63Ff8aE3d5f`. The limited keeper is `0xA5960A69E57F4EbC924503bC829f1E6670BfBA51`. Marketplace treasury payments now go directly to `FeeRwaReserve`. Deployment receipts and runtime bytecode were checked through RPC. Source verification for this deployment is still pending. The retired zero-agent deployment is preserved in `contracts/deployments/robinhood-mainnet-v1.json`.
+
+### FactoryV2 migration package
+
+`LiquidMuppetsFactoryV2` preserves the V1 agent ID range, delegates legacy reads to V1, and deploys only new vaults and Keys. It checks the creator's live balance against an immutable 15,000 `$MUPPETS` threshold, keeps the tokens in the creator wallet, and exposes defensive, balanced and active policy presets. Each task points to an exact asset, immutable adapter, route ID, deposit cap and allowed preset mask.
+
+The deployment script creates a separate V2 Key market, deploys the fork-tested NVDA/USDG adapter, switches only future policy registration to V2, and transfers the legacy factory, both Key markets, PolicyExecutor, FeeRwaReserve and FactoryV2 to a Safe with at least two owners and a threshold of at least two. Existing V1 vault deposits, allocations, redemptions and Key orders retain their original contracts. The frontend aggregates both Key markets after migration.
+
+FactoryV2 launches default to off. They can only be enabled by deployed governance code after Blockscout source verification. No FactoryV2 address is listed here because no migration transaction has been broadcast.
 
 ## Assets and venues
 
@@ -110,7 +130,7 @@ The first dev-funded cycle spent `0.01 ETH`, routed `24.587800 USDG`, and bought
 
 ## Public activity
 
-`GET /api/v1/activity` scans the deployed contracts from the current deployment block and returns real launches, asks, bids, fills, deposits, withdrawals, allocations, recalls, recenters, and Key bindings. The marketplace polls this endpoint and links every item to its transaction.
+`GET /api/v1/activity` incrementally indexes the deployed contracts and returns real launches, asks, bids, fills, deposits, withdrawals, allocations, recalls, recenters, and Key bindings. The indexer starts at the deployment block once, persists decoded events and its next safe block in SQLite, then reads only the new confirmed range plus a short reorg window. The marketplace polls the persisted snapshot and links every item to its transaction.
 
 - green: buys, deposits, launches and strategy allocations
 - red: sells, withdrawals and recalls
@@ -155,7 +175,9 @@ The profile shows a wallet-signed app handle when one exists. The handle proves 
 
 When a keeper transaction matches a decoded chain receipt, Pulse shows one event enriched with the keeper reason instead of duplicating it. A hold has no transaction link and says no transaction was signed. The endpoint supports `category`, `creator`, `agent_id`, and `limit` filters. Agent Key records remain visibly separate from vault performance, and Stock Token reserve activity remains its own category.
 
-The chain decoder refreshes at most once per minute during normal operation and caches immutable agent metadata, token symbols and event-block timestamps instead of rereading them on every visitor request. Rate limits and other retryable RPC failures get bounded retries. A recent successful snapshot is reported as `cached` without a page-level alert; it becomes `stale` after five minutes and remains visibly labeled until a refresh succeeds.
+The chain decoder refreshes in the background at most once per minute during normal operation and caches immutable agent metadata, token symbols and event-block timestamps instead of rereading them on every visitor request. Rate limits and other retryable RPC failures get bounded retries. A recent successful snapshot is reported as `cached` without a page-level alert; it becomes `stale` after five minutes and remains visibly labeled until a refresh succeeds.
+
+Activity events, scan progress and the last healthy fee-reserve response survive API restarts in SQLite. Chain, activity and browser read-relay requests use the configured ordered RPC pool and move to the next endpoint on transport, rate-limit or upstream failures. Robinhood's public endpoint is rate-limited and is not represented as an independent fallback; production should set `RPC_FALLBACK_URLS` to one or more separately operated provider endpoints.
 
 ## Watchlists, alerts and Muppet Market Radar
 
@@ -163,10 +185,10 @@ The chain decoder refreshes at most once per minute during normal operation and 
 
 The alert inbox combines two existing evidence sources for followed Muppets: recorded market observations and System Pulse. It calls out blocked or unavailable market health, an out-of-range position, a delayed market-evidence refresh, an unavailable or explicitly aged oracle, keeper actions or holds, deposits, withdrawals, allocations, Agent Key activity and protocol-wide Stock Token reserve purchases. A chain action links to its receipt. A keeper hold says no transaction was signed. A market observation says it has no receipt.
 
-Muppet Market Radar is read-only. `GET /api/v1/market-radar` compiles the configured task routes from the latest recorded adapter summaries. Each route receives one explicit state:
+Muppet Market Radar is read-only. `GET /api/v1/market-radar` compiles the three live routes and four FactoryV2 review candidates from the latest recorded adapter summaries. Each route receives one explicit state:
 
 - `live`: the latest usable adapter evidence passed the configured route checks
-- `review`: the route is approved but current evidence is absent or unavailable
+- `review`: the route is missing current evidence or still awaits protocol approval
 - `rejected`: a recorded hard route or accounting check failed
 
 Radar reports exact pool or market identifiers, native route liquidity, oracle evidence, per-vault capacity and policy fee or slippage limits when those fields exist. Current adapters do not expose 24 hour volume, pool age, realized execution cost or an expected return model, so those fields remain `not exposed` or `not applicable`. Radar never fills those gaps with historical APY, USD conversions or projected yield, and it cannot approve or execute a route.
@@ -248,10 +270,11 @@ forge build
 forge test -vv
 forge test --match-contract MorphoBlueAdapterForkTest --fork-url https://rpc.mainnet.chain.robinhood.com -vv
 forge test --match-contract EZManagerRangeAdapterForkTest --fork-url https://rpc.mainnet.chain.robinhood.com -vv
+forge test --match-contract EZManagerPoolAdapterForkTest --fork-url https://rpc.mainnet.chain.robinhood.com -vv
 forge test --match-contract FeeRwaReserveForkTest --fork-url https://rpc.mainnet.chain.robinhood.com -vv
 ```
 
-The fork suites enter and redeem the current Morpho route, open, atomically recenter, and redeem a current EZManager range, and buy an oracle-bounded AAPL Stock Token through the live reserve route.
+The fork suites enter and redeem the current Morpho route, open, atomically recenter, and redeem the current WETH range, exercise a full NVDA/USDG deposit and exit through the new reviewed adapter, and buy an oracle-bounded AAPL Stock Token through the live reserve route.
 
 ## Deployment
 
@@ -262,6 +285,21 @@ cd contracts
 forge script script/DeployMainnet.s.sol:DeployMainnet --rpc-url https://rpc.mainnet.chain.robinhood.com -vvv
 forge script script/DeployMainnet.s.sol:DeployMainnet --rpc-url https://rpc.mainnet.chain.robinhood.com --broadcast -vvv
 ```
+
+FactoryV2 migration is intentionally a separate operation. `SAFE_MULTISIG` must be deployed Safe-compatible code with at least two owners and a threshold of at least two. Run the first command without `--broadcast`, inspect the simulated ownership and legacy-path assertions, then broadcast only after the Safe address and migration window are approved:
+
+```bash
+cd contracts
+SAFE_MULTISIG=0x... forge script script/DeployFactoryV2.s.sol:DeployFactoryV2 \
+  --rpc-url https://rpc.mainnet.chain.robinhood.com -vvv
+
+WRITE_DEPLOYMENT_RECEIPT=true SAFE_MULTISIG=0x... forge script script/DeployFactoryV2.s.sol:DeployFactoryV2 \
+  --rpc-url https://rpc.mainnet.chain.robinhood.com --broadcast -vvv
+
+./scripts/verify-factory-v2.sh deployments/robinhood-mainnet-v2.json
+```
+
+The migration receipt is written with `deployed-pending-verification`. The verification script checks all three new contracts, confirms Safe ownership and confirms launches are still disabled, then prints the exact Safe calldata for `setLaunchesEnabled(true)`. Update the API and frontend to V2 only after that Safe transaction confirms.
 
 The frontend uses atomic release directories under `/var/www/liquidmuppets/releases/` with `/var/www/liquidmuppets/current` as the active symlink. The API runs as the unprivileged `liquidmuppets` user from `/opt/liquidmuppets-api/current`, reads public runtime values from `/etc/liquidmuppets/api.env` and `/etc/liquidmuppets/runtime-public.env`, reads the keeper secret only from mode-0600 `/etc/liquidmuppets/keeper.env`, and writes profiles, keeper decisions, performance checkpoints, and marketplace performance summaries to SQLite under `/var/lib/liquidmuppets`. Creator profiles and Pulse are read models over those persisted records plus decoded chain events.
 
@@ -290,10 +328,10 @@ Public keeper triggering is disabled. The production scheduler is active every f
 
 ## Risk boundary
 
-- `$MUPPETS` launch access is enforced by the app and API, not the current factory contract
+- `$MUPPETS` launch access is enforced by the app and API, not the currently deployed V1 factory contract
 - app launch fails closed if the canonical `$MUPPETS` contract or its Robinhood Chain balance read is unavailable
 - interrupted launch recovery is stored only in the current browser; users should keep wallet receipts if they switch devices or clear site data
-- an unbypassable 15,000 `$MUPPETS` rule requires a gated factory migration because the current factory predates the rule
+- FactoryV2 implements an unbypassable 15,000 `$MUPPETS` balance rule, but it is not active until its multisig migration is broadcast, verified and enabled
 - contracts are tested but not independently audited
 - stable APY is variable and can be zero
 - Morpho withdrawals depend on market liquidity
@@ -306,4 +344,6 @@ Public keeper triggering is disabled. The production scheduler is active every f
 - while the fee reserve is paused, the owner can rescue its native ETH or held tokens to a chosen receiver
 - the current owner is a dedicated EOA, not a multisig
 - source verification for the current deployment is still pending
+- AAPL/USDG and SPY/USDG remain disabled because their EZManager pools are not currently approved; no meme/WETH pool has been selected
+- NVDA/USDG passed the repository's mainnet-fork entry and full-exit test, but remains disabled until the verified FactoryV2 migration and Safe activation
 - per-vault caps reduce exposure but do not make deposits risk-free

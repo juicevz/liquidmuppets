@@ -1,0 +1,28 @@
+LIQUIDMUPPETS OFFICIAL
+
+liquidmuppets update: the reliability release is live, and the FactoryV2 migration package is now public.
+
+System Pulse now indexes new confirmed blocks instead of replaying full history. decoded receipts, scan progress, and the last healthy reserve snapshot persist across API restarts. RPC reads can fail over to an independently configured provider, while cached evidence keeps its original timestamp and becomes visibly stale after five minutes.
+
+FactoryV2 adds the 15,000 $MUPPETS launch requirement onchain. the balance stays in the creator's wallet. it also adds an approved strategy registry, defensive, balanced, and active policy presets, V1 compatibility, Safe ownership checks, and a launch switch that stays off until the contracts are source verified.
+
+the strategy catalog now separates three live routes from four review candidates: AAPL/USDG, NVDA/USDG, SPY/USDG, and a screened meme/WETH slot. NVDA passed a real mainnet-fork open, allocation, and full redemption. AAPL and SPY remain disabled while their EZManager pool approvals are false. no meme pool has been selected.
+
+no invented APY. no candidate shown as live before its evidence passes.
+
+code and full migration notes:
+https://github.com/juicevz/liquidmuppets
+
+
+FOUNDER
+
+been fixing the boring parts of liquidmuppets because those are usually the parts users notice first.
+
+the red receipt refresh warning wasn't a wallet problem and reconnecting wallets wouldn't fix it. System Pulse was leaning too hard on a rate-limited public RPC and could replay a wide block range after a restart. the new indexer saves every confirmed step, resumes from the last healthy block, rewinds a small window for reorgs, and keeps the last good receipt and reserve snapshots through restarts. it can also switch to a second provider when one is configured.
+
+I packaged FactoryV2 in the same release. it checks the 15,000 $MUPPETS balance inside the factory, leaves the tokens in your wallet, gives each approved strategy an exact asset, adapter, route, cap, and preset mask, and moves ownership toward a Safe. legacy Muppets keep their vaults, withdrawals, policies, and Key market.
+
+I also added the next strategy set to public review. the NVDA/USDG adapter passed a mainnet-fork deposit, allocation, and full exit. AAPL and SPY are still blocked by venue approval. the meme/WETH slot has no token selected because making up a pool to fill a card would be silly.
+
+the V2 contracts stay launch-disabled until source verification and the Safe activation. app code, tests, and docs are here:
+https://github.com/juicevz/liquidmuppets

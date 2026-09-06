@@ -56,6 +56,26 @@ const taskDetails: Record<StrategyTaskId, { summary: string; movement: string; g
     movement: 'A cycle can stage 10% in the reserve. The position stays in WETH and remains recallable.',
     guardrail: '90% stays idle, each vault is capped at 0.25 WETH, and staged WETH remains recallable at any time.',
   },
+  3: {
+    summary: 'Prepares a USDG-accounted AAPL range through the reviewed FactoryV2 adapter interface.',
+    movement: 'The route stays disabled until the exact pool is approved by EZManager and its full exit passes a mainnet-fork test.',
+    guardrail: 'A freshness-bounded stock oracle, fixed pool identity, vault cap, and selected risk preset are required.',
+  },
+  4: {
+    summary: 'Prepares a separately-accounted NVDA range whose vault accepts USDG and returns USDG on exit.',
+    movement: 'The pool is venue-allowlisted and its full exit passed fork review. Launch remains disabled until the verified FactoryV2 migration.',
+    guardrail: 'The adapter checks venue status and oracle freshness before opening or adding to a position.',
+  },
+  5: {
+    summary: 'Prepares a defensive SPY range with USDG vault accounting and its own immutable adapter.',
+    movement: 'The route stays disabled until venue approval and the complete withdrawal path are verified on a fork.',
+    guardrail: 'The route needs an exact pool, a fresh stock oracle, a vault cap, and a FactoryV2 risk preset.',
+  },
+  6: {
+    summary: 'Reserves a reviewed template slot for one meme and WETH market. No token or pool is selected.',
+    movement: 'Governance can activate a route only after the pool, adapter and exit path are fixed onchain.',
+    guardrail: 'At least $250k liquidity, 30 days of pool age, $50k daily volume, and independent oracle evidence are required.',
+  },
 }
 
 export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: CreateAgentPageProps) {
@@ -64,6 +84,7 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
   const [petId, setPetId] = useState(0)
   const [taskId, setTaskId] = useState<StrategyTaskId>(0)
   const [marketId, setMarketId] = useState(defaultMarketForTask(0).id)
+  const [presetId, setPresetId] = useState<0 | 1 | 2>(1)
   const [name, setName] = useState('')
   const [keySymbol, setKeySymbol] = useState('')
   const [keySupply, setKeySupply] = useState('100')
@@ -103,7 +124,7 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
   const canContinue = useMemo(
     () => step === 0
       || (step === 1 && Boolean(task))
-      || (step === 2 && Boolean(market))
+      || (step === 2 && market?.status === 'live')
       || (step === 3 && formReady),
     [formReady, market?.id, step, task],
   )
@@ -111,6 +132,7 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
   const route = task
     ? config?.mode === 'testnet' ? task.testnet_route : task.production_route
     : ''
+  const selectedPreset = task?.risk_presets[presetId]
 
   useEffect(() => {
     if (!walletAddress) {
@@ -144,6 +166,7 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
     setPetId(stored.input.petId)
     setTaskId(stored.input.taskId)
     setMarketId(defaultMarketForTask(stored.input.taskId).id)
+    setPresetId(stored.input.presetId ?? 1)
     setName(stored.input.name)
     setKeySymbol(stored.input.keySymbol)
     setKeySupply(String(stored.input.keySupply))
@@ -186,6 +209,7 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
       keySupply: supply,
       listingQuantity: listed,
       floorPriceEth: floorPrice,
+      presetId: config.factoryVersion >= 2 && task?.risk_presets.length ? presetId : undefined,
     }
     let activeSession = session ?? createLaunchSession(
       config.chainId,
@@ -235,6 +259,7 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
     setPetId(0)
     setTaskId(0)
     setMarketId(defaultMarketForTask(0).id)
+    setPresetId(1)
     setName('')
     setKeySymbol('')
     setKeySupply('100')
@@ -296,6 +321,7 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
               <div className="task-picker" role="group" aria-label="Choose type of task">
                 {tasks.map((item) => (
                   <button type="button" aria-pressed={taskId === item.id} className={taskId === item.id ? 'active' : ''} onClick={() => selectTask(item.id)} key={item.id}>
+                    <span className={`task-availability ${item.live ? 'live' : ''}`}>{item.live ? 'live' : 'route review'}</span>
                     <strong>{item.label}</strong><span className="task-assets">{item.deposit_asset} → {item.share_prefix}</span><i />
                   </button>
                 ))}
@@ -326,16 +352,17 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
             <div className="builder-step market-universe-step">
               <span className="builder-step-number">03 / MARKET</span>
               <h2>Choose where this pet can work.</h2>
+              <div className="market-status-legend"><span><i className="live" />live route</span><span><i />review only</span></div>
               <div className="strategy-market-grid" role="group" aria-label="Choose market route">
                 {marketOptions.map((item) => (
                   <button
                     type="button"
-                    className={market?.id === item.id ? 'active' : ''}
+                    className={`${market?.id === item.id ? 'active ' : ''}market-${item.status}`}
                     aria-pressed={market?.id === item.id}
                     onClick={() => setMarketId(item.id)}
                     key={item.id}
                   >
-                    <span className="strategy-market-topline"><small>{item.groupLabel}</small></span>
+                    <span className="strategy-market-topline"><small>{item.groupLabel}</small><b>{item.status}</b></span>
                     <strong>{item.title}</strong>
                     <span className="strategy-market-pair">{item.market}</span>
                     <p>{item.description}</p>
@@ -344,11 +371,32 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
                 ))}
               </div>
               {market && (
-                <div className="strategy-market-detail" aria-live="polite">
+                <div className={`strategy-market-detail market-detail-${market.status}`} aria-live="polite">
                   <div>
                     <span><small>selected market</small><strong>{market.market}</strong></span>
+                    <b>{market.status === 'live' ? 'enabled' : 'not launchable'}</b>
                   </div>
-                  <ul>{market.checks.map((check) => <li key={check}><Icon name="check" />{check}</li>)}</ul>
+                  <ul>{market.checks.map((check) => <li key={check}><Icon name={market.status === 'live' ? 'check' : 'alert'} />{check}</li>)}</ul>
+                  {market.status === 'review' && (
+                    <p className="market-review-boundary"><Icon name="shield" /><span><strong>Candidate only.</strong> Code support is present, but no user capital can enter this route until its contract registry entry is enabled.</span></p>
+                  )}
+                  {task && task.risk_presets.length > 0 && (
+                    <div className="risk-preset-picker" role="group" aria-label="FactoryV2 range risk preset">
+                      {task.risk_presets.map((preset, index) => (
+                        <button
+                          type="button"
+                          className={presetId === index ? 'active' : ''}
+                          disabled={(config?.factoryVersion ?? 1) < 2}
+                          onClick={() => setPresetId(index as 0 | 1 | 2)}
+                          key={preset.id}
+                        >
+                          <strong>{preset.id}</strong>
+                          <small>{preset.max_allocation_bps / 100}% max · {preset.cooldown_seconds / 3600}h cooldown</small>
+                        </button>
+                      ))}
+                      {(config?.factoryVersion ?? 1) < 2 && <p>Preset selection activates only after the FactoryV2 multisig migration.</p>}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -392,6 +440,7 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
                     <div className="review-pet"><img src={pet.portrait} alt="" /><span><small>appearance</small><strong>{pet.name}</strong></span></div>
                     <div><small>task</small><strong>{task?.label ?? 'loading'}</strong></div>
                     <div className="review-market"><small>market</small><strong>{market?.market ?? 'loading'}</strong></div>
+                    {selectedPreset && config?.factoryVersion && config.factoryVersion >= 2 && <div><small>risk preset</small><strong>{selectedPreset.id}</strong></div>}
                     <div><small>vault share</small><strong>{task?.share_prefix}-{keySymbol || 'KEY'}</strong></div>
                     <div><small>Agent Key</small><strong>{supply || 0} ${keySymbol || 'KEY'}</strong></div>
                     <div><small>first ask</small><strong>{listed || 0} at {floorPrice || '0'} ETH</strong></div>

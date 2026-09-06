@@ -56,8 +56,16 @@ def test_radar_uses_recorded_evidence_without_inventing_missing_metrics() -> Non
         explorer_url="https://explorer.invalid",
     )
 
-    assert [route.status for route in response.routes] == ["live", "live", "live"]
-    stable, range_route, reserve = response.routes
+    assert [route.status for route in response.routes] == [
+        "live",
+        "live",
+        "live",
+        "review",
+        "review",
+        "review",
+        "review",
+    ]
+    stable, range_route, reserve, *candidates = response.routes
     assert stable.liquidity.value == "311877447.463792"
     assert stable.liquidity.unit == "USDG"
     assert stable.volume_24h.availability == "not_exposed"
@@ -66,6 +74,7 @@ def test_radar_uses_recorded_evidence_without_inventing_missing_metrics() -> Non
     assert range_route.costs.max_execution_slippage_bps == 300
     assert range_route.costs.estimate.value is None
     assert reserve.liquidity.availability == "not_applicable"
+    assert all(route.approved is False for route in candidates)
     assert "does not estimate APY" in response.boundary
 
 
@@ -123,6 +132,6 @@ def test_market_radar_route_reads_only_the_recorded_summary_cache(tmp_path: Path
 
     assert response.status_code == 200
     body = response.json()
-    assert len(body["routes"]) == 3
+    assert len(body["routes"]) == 7
     assert body["routes"][0]["status"] == "live"
     assert body["routes"][0]["read_only"] is True

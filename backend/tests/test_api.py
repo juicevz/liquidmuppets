@@ -1,5 +1,5 @@
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from time import monotonic
 from unittest.mock import MagicMock
 
 import httpx
@@ -9,21 +9,39 @@ from fastapi.testclient import TestClient
 from pytest import MonkeyPatch
 
 from app.config import Settings
+from app.database import Database
 from app.main import create_app
 from app.routers import system
 from app.services.activity import ActivityService
 from app.services.token_gate import TokenGateService, format_token_amount
 
 
-def test_strategy_api_exposes_three_concrete_tasks(tmp_path: Path) -> None:
+def test_strategy_api_exposes_live_and_factory_v2_candidate_tasks(tmp_path: Path) -> None:
     app = create_app(Settings(database_path=tmp_path / "test.sqlite3", rpc_url="http://127.0.0.1:1"))
     with TestClient(app) as client:
         response = client.get("/api/v1/strategies")
     assert response.status_code == 200
     tasks = response.json()
-    assert [task["slug"] for task in tasks] == ["stable-yield", "eth-range", "launch-liquidity"]
-    assert [task["live"] for task in tasks] == [True, True, True]
-    assert [task["execution_mode"] for task in tasks] == ["active", "active", "reserve"]
+    assert [task["slug"] for task in tasks] == [
+        "stable-yield",
+        "eth-range",
+        "launch-liquidity",
+        "aapl-usdg-range",
+        "nvda-usdg-range",
+        "spy-usdg-range",
+        "screened-meme-weth-range",
+    ]
+    assert [task["live"] for task in tasks] == [True, True, True, False, False, False, False]
+    assert [task["execution_mode"] for task in tasks] == [
+        "active",
+        "active",
+        "reserve",
+        "review",
+        "review",
+        "review",
+        "review",
+    ]
+    assert [preset["id"] for preset in tasks[3]["risk_presets"]] == ["defensive", "balanced", "active"]
 
 
 def test_preview_api_returns_integer_amount(tmp_path: Path) -> None:
@@ -117,7 +135,7 @@ def test_activity_api_filters_receipts_by_agent(tmp_path: Path) -> None:
 def test_activity_uses_recent_cache_during_a_transient_rpc_error(monkeypatch: MonkeyPatch) -> None:
     service = ActivityService(Settings(rpc_url="https://rpc.invalid", activity_stale_after_seconds=300))
     service._cache = [{"agent_id": 1, "action": "deposited"}]
-    service._last_success_at = monotonic()
+    service._last_success_at = datetime.now(UTC)
     monkeypatch.setattr(service, "_read_chain_activity", MagicMock(side_effect=RuntimeError("rate limited")))
 
     assert service.list_agent_activity(1) == [{"agent_id": 1, "action": "deposited"}]
@@ -128,7 +146,7 @@ def test_activity_uses_recent_cache_during_a_transient_rpc_error(monkeypatch: Mo
 def test_activity_marks_an_old_cache_stale_after_a_refresh_error(monkeypatch: MonkeyPatch) -> None:
     service = ActivityService(Settings(rpc_url="https://rpc.invalid", activity_stale_after_seconds=60))
     service._cache = [{"agent_id": 1, "action": "deposited"}]
-    service._last_success_at = monotonic() - 61
+    service._last_success_at = datetime.now(UTC) - timedelta(seconds=61)
     monkeypatch.setattr(service, "_read_chain_activity", MagicMock(side_effect=RuntimeError("rate limited")))
 
     assert service.list_agent_activity(1) == [{"agent_id": 1, "action": "deposited"}]
@@ -148,6 +166,43 @@ def test_activity_retries_a_rate_limit_and_recovers(monkeypatch: MonkeyPatch) ->
     assert service.list_agent_activity(1) == [{"agent_id": 1, "action": "deposited"}]
     assert service.cache_status == "available"
     assert read_chain.call_count == 2
+
+
+def test_activity_snapshot_survives_a_service_restart(tmp_path: Path) -> None:
+    database = Database(tmp_path / "activity.sqlite3")
+    database.initialize()
+    timestamp = datetime.now(UTC).isoformat()
+    row = {
+        "id": "0xabc-1",
+        "tx_hash": "0x" + "ab" * 32,
+        "block_number": 123,
+        "log_index": 1,
+        "timestamp": timestamp,
+        "action": "deposited",
+        "actor": "0x1111111111111111111111111111111111111111",
+        "creator": None,
+        "agent_id": 1,
+        "agent_name": "quiet frog",
+        "key_symbol": "FROG",
+        "quantity": None,
+        "value": "1",
+        "value_symbol": "USDG",
+        "direction": "positive",
+    }
+    database.commit_activity_index("source", 124, [row], [], rewind_from_block=100)
+    settings = Settings(
+        database_path=database.path,
+        rpc_url="https://rpc.invalid",
+        factory_address="0x2222222222222222222222222222222222222222",
+        key_marketplace_address="0x3333333333333333333333333333333333333333",
+        deployment_block=100,
+    )
+    service = ActivityService(settings, database)
+    service._source = "source"
+    service.restore_persistent_state()
+
+    assert service.list_agent_activity(1) == [row]
+    assert service.cache_status == "available"
 
 
 def test_public_rwa_keeper_trigger_is_disabled(tmp_path: Path) -> None:
@@ -301,6 +356,37 @@ def test_rpc_proxy_splits_large_batches_before_upstream(tmp_path: Path, monkeypa
     assert response.status_code == 200
     assert len(response.json()) == 25
     assert batch_sizes == [10, 10, 5]
+
+
+def test_rpc_proxy_fails_over_to_the_secondary_endpoint(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    calls: list[str] = []
+
+    def fake_post(url: str, **_kwargs: object) -> httpx.Response:
+        calls.append(url)
+        request = httpx.Request("POST", url)
+        if url == "https://primary.invalid":
+            return httpx.Response(503, request=request)
+        return httpx.Response(200, json={"jsonrpc": "2.0", "id": 1, "result": "0x1237"}, request=request)
+
+    monkeypatch.setattr(system, "sleep", lambda _: None)
+    app = create_app(
+        Settings(
+            database_path=tmp_path / "test.sqlite3",
+            rpc_url="https://primary.invalid",
+            rpc_fallback_urls=("https://secondary.invalid",),
+        )
+    )
+    with TestClient(app) as client:
+        monkeypatch.setattr(app.state.rpc_client, "post", fake_post)
+        response = client.post(
+            "/api/v1/rpc",
+            json={"jsonrpc": "2.0", "id": 1, "method": "eth_chainId", "params": []},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["result"] == "0x1237"
+    assert calls.count("https://primary.invalid") == len(system.RPC_RETRY_DELAYS)
+    assert calls[-1] == "https://secondary.invalid"
 
 
 def test_wallet_profile_requires_the_wallet_signature(tmp_path: Path) -> None:

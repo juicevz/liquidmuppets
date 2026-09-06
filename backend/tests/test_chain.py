@@ -1,8 +1,10 @@
+from pathlib import Path
 from typing import Any
 
 from pytest import MonkeyPatch
 
 from app.config import Settings
+from app.database import Database
 from app.services import chain as chain_module
 from app.services.chain import ChainService
 
@@ -60,3 +62,15 @@ def test_rwa_read_returns_last_confirmed_state_after_rpc_failure(monkeypatch: Mo
 
     assert attempts == len(chain_module.RWA_READ_RETRY_DELAYS)
     assert state == {"configured": True, "blockNumber": 123, "stale": True}
+
+
+def test_rwa_snapshot_survives_a_service_restart(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    database = Database(tmp_path / "state.sqlite3")
+    database.initialize()
+    database.upsert_service_snapshot("rwa_reserve", {"configured": True, "blockNumber": 456})
+    service = ChainService(Settings(rpc_url="https://rpc.invalid"), database)
+    service.restore_persistent_state()
+    monkeypatch.setattr(service, "_read_rwa_reserve_once", lambda **_kwargs: (_ for _ in ()).throw(RuntimeError()))
+    monkeypatch.setattr(chain_module, "sleep", lambda _: None)
+
+    assert service.read_rwa_reserve() == {"configured": True, "blockNumber": 456, "stale": True}

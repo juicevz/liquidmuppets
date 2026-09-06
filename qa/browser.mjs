@@ -244,6 +244,13 @@ await page.getByText('What should this pet do?').waitFor()
 results.taskPickerCount = await page.locator('.task-picker button').count()
 results.taskMoneyPath = await page.locator('.task-money-path').count() === 1
 results.taskDetails = await page.locator('.task-detail-grid > div').count() === 3
+await page.getByRole('button', { name: /NVDA range/i }).click()
+results.nvdaCandidateVisible = await page.getByRole('button', { name: /NVDA range/i }).getAttribute('aria-pressed') === 'true'
+await page.getByRole('button', { name: /Continue/ }).click()
+await page.getByText('Choose where this pet can work.').waitFor()
+results.candidateMarketReviewOptions = await page.locator('.strategy-market-grid .market-review').count()
+results.candidateCannotContinue = await page.getByRole('button', { name: /Continue/ }).isDisabled()
+await page.locator('.compact-builder-progress button').filter({ hasText: 'Task' }).click()
 await page.getByRole('button', { name: /ETH range/i }).click()
 results.ethRangeSelectable = await page.getByRole('button', { name: /ETH range/i }).getAttribute('aria-pressed') === 'true'
 results.ethRangeExplained = await page.getByText(/Converts WETH through the canonical/i).count() === 1
@@ -449,7 +456,7 @@ results.radarEndpoint = await page.evaluate(async () => {
   const body = await response.json()
   return response.ok
     && Array.isArray(body.routes)
-    && body.routes.length === 3
+    && body.routes.length === 7
     && body.routes.every((route) => route.read_only === true && ['live', 'review', 'rejected'].includes(route.status))
     && body.routes.every((route) => route.volume_24h.value === null && route.costs.estimate.value === null)
 })
@@ -700,9 +707,12 @@ const failed =
   || results.builderProgressSteps !== 5
   || results.descriptionInputs !== 0
   || !results.appearanceCopy
-  || results.taskPickerCount !== 3
+  || results.taskPickerCount !== 7
   || !results.taskMoneyPath
   || !results.taskDetails
+  || !results.nvdaCandidateVisible
+  || results.candidateMarketReviewOptions !== 1
+  || !results.candidateCannotContinue
   || !results.ethRangeSelectable
   || !results.ethRangeExplained
   || !results.launchPoolSelectable
@@ -758,7 +768,7 @@ const failed =
   || !results.monitorAlertBoundaries
   || results.monitorUnreadBefore < 1
   || !results.monitorUnreadClears
-  || results.radarRows !== 3
+  || results.radarRows !== 7
   || !results.radarReadOnly
   || !results.radarStatuses.every((status) => /live|review|rejected/i.test(status))
   || !results.radarMissingStaysMissing
@@ -770,7 +780,7 @@ const failed =
   || !results.portfolioConnectState
   || !results.portfolioChainNumberRemoved
   || results.docsTitle !== 'Docs | LIQUIDMUPPETS'
-  || results.docsSections !== 17
+  || results.docsSections !== 19
   || !results.docsTokenGate
   || !results.docsSevenPets
   || !results.docsFeeReserve
@@ -815,7 +825,7 @@ const failed =
   || results.narrowDocsOverflow
   || results.narrowPerformanceOverflow
   || !results.narrowHeaderVisible
-  || results.degradedTaskPickerCount !== 3
+  || results.degradedTaskPickerCount !== 7
   || !results.degradedTaskWarning
   || consoleErrors.length > 0
 

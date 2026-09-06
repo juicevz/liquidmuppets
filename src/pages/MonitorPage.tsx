@@ -258,12 +258,12 @@ function RadarPanel({ radar, loading }: { radar: MarketRadarResponse | null; loa
   return (
     <section className="monitor-ledger radar-panel" aria-labelledby="radar-title">
       <header>
-        <div><small>approved route scanner · beta</small><h2 id="radar-title">Muppet Market Radar</h2></div>
+        <div><small>live routes + candidate review · beta</small><h2 id="radar-title">Muppet Market Radar</h2></div>
         <span>{radar.routes.filter((route) => route.status === 'live').length}/{radar.routes.length} routes live</span>
       </header>
       <div className="radar-boundary"><Icon name="shield" /><p><strong>Read-only.</strong> {radar.boundary}</p></div>
       <div className="radar-table-wrap">
-        <div className="radar-table" role="table" aria-label="Approved Muppet route evidence">
+        <div className="radar-table" role="table" aria-label="Live and candidate Muppet route evidence">
           <div className="radar-table-head" role="row">
             <span role="columnheader">route / task</span>
             <span role="columnheader">exact market</span>

@@ -320,6 +320,66 @@ LAUNCH_ADAPTER_ABI: list[dict[str, Any]] = [
     }
 ]
 
+REVIEWED_RANGE_ADAPTER_ABI: list[dict[str, Any]] = [
+    {"type": "function", "name": "pool", "stateMutability": "view", "inputs": [], "outputs": [{"type": "address"}]},
+    {"type": "function", "name": "oracle", "stateMutability": "view", "inputs": [], "outputs": [{"type": "address"}]},
+    {
+        "type": "function",
+        "name": "halfRangeTicks",
+        "stateMutability": "view",
+        "inputs": [],
+        "outputs": [{"type": "int24"}],
+    },
+    {
+        "type": "function",
+        "name": "tickSpacing",
+        "stateMutability": "view",
+        "inputs": [],
+        "outputs": [{"type": "int24"}],
+    },
+    {
+        "type": "function",
+        "name": "slippageBps",
+        "stateMutability": "view",
+        "inputs": [],
+        "outputs": [{"type": "uint16"}],
+    },
+    {
+        "type": "function",
+        "name": "maxOracleAge",
+        "stateMutability": "view",
+        "inputs": [],
+        "outputs": [{"type": "uint32"}],
+    },
+    {
+        "type": "function",
+        "name": "positionKey",
+        "stateMutability": "view",
+        "inputs": [{"name": "vault", "type": "address"}],
+        "outputs": [{"type": "bytes32"}],
+    },
+    {
+        "type": "function",
+        "name": "currentRange",
+        "stateMutability": "view",
+        "inputs": [],
+        "outputs": [{"name": "lower", "type": "int24"}, {"name": "upper", "type": "int24"}],
+    },
+    {
+        "type": "function",
+        "name": "marketHealth",
+        "stateMutability": "view",
+        "inputs": [],
+        "outputs": [
+            {"name": "allowed", "type": "bool"},
+            {"name": "deprecated", "type": "bool"},
+            {"name": "oracleAnswer", "type": "int256"},
+            {"name": "oracleUpdatedAt", "type": "uint256"},
+            {"name": "currentTick", "type": "int24"},
+        ],
+    },
+]
+
 
 @dataclass(frozen=True)
 class AgentSnapshot:
@@ -625,7 +685,9 @@ class PerformanceService:
                 return {**common, **self._read_stable_market(snapshot)}
             if snapshot.task_id == 1:
                 return {**common, **self._read_range_market(snapshot)}
-            return {**common, **self._read_launch_market(snapshot)}
+            if snapshot.task_id == 2:
+                return {**common, **self._read_launch_market(snapshot)}
+            return {**common, **self._read_reviewed_range_market(snapshot)}
         except Exception as error:
             return {
                 **common,
@@ -814,6 +876,86 @@ class PerformanceService:
             },
         }
 
+    def _read_reviewed_range_market(self, snapshot: AgentSnapshot) -> dict[str, object]:
+        adapter = self.web3.eth.contract(
+            address=Web3.to_checksum_address(snapshot.adapter),
+            abi=REVIEWED_RANGE_ADAPTER_ABI,
+        )
+        values = self._batch_at_block(
+            [
+                adapter.functions.pool(),
+                adapter.functions.oracle(),
+                adapter.functions.halfRangeTicks(),
+                adapter.functions.tickSpacing(),
+                adapter.functions.slippageBps(),
+                adapter.functions.maxOracleAge(),
+                adapter.functions.positionKey(snapshot.vault),
+                adapter.functions.currentRange(),
+                adapter.functions.marketHealth(),
+            ],
+            snapshot.block_number,
+        )
+        pool_address = Web3.to_checksum_address(values[0])
+        pool = self.web3.eth.contract(address=pool_address, abi=POOL_HEALTH_ABI)
+        pool_values = self._batch_at_block(
+            [pool.functions.liquidity(), pool.functions.token0(), pool.functions.token1()],
+            snapshot.block_number,
+        )
+        health = values[8]
+        updated_at = int(health[3])
+        observed_at = datetime.fromisoformat(snapshot.block_timestamp)
+        observed_timestamp = int(observed_at.timestamp())
+        oracle_age = max(0, observed_timestamp - updated_at) if updated_at else None
+        healthy = bool(health[0]) and not bool(health[1]) and int(health[2]) > 0
+        healthy = healthy and oracle_age is not None and oracle_age <= int(values[5])
+        lower, upper = int(values[7][0]), int(values[7][1])
+        current_tick = int(health[4])
+        position_key = Web3.to_hex(values[6])
+        empty_key = int.from_bytes(bytes(values[6]), "big") == 0
+        pair = {3: "AAPL / USDG", 4: "NVDA / USDG", 5: "SPY / USDG"}.get(
+            snapshot.task_id,
+            "screened meme / WETH",
+        )
+        return {
+            "venue": "Uniswap V3 via reviewed EZManager adapter",
+            "pair": pair,
+            "pool": pool_address,
+            "market_id": None,
+            "range": {
+                "status": "next_target" if empty_key else "open",
+                "position_key": None if empty_key else position_key,
+                "lower_tick": lower,
+                "upper_tick": upper,
+                "current_tick": current_tick,
+                "in_range": None if empty_key else lower <= current_tick < upper,
+                "tick_spacing": int(values[3]),
+                "half_range_ticks": int(values[2]),
+            },
+            "oracle": {
+                "status": "fresh" if healthy else "unavailable",
+                "address": Web3.to_checksum_address(values[1]),
+                "updated_at": datetime.fromtimestamp(updated_at, UTC).isoformat() if updated_at else None,
+                "age_seconds": oracle_age,
+                "detail": (
+                    "The adapter checks a positive, complete and freshness-bounded oracle round before allocation."
+                ),
+                "price_raw": str(int(health[2])),
+            },
+            "health": {
+                "status": "healthy" if healthy else "blocked",
+                "detail": "Pool approval, deprecation and oracle freshness are enforced before capital can enter.",
+                "metrics": {
+                    "pool_allowed": bool(health[0]),
+                    "pool_deprecated": bool(health[1]),
+                    "pool_liquidity_raw": str(int(pool_values[0])),
+                    "slippage_bps": int(values[4]),
+                    "max_oracle_age_seconds": int(values[5]),
+                    "token0": Web3.to_checksum_address(pool_values[1]),
+                    "token1": Web3.to_checksum_address(pool_values[2]),
+                },
+            },
+        }
+
     def _key_market(self, snapshot: AgentSnapshot) -> dict[str, object]:
         try:
             return self._read_key_market(snapshot)
@@ -831,11 +973,18 @@ class PerformanceService:
             }
 
     def _read_key_market(self, snapshot: AgentSnapshot) -> dict[str, object]:
-        if not self.settings.key_marketplace_address:
+        market_address = (
+            self.settings.legacy_key_marketplace_address
+            if self.settings.factory_version >= 2
+            and snapshot.agent_id < self.settings.legacy_agent_count
+            and self.settings.legacy_key_marketplace_address
+            else self.settings.key_marketplace_address
+        )
+        if not market_address:
             raise RuntimeError("Agent Key marketplace is not configured")
         key = self.web3.eth.contract(address=Web3.to_checksum_address(snapshot.key), abi=KEY_PERFORMANCE_ABI)
         market = self.web3.eth.contract(
-            address=Web3.to_checksum_address(self.settings.key_marketplace_address),
+            address=Web3.to_checksum_address(market_address),
             abi=KEY_MARKET_ABI,
         )
         summary = self._batch_at_block(

@@ -24,8 +24,8 @@ logger = logging.getLogger(__name__)
 
 def create_app(app_settings: Settings = settings) -> FastAPI:
     database = Database(app_settings.database_path)
-    chain = ChainService(app_settings)
-    activity_service = ActivityService(app_settings)
+    chain = ChainService(app_settings, database)
+    activity_service = ActivityService(app_settings, database)
     token_gate = TokenGateService(app_settings, chain.web3)
     performance_service = PerformanceService(app_settings, database, chain)
     public_data_service = PublicDataService(app_settings, database, activity_service)
@@ -33,15 +33,21 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
     @asynccontextmanager
     async def lifespan(live_app: FastAPI) -> AsyncIterator[None]:
         database.initialize()
+        chain.restore_persistent_state()
+        activity_service.restore_persistent_state()
         rpc_client = httpx.Client(timeout=8)
         live_app.state.rpc_client = rpc_client
+        live_app.state.rpc_urls = app_settings.rpc_urls
+        live_app.state.rpc_active_index = 0
         live_app.state.rpc_cache = {}
         live_app.state.rpc_cache_lock = Lock()
         stop = asyncio.Event()
         keeper_task = None
         performance_task = None
+        activity_task = None
         if app_settings.factory_address:
             performance_task = asyncio.create_task(_performance_loop(performance_service, app_settings, stop))
+            activity_task = asyncio.create_task(_activity_loop(activity_service, app_settings, stop))
         if (
             app_settings.auto_keeper_enabled
             and app_settings.keeper_private_key
@@ -56,11 +62,13 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
                 await keeper_task
             if performance_task is not None:
                 await performance_task
+            if activity_task is not None:
+                await activity_task
             rpc_client.close()
 
     app = FastAPI(
         title="LiquidMuppets Strategy API",
-        version="0.5.0",
+        version="0.6.0",
         docs_url="/api/docs",
         openapi_url="/api/openapi.json",
         lifespan=lifespan,
@@ -92,6 +100,25 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
 
 
 app = create_app()
+
+
+async def _activity_loop(
+    activity_service: ActivityService,
+    app_settings: Settings,
+    stop: asyncio.Event,
+) -> None:
+    while not stop.is_set():
+        try:
+            await asyncio.to_thread(activity_service.refresh)
+        except Exception as error:
+            logger.warning("scheduled activity indexing failed: %s", type(error).__name__)
+        try:
+            await asyncio.wait_for(
+                stop.wait(),
+                timeout=max(15, app_settings.activity_refresh_interval_seconds),
+            )
+        except TimeoutError:
+            continue
 
 
 async def _performance_loop(

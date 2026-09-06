@@ -10,8 +10,12 @@ describe('strategy market catalog', () => {
     }
   })
 
-  it('does not advertise undeployed routes', () => {
-    expect(strategyMarkets).toHaveLength(3)
-    expect(strategyMarkets.every((market) => market.status === 'live')).toBe(true)
+  it('keeps FactoryV2 candidates visibly separate from live routes', () => {
+    expect(strategyMarkets).toHaveLength(7)
+    expect(strategyMarkets.filter((market) => market.status === 'live')).toHaveLength(3)
+    expect(strategyMarkets.filter((market) => market.status === 'review')).toHaveLength(4)
+    for (const taskId of [3, 4, 5, 6] as const) {
+      expect(defaultMarketForTask(taskId).status).toBe('review')
+    }
   })
 })

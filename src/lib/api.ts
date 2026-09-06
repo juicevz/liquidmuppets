@@ -6,9 +6,13 @@ export interface ProtocolConfig {
   explorerUrl: string
   rpcUrl: string
   deploymentBlock: number
+  factoryVersion: number
   factory: `0x${string}` | null
+  legacyFactory: `0x${string}` | null
+  legacyAgentCount: number
   policyExecutor: `0x${string}` | null
   keyMarketplace: `0x${string}` | null
+  legacyKeyMarketplace: `0x${string}` | null
   feeRwaReserve: `0x${string}` | null
   testUSDG: `0x${string}` | null
   testWETH: `0x${string}` | null
@@ -29,7 +33,7 @@ export interface ProtocolConfig {
     tokenSymbol: string
     minimum: string
     configured: boolean
-    enforcement: 'app_and_api'
+    enforcement: 'app_and_api' | 'onchain'
   }
   mode: 'testnet' | 'mainnet'
 }
@@ -169,7 +173,7 @@ export interface MarketEvidence {
     half_range_ticks: number
   } | null
   oracle: {
-    status: 'value_available_timestamp_not_exposed' | 'unavailable' | 'not_used'
+    status: 'value_available_timestamp_not_exposed' | 'fresh' | 'unavailable' | 'not_used'
     address?: `0x${string}`
     updated_at: string | null
     age_seconds: number | null

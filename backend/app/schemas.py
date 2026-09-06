@@ -5,9 +5,9 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-TaskId = Literal[0, 1, 2]
+TaskId = Literal[0, 1, 2, 3, 4, 5, 6]
 StrategyAction = Literal["allocate", "hold", "recall"]
-ExecutionMode = Literal["active", "reserve"]
+ExecutionMode = Literal["active", "reserve", "review"]
 RadarStatus = Literal["live", "review", "rejected"]
 RadarAvailability = Literal["available", "not_exposed", "not_applicable"]
 
@@ -15,6 +15,14 @@ RadarAvailability = Literal["available", "not_exposed", "not_applicable"]
 class SafetyGate(BaseModel):
     label: str
     value: str
+
+
+class RiskPreset(BaseModel):
+    id: Literal["defensive", "balanced", "active"]
+    max_single_bps: int
+    max_daily_bps: int
+    max_allocation_bps: int
+    cooldown_seconds: int
 
 
 class StrategyTask(BaseModel):
@@ -31,6 +39,7 @@ class StrategyTask(BaseModel):
     execution_mode: ExecutionMode
     execution_note: str
     safety_gates: list[SafetyGate]
+    risk_presets: list[RiskPreset] = Field(default_factory=list)
 
 
 class PoolCandidate(BaseModel):
@@ -156,10 +165,13 @@ class HealthResponse(BaseModel):
     chain_id: int
     chain_name: str
     rpc_connected: bool
+    rpc_source: Literal["primary", "fallback"]
+    rpc_endpoint_count: int
     latest_block: int | None
     contracts_configured: bool
     rwa_reserve_configured: bool
     keeper_configured: bool
+    activity_status: Literal["available", "cached", "stale", "unavailable"]
 
 
 class TokenAccessResponse(BaseModel):

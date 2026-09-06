@@ -7,7 +7,7 @@ LiquidMuppets combines two separate products on Robinhood Chain mainnet:
 
 A third token has platform access utility. Public browsing remains open, but a creator must hold at least `15,000 $MUPPETS` in the connected wallet to launch a new agent through the LiquidMuppets app. The token remains in the wallet and is not spent, locked or burned.
 
-A qualifying creator chooses one of seven cosmetic pets, assigns one of three enabled tasks, chooses that task's live market, sets the Key supply and initial ask, and signs the factory transaction. The selected task fixes the deposit asset, adapter, allocation cap, cooldown, and vault cap. Pet appearance never changes the financial behavior.
+A qualifying creator chooses one of seven cosmetic pets, assigns one of three enabled tasks, chooses that task's live market, sets the Key supply and initial ask, and signs the factory transaction. Four FactoryV2 candidates are visible for review but cannot be selected for a live launch. The selected task fixes the deposit asset, adapter, allocation cap, cooldown, and vault cap. Pet appearance never changes the financial behavior.
 
 ## $MUPPETS access gate
 
@@ -19,7 +19,7 @@ A qualifying creator chooses one of seven cosmetic pets, assigns one of three en
 
 The gate fails closed. An empty address, invalid contract, RPC failure or balance below the threshold cannot launch through the app.
 
-The current mainnet factory was deployed before this rule and does not check `$MUPPETS` itself. A technically capable user can call that factory directly. Unbypassable protocol-level utility requires a gated factory migration after the canonical token is deployed. Until then, this is an app and API access rule.
+The current mainnet factory was deployed before this rule and does not check `$MUPPETS` itself. A technically capable user can call that factory directly. FactoryV2 implements the immutable token address and 15,000-token balance check onchain while leaving the balance in the creator wallet. Until the published FactoryV2 multisig migration is broadcast, verified and activated, the live V1 path remains an app and API access rule.
 
 ## Current deployment
 
@@ -37,7 +37,23 @@ The current mainnet factory was deployed before this rule and does not check `$M
 
 All deployment receipts succeeded and runtime bytecode is present. The marketplace treasury now points to the fee RWA reserve. Source verification for this deployment is pending. The previous zero-agent release remains recorded in `contracts/deployments/robinhood-mainnet-v1.json`.
 
-## Three task configurations
+## FactoryV2 migration and governance
+
+The repository now contains `LiquidMuppetsFactoryV2`, a guarded deployment script, an explorer verification script, and V1/V2 frontend and indexer compatibility. No V2 address is shown in the current deployment list because the migration has not been broadcast.
+
+FactoryV2 adds:
+
+- an immutable 15,000 `$MUPPETS` balance check on every new launch
+- an owner-controlled registry binding each approved task to an exact asset, adapter, route ID, vault cap and allowed preset mask
+- defensive, balanced and active presets for eligible range tasks
+- global launch activation that defaults to off and can only be enabled after ownership moves to deployed governance code
+- a single global agent ID space that delegates legacy IDs and creator lookups to V1
+
+`DeployFactoryV2.s.sol` requires Safe-compatible code with at least two owners and a threshold of at least two. It creates a separate V2 Key marketplace, preserves the V1 marketplace for legacy orders, and switches PolicyExecutor so V1 cannot register new vaults. Existing V1 vault policies, deposits, withdrawals, recalls and redemptions continue against their original contracts. The app and indexer aggregate the legacy and V2 markets without pretending they are one contract.
+
+The migration leaves new launches disabled. `scripts/verify-factory-v2.sh` submits the new factory, Key market and NVDA adapter sources to Blockscout, rechecks Safe ownership and the disabled launch switch, then prints the Safe calldata needed to activate V2 after review.
+
+## Three live tasks and four reviewed candidates
 
 ### Stable yield
 
@@ -79,6 +95,29 @@ This route currently allows up to 3% swap and LP execution slippage, and EZManag
 This choice is enabled so creators can launch and fund the full product shape, but the adapter only isolates WETH by vault. It cannot swap, lend, bridge, enter a token pool, or send funds to an administrator. It produces no yield. The canonical `$MUPPETS` address is now known, but a pool route is not configured because no initial liquidity terms or approved adapter migration have been supplied.
 
 There is no platform-volume threshold hiding the route. The restriction is venue safety. The inspected thin pool did not have enough oracle history to justify automated mainnet allocation.
+
+### FactoryV2 route candidates
+
+The candidate templates use the same public evidence model as the live routes. A candidate cannot launch until its exact pool, asset, oracle, adapter, preset mask and cap are approved in FactoryV2.
+
+| Candidate | Deposit asset | Candidate cap | Route status | Current evidence |
+| --- | --- | ---: | --- | --- |
+| AAPL / USDG | USDG | 2,500 USDG | disabled | exact 0.05% pool and feed identified; EZManager pool approval is currently false |
+| NVDA / USDG | USDG | 2,500 USDG | prepared, still disabled | exact 0.05% pool is allowlisted; the dedicated adapter passed a real mainnet-fork open, allocation and full redemption |
+| SPY / USDG | USDG | 2,500 USDG | disabled | exact 0.05% pool and feed identified; EZManager pool approval is currently false |
+| screened meme / WETH | USDG | 1,000 USDG | unselected and disabled | requires an exact token and pool, at least $250,000 liquidity, 30 days of age, $50,000 24 hour volume, independent fresh price evidence and a tested exit |
+
+`EZManagerPoolAdapter` keeps one immutable pool and oracle per deployment and one separately accounted position key per vault. It checks that EZManager still allows the pool, the pool is not deprecated, and the oracle round is positive, complete and no older than the configured limit before entry. It never blocks an exit on oracle freshness. Full vault redemption closes the position and returns the assets actually realized.
+
+FactoryV2 packages three range-policy choices for routes that allow them:
+
+| Preset | Single action | Daily movement | Maximum deployed | Cooldown |
+| --- | ---: | ---: | ---: | ---: |
+| defensive | 20% | 30% | 60% | 24 hours |
+| balanced | 35% | 50% | 75% | 12 hours |
+| active | 50% | 75% | 85% | 6 hours |
+
+Presets are enforceable policy inputs, not return targets. A route can restrict or disable them independently.
 
 ## Marketplace fee to Stock Token reserve
 
@@ -152,7 +191,9 @@ A claimed app handle is displayed as a wallet-signed label. It does not verify a
 - range actions, vault activity, Agent Key speculation and Stock Token reserve purchases remain separately labeled and filterable
 - creator filtering follows the Muppet creator, so deposits or keeper actions for that creator's vault remain on the creator record even when another wallet was the immediate actor
 
-The chain decoder refreshes at most once per minute during normal operation and caches immutable agent metadata, token symbols and event-block timestamps. Retryable RPC failures receive bounded retries. A recent successful snapshot is reported as `cached` without a page-level warning; it becomes `stale` after five minutes and remains visibly labeled until a refresh succeeds. Persisted keeper decisions remain available throughout.
+The chain decoder refreshes in the background at most once per minute during normal operation. Its decoded events, order mappings and next confirmed block persist in SQLite, so an API restart resumes from the last healthy point instead of replaying full history. Each refresh reads only new confirmed blocks plus a 12-block reorg window, and contract log requests are chunked. Immutable agent metadata, token symbols and event-block timestamps are cached as well. A recent successful snapshot is reported as `cached` without a page-level warning; it becomes `stale` after five minutes and remains visibly labeled until a refresh succeeds. Persisted keeper decisions remain available throughout.
+
+Chain reads, the activity indexer and the browser's read-only RPC relay share an ordered provider pool. Transport failures, rate limits and retryable upstream JSON-RPC errors move the request to the next configured endpoint. The last healthy fee-reserve response also persists across restarts. Robinhood's public RPC is rate-limited; an independent production fallback must be supplied through `RPC_FALLBACK_URLS` using a provider account or separately operated node.
 
 ### Watchlists and Muppet Market Radar
 
@@ -160,7 +201,7 @@ The chain decoder refreshes at most once per minute during normal operation and 
 
 The Alerts view derives warnings from recorded evidence for followed Muppets and from System Pulse. It covers out-of-range positions, blocked or unavailable market health, delayed market-evidence refreshes, explicitly aged or unavailable oracles, keeper actions and holds, deposits, withdrawals, allocations, Agent Key activity and protocol-wide Stock Token reserve purchases. A transaction-backed action links to its receipt. Keeper holds and market observations keep their no-transaction boundary explicit.
 
-The Market Radar beta is read-only. `GET /api/v1/market-radar` groups the latest recorded adapter evidence by configured task route and returns `live`, `review`, or `rejected` with the exact reason. It exposes the exact pool or Morpho market, native liquidity evidence, oracle boundary, policy capacity, protocol fee and maximum slippage when available. The current adapters do not expose 24 hour volume, pool age, realized execution cost or an expected-return model. Those values remain `not exposed` or `not applicable`; the app does not derive USD liquidity, historical APY or projected yield. Radar cannot approve a route or move capital.
+The Market Radar beta is read-only. `GET /api/v1/market-radar` groups the latest recorded adapter evidence for three live routes and four FactoryV2 candidates and returns `live`, `review`, or `rejected` with the exact reason. It exposes the exact pool or Morpho market, native liquidity evidence, oracle boundary, policy capacity, protocol fee and maximum slippage when available. The current adapters do not expose 24 hour volume, pool age, realized execution cost or an expected-return model. Those values remain `not exposed` or `not applicable`; the app does not derive USD liquidity, historical APY or projected yield. Radar cannot approve a route or move capital.
 
 ## User flow
 
@@ -239,7 +280,9 @@ The API reads deployment configuration from environment variables and validates 
 - query factory, vault, Key, marketplace, and adapter state through RPC
 - return live fee-reserve totals, holdings, limits, and all 26 routes
 - decode public activity logs and enrich them with agent metadata
-- cache the activity response briefly to avoid repeated wide log scans
+- incrementally index confirmed activity into SQLite and rewind a short window for reorg safety
+- restore activity and fee-reserve snapshots across API restarts
+- fail over read requests across an ordered set of independently configured RPC endpoints
 - assemble public creator profiles from persisted performance summaries without summing unlike assets
 - merge keeper decisions with matching chain receipts for the filtered System Pulse feed
 - compile read-only Market Radar route states from persisted adapter summaries without triggering new chain reads
@@ -249,11 +292,11 @@ The API reads deployment configuration from environment variables and validates 
 - validate that the encrypted keeper key derives to A5 and that A5 is allowed by both keeper contracts before any scheduled signing
 - check all live vaults and the fee reserve every five minutes, record every decision, and sign only executable actions
 
-SQLite stores public profile claims, challenges, and keeper-run metadata. A claimed handle is normalized and unique. Challenges expire after 10 minutes and cannot be reused.
+SQLite stores public profile claims, challenges, keeper-run metadata, performance checkpoints, decoded activity, index progress and last healthy service snapshots. A claimed handle is normalized and unique. Challenges expire after 10 minutes and cannot be reused.
 
 Launch recovery and the post-launch command state are frontend-only. They are not added to SQLite and do not add a custodial backend path.
 
-Failure handling is explicit: RPC or decode failures return an API error, activity polling shows a reconnecting state, contract transactions surface wallet errors, and policy or adapter checks revert the whole onchain action.
+Failure handling is explicit: RPC or decode failures keep the last healthy timestamp visible, activity polling labels stale state after five minutes, contract transactions surface wallet errors, and policy or adapter checks revert the whole onchain action. A cache is never relabeled as a new chain read.
 
 `GET /api/v1/access/{wallet}` returns the token address, required amount, live balance and eligibility decision. Access verification fails closed when token configuration or RPC reads are unavailable.
 
@@ -284,11 +327,26 @@ forge test --match-contract MorphoBlueAdapterForkTest \
 forge test --match-contract EZManagerRangeAdapterForkTest \
   --fork-url https://rpc.mainnet.chain.robinhood.com -vv
 
+forge test --match-contract EZManagerPoolAdapterForkTest \
+  --fork-url https://rpc.mainnet.chain.robinhood.com -vv
+
 forge test --match-contract FeeRwaReserveForkTest \
   --fork-url https://rpc.mainnet.chain.robinhood.com -vv
 ```
 
-The Morpho fork test allocates and redeems canonical USDG. The EZManager fork test deposits WETH, opens a real range, advances time, atomically recenters, and fully redeems. The reserve fork test buys AAPL through the live WETH, USDG, and Stock Token pools with the onchain oracle minimum.
+The Morpho fork test allocates and redeems canonical USDG. The current EZManager fork test deposits WETH, opens a real range, advances time, atomically recenters, and fully redeems. The FactoryV2 adapter fork test deposits USDG, opens the allowlisted NVDA/USDG range and fully redeems back to USDG. The reserve fork test buys AAPL through the live WETH, USDG, and Stock Token pools with the onchain oracle minimum.
+
+FactoryV2 must be simulated before broadcast, then verified before its launch switch is enabled:
+
+```bash
+cd contracts
+SAFE_MULTISIG=0x... forge script script/DeployFactoryV2.s.sol:DeployFactoryV2 \
+  --rpc-url https://rpc.mainnet.chain.robinhood.com -vvv
+
+# Add --broadcast only after the Safe and migration window are approved.
+# Set WRITE_DEPLOYMENT_RECEIPT=true only for that approved broadcast.
+./scripts/verify-factory-v2.sh deployments/robinhood-mainnet-v2.json
+```
 
 ## Launch readiness
 
@@ -297,15 +355,18 @@ The controlled mainnet beta is operational: qualifying creator launches, deposit
 Before an unrestricted public launch:
 
 - the canonical `$MUPPETS` contract is configured in the app and API, with unavailable reads still failing closed
-- the existing factory does not enforce the token rule against direct contract calls; a gated factory migration is required if the rule must be unbypassable
+- the deployed V1 factory does not enforce the token rule against direct contract calls; FactoryV2 implements it but its migration has not been broadcast
 - mainnet deposits use real assets and carry loss risk
 - contracts are tested but not independently audited
 - the current owner is a dedicated EOA rather than a multisig; it can pause `FeeRwaReserve` and rescue reserve assets while paused
 - source verification for the current deployment is pending
+- FactoryV2 requires a verified Safe migration and a separate Safe launch-enable transaction; launches default to off
 - public keeper triggering is disabled; the host-encrypted A5 key is installed, both onchain allowlists are active, and scheduled checks run every five minutes
 - stable yield can be zero and can become temporarily illiquid
 - the range route has execution, LP, pricing, smart-contract, and impermanent-loss risk
 - the launch route currently stages WETH and generates no yield
+- NVDA/USDG passed a mainnet-fork open and full exit but remains disabled until FactoryV2 activation
+- AAPL/USDG and SPY/USDG are disabled while EZManager approval is false, and the meme/WETH slot has no approved asset or pool
 - Stock Token routes can lose liquidity, pause, or hold stale prices; the contract skips those routes but cannot remove market risk
 - Stock Token availability and restrictions depend on jurisdiction; legal review is required for the intended launch audience
 - task and deposit caps reduce exposure but do not make any route safe or guaranteed

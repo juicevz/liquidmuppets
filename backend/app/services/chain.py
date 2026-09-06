@@ -9,8 +9,10 @@ from eth_account.signers.local import LocalAccount
 from web3 import Web3
 
 from app.config import Settings
+from app.database import Database
 from app.schemas import StrategyPreviewRequest, TaskId
-from app.services.strategy import preview_strategy
+from app.services.rpc import FailoverHTTPProvider
+from app.services.strategy import TASKS, preview_strategy
 
 VAULT_ABI: list[dict[str, Any]] = [
     {"type": "function", "name": "taskId", "stateMutability": "view", "inputs": [], "outputs": [{"type": "uint8"}]},
@@ -259,14 +261,29 @@ class VaultState:
 
 
 class ChainService:
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, database: Database | None = None) -> None:
         self.settings = settings
-        self.web3 = Web3(Web3.HTTPProvider(settings.rpc_url, request_kwargs={"timeout": 8}))
+        self.database = database
+        self.web3 = Web3(FailoverHTTPProvider(settings.rpc_urls, timeout=8))
         self._run_lock = Lock()
         self._transaction_lock = Lock()
         self._last_run: dict[str, float] = {}
         self._rwa_cache: tuple[float, dict[str, object]] | None = None
         self._rwa_cache_lock = Lock()
+
+    @property
+    def rpc_source(self) -> str:
+        provider = self.web3.provider
+        return provider.active_source if isinstance(provider, FailoverHTTPProvider) else "primary"
+
+    def restore_persistent_state(self) -> None:
+        if self.database is None:
+            return
+        stored = self.database.get_service_snapshot("rwa_reserve")
+        if stored is None or not isinstance(stored.get("payload"), dict):
+            return
+        with self._rwa_cache_lock:
+            self._rwa_cache = (0.0, cast(dict[str, object], stored["payload"]))
 
     @property
     def contracts_configured(self) -> bool:
@@ -470,6 +487,8 @@ class ChainService:
                 "routes": route_rows,
             }
             self._rwa_cache = (now + RWA_CACHE_SECONDS, state)
+            if self.database is not None:
+                self.database.upsert_service_snapshot("rwa_reserve", state)
             return state
 
     def run_keeper(self, vault_address: str, *, public_request: bool = True) -> tuple[VaultState, Any, str | None, str]:
@@ -484,7 +503,7 @@ class ChainService:
                 raise RuntimeError("keeper run rate limit is active")
 
         state = self.read_vault(vault_address)
-        if state.task_id not in (0, 1, 2):
+        if state.task_id not in TASKS:
             raise RuntimeError("vault returned an unknown task id")
         preview = preview_strategy(
             StrategyPreviewRequest(

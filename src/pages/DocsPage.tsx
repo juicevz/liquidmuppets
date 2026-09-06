@@ -32,7 +32,7 @@ const docsSections: DocsSection[] = [
   {
     number: '01',
     title: 'The product loop',
-    body: 'LIQUIDMUPPETS is a Robinhood mainnet marketplace for policy-bounded onchain agents. A creator holding 15,000 $MUPPETS chooses a cosmetic pet, assigns a live task, deploys a single-asset vault and fungible Agent Key, then opens the first Key ask.',
+    body: 'LIQUIDMUPPETS is a Robinhood mainnet marketplace for policy-bounded onchain agents. A creator holding 15,000 $MUPPETS chooses a cosmetic pet, assigns a live task, deploys a single-asset vault and fungible Agent Key, then opens the first Key ask. Review candidates stay visible but cannot launch.',
     details: ['pet appearance has no financial effect', 'the task fixes the asset, adapter and risk caps', 'vault shares and Agent Keys remain separate'],
     visual: 'loop',
   },
@@ -43,13 +43,13 @@ const docsSections: DocsSection[] = [
     details: [
       'the balance remains in the wallet and is not spent, locked or burned',
       'canonical token · 0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189',
-      'the deployed factory predates this access rule; direct contract calls are not token-gated until a gated factory migration',
+      'the live V1 factory predates this rule; FactoryV2 adds the same 15,000-token check onchain but has not been broadcast',
     ],
   },
   {
     number: '03',
     title: 'Seven pets, three live tasks',
-    body: 'Blue, sage, stone, fox, plum, frog and gold are appearance choices. Any pet can use stable yield, ETH range, or launch reserve. The pet never changes the money path or permissions.',
+    body: 'Blue, sage, stone, fox, plum, frog and gold are appearance choices. Any pet can use stable yield, ETH range, or launch reserve. AAPL, NVDA, SPY and screened meme routes are visible as FactoryV2 review candidates. The pet never changes the money path or permissions.',
     visual: 'pets',
   },
   {
@@ -161,7 +161,7 @@ const docsSections: DocsSection[] = [
   {
     number: '16',
     title: 'Watchlists and Market Radar',
-    body: 'Follow any Muppet from the marketplace or its public performance page, then open /app/watchlist for a browser-local watchlist and evidence alert inbox. Market Radar reads approved route evidence separately and cannot approve a route or move capital.',
+    body: 'Follow any Muppet from the marketplace or its public performance page, then open /app/watchlist for a browser-local watchlist and evidence alert inbox. Market Radar separates three live routes from four FactoryV2 review candidates and cannot approve a route or move capital.',
     details: [
       'followed Muppet IDs and alert read state remain in this browser; no wallet or signature is required',
       'alerts cover range, health, oracle, keeper, vault, Agent Key and protocol-reserve evidence with receipt links when a transaction exists',
@@ -172,6 +172,29 @@ const docsSections: DocsSection[] = [
   },
   {
     number: '17',
+    title: 'Indexer and RPC reliability',
+    body: 'System Pulse now indexes only new confirmed blocks plus a short reorg window. Decoded events, scan progress and the last healthy fee-reserve response survive API restarts in SQLite. Public pages keep the last successful timestamp visible when an upstream read fails.',
+    details: [
+      'log requests are chunked and background refreshes do not replay full history',
+      'transport, rate-limit and retryable upstream errors fail over to the next configured RPC provider',
+      'the public Robinhood RPC is rate-limited; an independent provider endpoint must be configured for real failover',
+      'cached evidence becomes visibly stale after five minutes and is never presented as a fresh read',
+    ],
+  },
+  {
+    number: '18',
+    title: 'FactoryV2 and reviewed templates',
+    body: 'FactoryV2 implements the 15,000 $MUPPETS check onchain, exact task and adapter registration, defensive, balanced and active presets, V1 read compatibility, and contract-governed ownership. It ships launch-disabled until Blockscout verification and an explicit Safe activation.',
+    details: [
+      'existing V1 vaults, withdrawals, policies and Key orders stay on their original contracts',
+      'NVDA / USDG passed a mainnet-fork open, allocation and full redemption test',
+      'AAPL / USDG and SPY / USDG stay disabled while their EZManager pool approvals are false',
+      'the meme / WETH slot stays disabled until one exact token, pool, oracle and exit path pass review',
+      'no FactoryV2 deployment address is claimed because the migration has not been broadcast',
+    ],
+  },
+  {
+    number: '19',
     title: 'Current boundary',
     body: 'The mainnet contracts use real USDG, WETH, Morpho, Uniswap and EZManager. Local and fork tests cover the adapters, full redemption and atomic recentering, but the contracts are not independently audited. Caps limit exposure and do not remove protocol, oracle, liquidity, LP or stablecoin risk.',
     details: [

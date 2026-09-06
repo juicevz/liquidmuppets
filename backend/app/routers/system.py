@@ -48,10 +48,13 @@ def health(request: Request) -> HealthResponse:
         chain_id=settings.chain_id,
         chain_name=settings.chain_name,
         rpc_connected=connected,
+        rpc_source=chain.rpc_source,
+        rpc_endpoint_count=len(settings.rpc_urls),
         latest_block=block,
         contracts_configured=chain.contracts_configured,
         rwa_reserve_configured=chain.rwa_reserve_configured,
         keeper_configured=chain.keeper_configured,
+        activity_status=request.app.state.activity.cache_status,
     )
 
 
@@ -64,9 +67,13 @@ def contracts(request: Request) -> dict[str, object]:
         "explorerUrl": settings.explorer_url,
         "rpcUrl": settings.browser_rpc_url,
         "deploymentBlock": settings.deployment_block,
+        "factoryVersion": settings.factory_version,
         "factory": settings.factory_address or None,
+        "legacyFactory": settings.legacy_factory_address or None,
+        "legacyAgentCount": settings.legacy_agent_count,
         "policyExecutor": settings.policy_executor_address or None,
         "keyMarketplace": settings.key_marketplace_address or None,
+        "legacyKeyMarketplace": settings.legacy_key_marketplace_address or None,
         "feeRwaReserve": settings.fee_rwa_reserve_address or None,
         "testUSDG": settings.test_usdg_address or None,
         "testWETH": settings.test_weth_address or None,
@@ -87,7 +94,7 @@ def contracts(request: Request) -> dict[str, object]:
             "tokenSymbol": settings.muppets_token_symbol,
             "minimum": str(settings.muppets_token_minimum),
             "configured": request.app.state.token_gate.configured,
-            "enforcement": "app_and_api",
+            "enforcement": "onchain" if settings.factory_version >= 2 else "app_and_api",
         },
         "mode": "testnet" if settings.chain_id == 46630 else "mainnet",
     }
@@ -129,22 +136,26 @@ def rpc_proxy(request: Request, payload: Annotated[Any, Body()]) -> Response:
                 rows: list[object] = []
                 for start in range(0, len(payload), RPC_UPSTREAM_BATCH_SIZE):
                     chunk = payload[start : start + RPC_UPSTREAM_BATCH_SIZE]
-                    upstream = _post_rpc_with_retries(
+                    upstream, active_index = _post_rpc_with_failover(
                         request.app.state.rpc_client,
-                        request.app.state.settings.rpc_url,
+                        request.app.state.rpc_urls,
+                        request.app.state.rpc_active_index,
                         chunk,
                     )
+                    request.app.state.rpc_active_index = active_index
                     body = upstream.json()
                     if not isinstance(body, list):
                         raise ValueError("upstream returned a non-batch response")
                     rows.extend(body)
                 content = json.dumps(rows, separators=(",", ":")).encode()
             else:
-                upstream = _post_rpc_with_retries(
+                upstream, active_index = _post_rpc_with_failover(
                     request.app.state.rpc_client,
-                    request.app.state.settings.rpc_url,
+                    request.app.state.rpc_urls,
+                    request.app.state.rpc_active_index,
                     payload,
                 )
+                request.app.state.rpc_active_index = active_index
                 content = upstream.content
             if cacheable and _rpc_content_succeeded(content):
                 request.app.state.rpc_cache[cache_key] = (monotonic() + RPC_CACHE_SECONDS, content)
@@ -171,6 +182,51 @@ def _post_rpc_with_retries(client: httpx.Client, url: str, payload: Any) -> http
     if last_error is not None:
         raise last_error
     raise RuntimeError("RPC retry loop did not execute")
+
+
+def _post_rpc_with_failover(
+    client: httpx.Client,
+    urls: tuple[str, ...],
+    active_index: int,
+    payload: Any,
+) -> tuple[httpx.Response, int]:
+    ordered = [active_index, *(index for index in range(len(urls)) if index != active_index)]
+    last_error: Exception | None = None
+    retryable_response: httpx.Response | None = None
+    for index in ordered:
+        try:
+            response = _post_rpc_with_retries(client, urls[index], payload)
+        except httpx.HTTPError as error:
+            last_error = error
+            continue
+        if _rpc_content_retryable(response.content):
+            retryable_response = response
+            continue
+        return response, index
+    if last_error is not None:
+        raise last_error
+    if retryable_response is not None:
+        return retryable_response, active_index
+    raise RuntimeError("RPC failover loop did not execute")
+
+
+def _rpc_content_retryable(content: bytes) -> bool:
+    try:
+        body = json.loads(content)
+    except (UnicodeDecodeError, ValueError):
+        return False
+    rows = body if isinstance(body, list) else [body]
+    for row in rows:
+        if not isinstance(row, dict) or not isinstance(row.get("error"), dict):
+            continue
+        error = row["error"]
+        code = error.get("code")
+        message = str(error.get("message", "")).lower()
+        if code in {-32005, -32016, -32603} or any(
+            marker in message for marker in ("rate limit", "too many", "timeout", "unavailable", "gateway")
+        ):
+            return True
+    return False
 
 
 def _rpc_content_succeeded(content: bytes) -> bool:

@@ -12,18 +12,27 @@ def _bool(name: str, default: bool = False) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _csv(name: str) -> tuple[str, ...]:
+    return tuple(value.strip() for value in getenv(name, "").split(",") if value.strip())
+
+
 @dataclass(frozen=True)
 class Settings:
     app_env: str = getenv("APP_ENV", "development")
     chain_id: int = int(getenv("CHAIN_ID", "4663"))
     chain_name: str = getenv("CHAIN_NAME", "Robinhood Chain")
     rpc_url: str = getenv("RPC_URL", "https://rpc.mainnet.chain.robinhood.com")
+    rpc_fallback_urls: tuple[str, ...] = _csv("RPC_FALLBACK_URLS")
     browser_rpc_url: str = getenv("BROWSER_RPC_URL", "/api/v1/rpc")
     explorer_url: str = getenv("EXPLORER_URL", "https://robinhoodchain.blockscout.com")
     deployment_block: int = int(getenv("DEPLOYMENT_BLOCK", "0"))
+    factory_version: int = int(getenv("FACTORY_VERSION", "1"))
     factory_address: str = getenv("FACTORY_ADDRESS", "")
+    legacy_factory_address: str = getenv("LEGACY_FACTORY_ADDRESS", "")
+    legacy_agent_count: int = int(getenv("LEGACY_AGENT_COUNT", "0"))
     policy_executor_address: str = getenv("POLICY_EXECUTOR_ADDRESS", "")
     key_marketplace_address: str = getenv("KEY_MARKETPLACE_ADDRESS", "")
+    legacy_key_marketplace_address: str = getenv("LEGACY_KEY_MARKETPLACE_ADDRESS", "")
     fee_rwa_reserve_address: str = getenv("FEE_RWA_RESERVE_ADDRESS", "")
     test_usdg_address: str = getenv("TEST_USDG_ADDRESS", "")
     test_weth_address: str = getenv("TEST_WETH_ADDRESS", "")
@@ -52,12 +61,20 @@ class Settings:
     activity_refresh_interval_seconds: int = int(getenv("ACTIVITY_REFRESH_INTERVAL_SECONDS", "60"))
     activity_retry_interval_seconds: int = int(getenv("ACTIVITY_RETRY_INTERVAL_SECONDS", "15"))
     activity_stale_after_seconds: int = int(getenv("ACTIVITY_STALE_AFTER_SECONDS", "300"))
+    activity_block_chunk_size: int = int(getenv("ACTIVITY_BLOCK_CHUNK_SIZE", "50000"))
+    activity_chunk_delay_seconds: float = float(getenv("ACTIVITY_CHUNK_DELAY_SECONDS", "0.15"))
+    activity_confirmation_blocks: int = int(getenv("ACTIVITY_CONFIRMATION_BLOCKS", "2"))
+    activity_reorg_window_blocks: int = int(getenv("ACTIVITY_REORG_WINDOW_BLOCKS", "12"))
     database_path: Path = Path(getenv("DATABASE_PATH", "/tmp/liquidmuppets.sqlite3"))
     cors_origins: tuple[str, ...] = tuple(
         origin.strip()
         for origin in getenv("CORS_ORIGINS", "http://localhost:5173,https://liquidmuppets.io").split(",")
         if origin.strip()
     )
+
+    @property
+    def rpc_urls(self) -> tuple[str, ...]:
+        return tuple(dict.fromkeys((self.rpc_url, *self.rpc_fallback_urls)))
 
 
 settings = Settings()

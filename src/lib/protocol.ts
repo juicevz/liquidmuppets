@@ -37,6 +37,13 @@ const factoryAbi = [
     ], outputs: [{ type: 'uint256' }, { type: 'address' }, { type: 'address' }],
   },
   {
+    type: 'function', name: 'createAgentWithPreset', stateMutability: 'nonpayable', inputs: [
+      { name: 'petId', type: 'uint8' }, { name: 'taskId', type: 'uint8' }, { name: 'presetId', type: 'uint8' },
+      { name: 'name', type: 'string' }, { name: 'keySymbol', type: 'string' }, { name: 'keySupply', type: 'uint256' },
+      { name: 'baseFloorWei', type: 'uint128' },
+    ], outputs: [{ type: 'uint256' }, { type: 'address' }, { type: 'address' }],
+  },
+  {
     type: 'event', name: 'AgentCreated', inputs: [
       { name: 'agentId', type: 'uint256', indexed: true }, { name: 'creator', type: 'address', indexed: true },
       { name: 'vault', type: 'address', indexed: true }, { name: 'key', type: 'address', indexed: false },
@@ -123,6 +130,7 @@ interface RawAgentRecord {
 
 interface ListingRecord {
   id: bigint
+  market: Address
   seller: Address
   key: Address
   quantity: bigint
@@ -132,6 +140,7 @@ interface ListingRecord {
 
 interface OfferRecord {
   id: bigint
+  market: Address
   buyer: Address
   key: Address
   quantity: bigint
@@ -149,6 +158,7 @@ export interface ChainAgent {
   baseFloorWei: bigint
   key: {
     address: Address
+    marketAddress: Address
     symbol: string
     supply: bigint
     totalBound: bigint
@@ -224,7 +234,13 @@ export async function loadProtocolSnapshot(
   for (const [key, entry] of snapshotCache) {
     if (entry.expiresAt <= now) snapshotCache.delete(key)
   }
-  const cacheKey = [config.chainId, config.factory, config.keyMarketplace, walletAddress?.toLowerCase() ?? 'public'].join(':')
+  const cacheKey = [
+    config.chainId,
+    config.factory,
+    config.keyMarketplace,
+    config.legacyKeyMarketplace,
+    walletAddress?.toLowerCase() ?? 'public',
+  ].join(':')
   const cached = snapshotCache.get(cacheKey)
   if (!options.force && cached && cached.expiresAt > now) return cached.request
 
@@ -252,18 +268,33 @@ async function loadProtocolSnapshotUncached(
   const factory = config.factory
   const market = config.keyMarketplace
   const account = walletAddress as Address | undefined
-  const [count, feeBps, listings, offers] = await Promise.all([
+  const marketAddresses = Array.from(new Set(
+    [config.legacyKeyMarketplace, market].filter((address): address is Address => Boolean(address)),
+  ))
+  const [count, feeBps, marketRows] = await Promise.all([
     client.readContract({ address: factory, abi: factoryAbi, functionName: 'agentCount' }),
     client.readContract({ address: market, abi: marketAbi, functionName: 'feeBps' }),
-    loadListings(client, market),
-    loadOffers(client, market),
+    Promise.all(marketAddresses.map(async (address) => ({
+      address,
+      listings: await loadListings(client, address),
+      offers: await loadOffers(client, address),
+    }))),
   ])
+  const listings = marketRows.flatMap((row) => row.listings)
+  const offers = marketRows.flatMap((row) => row.offers)
 
   const records = await Promise.all(Array.from({ length: Number(count) }, (_, index) =>
     client.readContract({ address: factory, abi: factoryAbi, functionName: 'getAgent', args: [BigInt(index)] })
       .then((record) => record as unknown as RawAgentRecord),
   ))
-  const agents = await Promise.all(records.map((record, index) => enrichAgent(client, record, BigInt(index), listings, offers, account)))
+  const agents = await Promise.all(records.map((record, index) => {
+    const agentMarket = config.factoryVersion >= 2
+      && config.legacyKeyMarketplace
+      && index < config.legacyAgentCount
+      ? config.legacyKeyMarketplace
+      : market
+    return enrichAgent(client, record, BigInt(index), agentMarket, listings, offers, account)
+  }))
   return { config, agents, feeBps: Number(feeBps) }
 }
 
@@ -271,6 +302,7 @@ async function enrichAgent(
   client: PublicClient,
   record: RawAgentRecord,
   id: bigint,
+  market: Address,
   listings: ListingRecord[],
   offers: OfferRecord[],
   account?: Address,
@@ -298,8 +330,12 @@ async function enrichAgent(
     client.readContract({ address: asset, abi: erc20Abi, functionName: 'decimals' }),
     client.readContract({ address: asset, abi: erc20Abi, functionName: 'balanceOf', args: [wallet] }),
   ])
-  const keyListings = listings.filter((listing) => listing.active && listing.key.toLowerCase() === record.key.toLowerCase())
-  const keyOffers = offers.filter((offer) => offer.active && offer.key.toLowerCase() === record.key.toLowerCase())
+  const keyListings = listings.filter((listing) => listing.active
+    && listing.market.toLowerCase() === market.toLowerCase()
+    && listing.key.toLowerCase() === record.key.toLowerCase())
+  const keyOffers = offers.filter((offer) => offer.active
+    && offer.market.toLowerCase() === market.toLowerCase()
+    && offer.key.toLowerCase() === record.key.toLowerCase())
   const floor = keyListings.reduce<ListingRecord | null>((best, item) => !best || item.unitPriceWei < best.unitPriceWei ? item : best, null)
   const topBid = keyOffers.reduce<OfferRecord | null>((best, item) => !best || item.unitPriceWei > best.unitPriceWei ? item : best, null)
   return {
@@ -312,6 +348,7 @@ async function enrichAgent(
     baseFloorWei: record.baseFloorWei,
     key: {
       address: record.key,
+      marketAddress: market,
       symbol: keySymbol,
       supply: keySupply,
       totalBound,
@@ -346,7 +383,7 @@ async function loadListings(client: PublicClient, market: Address): Promise<List
   const ids = Array.from({ length: Math.max(0, Number(next) - 1) }, (_, index) => BigInt(index + 1))
   return Promise.all(ids.map(async (id) => {
     const row = await client.readContract({ address: market, abi: marketAbi, functionName: 'listings', args: [id] }) as unknown as readonly [Address, Address, bigint, bigint, boolean]
-    return { id, seller: row[0], key: row[1], quantity: row[2], unitPriceWei: row[3], active: row[4] }
+    return { id, market, seller: row[0], key: row[1], quantity: row[2], unitPriceWei: row[3], active: row[4] }
   }))
 }
 
@@ -355,7 +392,7 @@ async function loadOffers(client: PublicClient, market: Address): Promise<OfferR
   const ids = Array.from({ length: Math.max(0, Number(next) - 1) }, (_, index) => BigInt(index + 1))
   return Promise.all(ids.map(async (id) => {
     const row = await client.readContract({ address: market, abi: marketAbi, functionName: 'offers', args: [id] }) as unknown as readonly [Address, Address, bigint, bigint, bigint, boolean]
-    return { id, buyer: row[0], key: row[1], quantity: row[2], unitPriceWei: row[3], active: row[5] }
+    return { id, market, buyer: row[0], key: row[1], quantity: row[2], unitPriceWei: row[3], active: row[5] }
   }))
 }
 
@@ -367,6 +404,7 @@ export interface LaunchInput {
   keySupply: number
   listingQuantity: number
   floorPriceEth: string
+  presetId?: 0 | 1 | 2
 }
 
 export interface LaunchResult {
@@ -451,10 +489,13 @@ export async function launchAgent(
     }
     const floorWei = parseEther(input.floorPriceEth)
     options.onProgress?.('Creating the vault and Agent Key…')
+    const usePreset = config.factoryVersion >= 2 && input.presetId !== undefined
     const createReceipt = await sendAndWait(provider, client, account, config.factory, encodeFunctionData({
       abi: factoryAbi,
-      functionName: 'createAgent',
-      args: [input.petId, input.taskId, input.name, input.keySymbol.toUpperCase(), BigInt(input.keySupply), floorWei],
+      functionName: usePreset ? 'createAgentWithPreset' : 'createAgent',
+      args: usePreset
+        ? [input.petId, input.taskId, input.presetId!, input.name, input.keySymbol.toUpperCase(), BigInt(input.keySupply), floorWei]
+        : [input.petId, input.taskId, input.name, input.keySymbol.toUpperCase(), BigInt(input.keySupply), floorWei],
     }), undefined, (hash) => updateCheckpoint({ createTx: hash, createConfirmed: false }))
     created = decodeAgentCreated(createReceipt, config.factory)
     updateCheckpoint({ ...created, createTx: createReceipt.transactionHash, createConfirmed: true })
@@ -626,46 +667,44 @@ export async function recenterRange(
 }
 
 export async function buyFloorKeys(config: ProtocolConfig, provider: WalletProvider, account: Address, agent: ChainAgent, quantity: number, feeBps: number): Promise<Hash> {
-  if (!config.keyMarketplace || agent.key.floorListingId === null || agent.key.floorWei === null) throw new Error('No active ask.')
+  if (agent.key.floorListingId === null || agent.key.floorWei === null) throw new Error('No active ask.')
   const subtotal = agent.key.floorWei * BigInt(quantity)
   const value = subtotal + subtotal * BigInt(feeBps) / 10_000n
   const client = createProtocolClient(config)
-  return (await sendAndWait(provider, client, account, config.keyMarketplace, encodeFunctionData({
+  return (await sendAndWait(provider, client, account, agent.key.marketAddress, encodeFunctionData({
     abi: marketAbi, functionName: 'buy', args: [agent.key.floorListingId, BigInt(quantity)],
   }), value)).transactionHash
 }
 
 export async function listKeys(config: ProtocolConfig, provider: WalletProvider, account: Address, agent: ChainAgent, quantity: number, priceEth: string): Promise<Hash[]> {
-  if (!config.keyMarketplace) throw new Error('Marketplace is not configured.')
   const client = createProtocolClient(config)
   const price = parseEther(priceEth)
   const approve = await sendAndWait(provider, client, account, agent.key.address, encodeFunctionData({
-    abi: erc20Abi, functionName: 'approve', args: [config.keyMarketplace, BigInt(quantity)],
+    abi: erc20Abi, functionName: 'approve', args: [agent.key.marketAddress, BigInt(quantity)],
   }))
-  const listing = await sendAndWait(provider, client, account, config.keyMarketplace, encodeFunctionData({
+  const listing = await sendAndWait(provider, client, account, agent.key.marketAddress, encodeFunctionData({
     abi: marketAbi, functionName: 'createListing', args: [agent.key.address, BigInt(quantity), price],
   }))
   return [approve.transactionHash, listing.transactionHash]
 }
 
 export async function placeKeyOffer(config: ProtocolConfig, provider: WalletProvider, account: Address, agent: ChainAgent, quantity: number, priceEth: string, feeBps: number): Promise<Hash> {
-  if (!config.keyMarketplace) throw new Error('Marketplace is not configured.')
   const price = parseEther(priceEth)
   const subtotal = price * BigInt(quantity)
   const value = subtotal + subtotal * BigInt(feeBps) / 10_000n
   const client = createProtocolClient(config)
-  return (await sendAndWait(provider, client, account, config.keyMarketplace, encodeFunctionData({
+  return (await sendAndWait(provider, client, account, agent.key.marketAddress, encodeFunctionData({
     abi: marketAbi, functionName: 'createOffer', args: [agent.key.address, BigInt(quantity), price],
   }), value)).transactionHash
 }
 
 export async function sellIntoTopBid(config: ProtocolConfig, provider: WalletProvider, account: Address, agent: ChainAgent, quantity: number): Promise<Hash[]> {
-  if (!config.keyMarketplace || agent.key.topOfferId === null) throw new Error('No active bid.')
+  if (agent.key.topOfferId === null) throw new Error('No active bid.')
   const client = createProtocolClient(config)
   const approve = await sendAndWait(provider, client, account, agent.key.address, encodeFunctionData({
-    abi: erc20Abi, functionName: 'approve', args: [config.keyMarketplace, BigInt(quantity)],
+    abi: erc20Abi, functionName: 'approve', args: [agent.key.marketAddress, BigInt(quantity)],
   }))
-  const sale = await sendAndWait(provider, client, account, config.keyMarketplace, encodeFunctionData({
+  const sale = await sendAndWait(provider, client, account, agent.key.marketAddress, encodeFunctionData({
     abi: marketAbi, functionName: 'acceptOffer', args: [agent.key.topOfferId, BigInt(quantity)],
   }))
   return [approve.transactionHash, sale.transactionHash]

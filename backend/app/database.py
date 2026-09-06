@@ -135,6 +135,54 @@ class Database:
                 )
                 """
             )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS activity_events (
+                    id TEXT PRIMARY KEY,
+                    block_number INTEGER NOT NULL,
+                    log_index INTEGER NOT NULL,
+                    payload TEXT NOT NULL
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE INDEX IF NOT EXISTS activity_events_chain_order
+                ON activity_events (block_number DESC, log_index DESC)
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS activity_orders (
+                    market TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    order_id INTEGER NOT NULL,
+                    key_address TEXT NOT NULL,
+                    block_number INTEGER NOT NULL,
+                    PRIMARY KEY (market, kind, order_id)
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS activity_indexer_state (
+                    source TEXT PRIMARY KEY,
+                    next_block INTEGER NOT NULL,
+                    last_success_at TEXT NOT NULL,
+                    last_error_at TEXT,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS service_snapshots (
+                    key TEXT PRIMARY KEY,
+                    payload TEXT NOT NULL,
+                    observed_at TEXT NOT NULL
+                )
+                """
+            )
 
     def add_keeper_run(self, record: KeeperRunRecord) -> int:
         values = asdict(record)
@@ -246,6 +294,140 @@ class Database:
                 (agent_id,),
             ).fetchone()
         return json.loads(str(row["payload"])) if row else None
+
+    def commit_activity_index(
+        self,
+        source: str,
+        next_block: int,
+        events: list[dict[str, object]],
+        orders: list[tuple[str, str, int, str, int]],
+        *,
+        rewind_from_block: int | None = None,
+    ) -> None:
+        now = datetime.now(UTC).isoformat()
+        with self.connect() as connection:
+            if rewind_from_block is not None:
+                connection.execute("DELETE FROM activity_events WHERE block_number >= ?", (rewind_from_block,))
+                connection.execute("DELETE FROM activity_orders WHERE block_number >= ?", (rewind_from_block,))
+            connection.executemany(
+                """
+                INSERT INTO activity_events (id, block_number, log_index, payload)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    block_number = excluded.block_number,
+                    log_index = excluded.log_index,
+                    payload = excluded.payload
+                """,
+                [
+                    (
+                        str(event["id"]),
+                        int(str(event["block_number"])),
+                        int(str(event["log_index"])),
+                        json.dumps(event, separators=(",", ":"), sort_keys=True),
+                    )
+                    for event in events
+                ],
+            )
+            connection.executemany(
+                """
+                INSERT INTO activity_orders (market, kind, order_id, key_address, block_number)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(market, kind, order_id) DO UPDATE SET
+                    key_address = excluded.key_address,
+                    block_number = excluded.block_number
+                """,
+                orders,
+            )
+            connection.execute(
+                """
+                INSERT INTO activity_indexer_state (source, next_block, last_success_at, last_error_at, updated_at)
+                VALUES (?, ?, ?, NULL, ?)
+                ON CONFLICT(source) DO UPDATE SET
+                    next_block = excluded.next_block,
+                    last_success_at = excluded.last_success_at,
+                    last_error_at = NULL,
+                    updated_at = excluded.updated_at
+                """,
+                (source, next_block, now, now),
+            )
+
+    def mark_activity_index_error(self, source: str) -> None:
+        now = datetime.now(UTC).isoformat()
+        with self.connect() as connection:
+            connection.execute(
+                """
+                UPDATE activity_indexer_state
+                SET last_error_at = ?, updated_at = ?
+                WHERE source = ?
+                """,
+                (now, now, source),
+            )
+
+    def get_activity_index_state(self, source: str) -> dict[str, object] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM activity_indexer_state WHERE source = ?",
+                (source,),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def list_activity_events(self, limit: int = 200, agent_id: int | None = None) -> list[dict[str, object]]:
+        bounded = max(1, min(limit, 200))
+        with self.connect() as connection:
+            if agent_id is None:
+                rows = connection.execute(
+                    "SELECT payload FROM activity_events ORDER BY block_number DESC, log_index DESC LIMIT ?",
+                    (bounded,),
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    """
+                    SELECT payload FROM activity_events
+                    WHERE CAST(json_extract(payload, '$.agent_id') AS INTEGER) = ?
+                    ORDER BY block_number DESC, log_index DESC
+                    LIMIT ?
+                    """,
+                    (agent_id, bounded),
+                ).fetchall()
+        return [json.loads(str(row["payload"])) for row in rows]
+
+    def list_activity_orders(self) -> list[tuple[str, str, int, str, int]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT market, kind, order_id, key_address, block_number FROM activity_orders"
+            ).fetchall()
+        return [
+            (
+                str(row["market"]),
+                str(row["kind"]),
+                int(row["order_id"]),
+                str(row["key_address"]),
+                int(row["block_number"]),
+            )
+            for row in rows
+        ]
+
+    def upsert_service_snapshot(self, key: str, payload: dict[str, object]) -> None:
+        observed_at = datetime.now(UTC).isoformat()
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO service_snapshots (key, payload, observed_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(key) DO UPDATE SET payload = excluded.payload, observed_at = excluded.observed_at
+                """,
+                (key, json.dumps(payload, separators=(",", ":"), sort_keys=True), observed_at),
+            )
+
+    def get_service_snapshot(self, key: str) -> dict[str, object] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT payload, observed_at FROM service_snapshots WHERE key = ?",
+                (key,),
+            ).fetchone()
+        if row is None:
+            return None
+        return {"payload": json.loads(str(row["payload"])), "observed_at": str(row["observed_at"])}
 
     def create_profile_challenge(self, wallet: str, handle: str) -> dict[str, str]:
         now = datetime.now(UTC)

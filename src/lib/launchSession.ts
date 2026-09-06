@@ -150,6 +150,7 @@ function isLaunchInput(value: unknown): value is LaunchInput {
     && Number(input.petId) >= 0
     && Number(input.petId) <= 6
     && isTaskId(input.taskId)
+    && (input.presetId === undefined || input.presetId === 0 || input.presetId === 1 || input.presetId === 2)
     && typeof input.name === 'string'
     && input.name.length >= 2
     && input.name.length <= 32
@@ -190,7 +191,7 @@ function checkpointIsConsistent(checkpoint: LaunchCheckpoint): boolean {
 }
 
 function isTaskId(value: unknown): value is StrategyTaskId {
-  return value === 0 || value === 1 || value === 2
+  return value === 0 || value === 1 || value === 2 || value === 3 || value === 4 || value === 5 || value === 6
 }
 
 function isAddress(value: unknown): value is Address {

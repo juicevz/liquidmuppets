@@ -5,11 +5,36 @@ from dataclasses import dataclass
 from app.schemas import (
     CandidateDecision,
     PoolCandidate,
+    RiskPreset,
     SafetyGate,
     StrategyPreviewRequest,
     StrategyPreviewResponse,
     StrategyTask,
 )
+
+RANGE_PRESETS = [
+    RiskPreset(
+        id="defensive",
+        max_single_bps=2_000,
+        max_daily_bps=3_000,
+        max_allocation_bps=6_000,
+        cooldown_seconds=86_400,
+    ),
+    RiskPreset(
+        id="balanced",
+        max_single_bps=3_500,
+        max_daily_bps=5_000,
+        max_allocation_bps=7_500,
+        cooldown_seconds=43_200,
+    ),
+    RiskPreset(
+        id="active",
+        max_single_bps=5_000,
+        max_daily_bps=7_500,
+        max_allocation_bps=8_500,
+        cooldown_seconds=21_600,
+    ),
+]
 
 TASKS: dict[int, StrategyTask] = {
     0: StrategyTask(
@@ -53,6 +78,7 @@ TASKS: dict[int, StrategyTask] = {
             SafetyGate(label="execution", value="3% maximum swap slippage; 6 hour cycle cooldown"),
             SafetyGate(label="vault cap", value="1 WETH per vault while unaudited"),
         ],
+        risk_presets=RANGE_PRESETS,
     ),
     2: StrategyTask(
         id=2,
@@ -73,6 +99,105 @@ TASKS: dict[int, StrategyTask] = {
             SafetyGate(label="vault cap", value="0.25 WETH per vault while unaudited"),
             SafetyGate(label="asset behavior", value="no external pool execution"),
         ],
+    ),
+    3: StrategyTask(
+        id=3,
+        slug="aapl-usdg-range",
+        label="AAPL range",
+        deposit_asset="USDG",
+        share_prefix="mAAPL",
+        production_route="candidate AAPL / USDG 0.05% pool 0xAae0…2d6D",
+        testnet_route="AAPL / USDG mainnet-fork review",
+        target_allocation_bps=6_000,
+        protocol_fee_bps=40,
+        live=False,
+        execution_mode="review",
+        execution_note=(
+            "FactoryV2 support is implemented. Activation waits for EZManager pool approval and fork review."
+        ),
+        safety_gates=[
+            SafetyGate(label="pool", value="exact AAPL / USDG pool and 0.05% fee"),
+            SafetyGate(label="oracle", value="positive, complete and no older than 3 days"),
+            SafetyGate(label="venue", value="must be approved and not deprecated by EZManager"),
+            SafetyGate(label="vault cap", value="2,500 USDG per vault after approval"),
+            SafetyGate(label="status", value="disabled until the route passes fork tests"),
+        ],
+        risk_presets=RANGE_PRESETS,
+    ),
+    4: StrategyTask(
+        id=4,
+        slug="nvda-usdg-range",
+        label="NVDA range",
+        deposit_asset="USDG",
+        share_prefix="mNVDA",
+        production_route="candidate NVDA / USDG 0.05% pool 0xd4EB…14a3",
+        testnet_route="NVDA / USDG mainnet-fork review",
+        target_allocation_bps=7_500,
+        protocol_fee_bps=40,
+        live=False,
+        execution_mode="review",
+        execution_note=(
+            "The pool is venue-allowlisted and its adapter exit passed a mainnet-fork test. Activation waits for "
+            "FactoryV2 verification and multisig approval."
+        ),
+        safety_gates=[
+            SafetyGate(label="pool", value="exact NVDA / USDG pool and 0.05% fee"),
+            SafetyGate(label="oracle", value="positive, complete and no older than 3 days"),
+            SafetyGate(label="venue", value="approved and not deprecated by EZManager"),
+            SafetyGate(label="vault cap", value="2,500 USDG per vault"),
+            SafetyGate(label="exit path", value="full deposit, allocation and redemption passed on a mainnet fork"),
+            SafetyGate(label="status", value="disabled until the verified FactoryV2 migration is approved"),
+        ],
+        risk_presets=RANGE_PRESETS,
+    ),
+    5: StrategyTask(
+        id=5,
+        slug="spy-usdg-range",
+        label="SPY range",
+        deposit_asset="USDG",
+        share_prefix="mSPY",
+        production_route="candidate SPY / USDG 0.05% pool 0xa7Bb…9167",
+        testnet_route="SPY / USDG mainnet-fork review",
+        target_allocation_bps=6_000,
+        protocol_fee_bps=40,
+        live=False,
+        execution_mode="review",
+        execution_note=(
+            "FactoryV2 support is implemented. Activation waits for EZManager pool approval and fork review."
+        ),
+        safety_gates=[
+            SafetyGate(label="pool", value="exact SPY / USDG pool and 0.05% fee"),
+            SafetyGate(label="oracle", value="positive, complete and no older than 3 days"),
+            SafetyGate(label="venue", value="must be approved and not deprecated by EZManager"),
+            SafetyGate(label="vault cap", value="2,500 USDG per vault after approval"),
+            SafetyGate(label="status", value="disabled until the route passes fork tests"),
+        ],
+        risk_presets=RANGE_PRESETS,
+    ),
+    6: StrategyTask(
+        id=6,
+        slug="screened-meme-weth-range",
+        label="Meme range",
+        deposit_asset="USDG",
+        share_prefix="mMEME",
+        production_route="candidate meme / WETH pool selected through FactoryV2 review",
+        testnet_route="candidate pool mainnet-fork review",
+        target_allocation_bps=6_000,
+        protocol_fee_bps=40,
+        live=False,
+        execution_mode="review",
+        execution_note=(
+            "No meme pool is approved. A route needs liquidity, age, volume, oracle and exit-path evidence first."
+        ),
+        safety_gates=[
+            SafetyGate(label="liquidity", value="at least $250,000 and 5x intended vault value"),
+            SafetyGate(label="pool age", value="at least 30 days"),
+            SafetyGate(label="volume", value="at least $50,000 over 24 hours"),
+            SafetyGate(label="oracle", value="independent fresh price evidence required"),
+            SafetyGate(label="vault cap", value="1,000 USDG per vault if a route is approved"),
+            SafetyGate(label="status", value="no pool approved"),
+        ],
+        risk_presets=RANGE_PRESETS,
     ),
 }
 
@@ -202,14 +327,14 @@ def _score_candidate(task_id: int, candidate: PoolCandidate, vault_value_usd: fl
             reasons.append("market liquidity is below 5x the vault value")
         if candidate.utilization_bps is None or candidate.utilization_bps > 9_500:
             reasons.append("utilization is above 95%")
-    elif task_id == 1:
+    elif task_id in {1, 3, 4, 5}:
         if candidate.liquidity_usd < 500_000:
             reasons.append("pool liquidity is below $500,000")
         if candidate.estimated_net_apy_bps <= 0:
             reasons.append("expected fees do not cover execution cost")
     else:
-        if candidate.pool_age_seconds is None or candidate.pool_age_seconds < 1_800:
-            reasons.append("pool is younger than 30 minutes")
+        if candidate.pool_age_seconds is None or candidate.pool_age_seconds < 2_592_000:
+            reasons.append("pool is younger than 30 days")
         if candidate.liquidity_usd < 250_000:
             reasons.append("pool liquidity is below $250,000")
         if candidate.volume_24h_usd is None or candidate.volume_24h_usd < 50_000:
