@@ -18,6 +18,7 @@ describe('viewFromPath', () => {
     expect(viewFromPath('/app/muppet/42')).toBe('performance')
     expect(viewFromPath('/app/creator/0x1111111111111111111111111111111111111111')).toBe('creator')
     expect(viewFromPath('/app/pulse')).toBe('pulse')
+    expect(viewFromPath('/app/watchlist')).toBe('monitor')
     expect(viewFromPath('/docs')).toBe('docs')
   })
 

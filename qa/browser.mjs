@@ -339,6 +339,15 @@ results.performanceMarketEndpoint = await page.evaluate(async () => {
   const body = await response.json()
   return response.ok && Array.isArray(body.items) && body.items.length > 0
 })
+const firstFollow = page.locator('.performance-market-row').first().getByRole('button', { name: /^Follow / })
+results.marketFollowControl = await firstFollow.isVisible()
+await firstFollow.click()
+results.marketFollowPersisted = await page.evaluate(() => {
+  const raw = window.localStorage.getItem('liquidmuppets-monitor:v1')
+  if (!raw) return false
+  const state = JSON.parse(raw)
+  return Array.isArray(state.agentIds) && state.agentIds.length === 1 && state.agentIds[0] === 0
+})
 results.marketEmpty = await page.locator('.market-empty, .deployment-pending').count()
 results.rwaReserveModule = await page.locator('.rwa-reserve-module').count() === 1
 await page.locator('.rwa-reserve-module summary').click()
@@ -398,8 +407,52 @@ results.performanceKeeper = await page.getByRole('heading', { name: 'Last keeper
 results.performanceReceipts = await page.locator('.receipt-row').count()
 results.performanceKeySeparate = await page.getByRole('heading', { name: 'Agent Key market' }).count() === 1
 results.performanceNoHistoricalApy = await page.getByText(/historical APY/i).count() === 0
+results.performanceFollowControl = await page.getByRole('button', { name: /Follow range fox/i }).isVisible()
 results.performanceOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
 await page.screenshot({ path: new URL('muppet-performance.png', screenshotDir).pathname, fullPage: false })
+
+await page.close()
+page = await desktop.newPage()
+watch(page, 'monitor')
+await page.goto(`${baseUrl}/app/watchlist`, { waitUntil: 'domcontentloaded' })
+await page.getByRole('heading', { name: 'Watchlist.' }).waitFor({ timeout: 60_000 })
+await page.locator('.watchlist-row').first().waitFor({ timeout: 60_000 })
+results.monitorTitle = await page.title()
+results.monitorFollowedRows = await page.locator('.watchlist-row').count()
+results.monitorBrowserLocal = await page.getByText(/list and read state stay in this browser/i).count() === 1
+results.monitorNoWalletNeeded = await page.getByText(/No wallet signature, account, or contract change/i).count() === 1
+results.monitorWatchlistOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
+await page.getByRole('button', { name: /^Alerts/ }).click()
+await page.locator('.monitor-alert').first().waitFor({ timeout: 60_000 })
+results.monitorAlerts = await page.locator('.monitor-alert').count()
+results.monitorAlertBoundaries = await page.locator('.monitor-alert').evaluateAll((items) => items.every((item) => {
+  const footer = item.querySelector('.alert-body footer')
+  return Boolean(footer?.querySelector('a[href*="/app/muppet/"]') || footer?.textContent?.includes('protocol-wide reserve record'))
+    && Boolean(footer?.querySelector('a[href*="/tx/"]') || footer?.textContent?.includes('no transaction signed') || footer?.textContent?.includes('no receipt'))
+}))
+const markRead = page.getByRole('button', { name: /Mark all read/i })
+results.monitorUnreadBefore = Number(await page.locator('.monitor-summary span').filter({ hasText: 'unread alerts' }).locator('strong').innerText())
+await markRead.click()
+results.monitorUnreadClears = (await page.locator('.monitor-summary span').filter({ hasText: 'unread alerts' }).locator('strong').innerText()) === '0'
+await page.getByRole('button', { name: /Market Radar/ }).click()
+await page.locator('.radar-row').first().waitFor({ timeout: 60_000 })
+results.radarRows = await page.locator('.radar-row').count()
+results.radarReadOnly = await page.getByText(/^Read-only\./).count() === 1
+results.radarStatuses = await page.locator('.radar-status').allTextContents()
+results.radarMissingStaysMissing = await page.getByText(/not exposed/i).count() > 0
+results.radarExactMarkets = await page.locator('.radar-value.market a, .radar-value.market code').count() >= 2
+results.radarNoExecution = await page.locator('.radar-panel').getByRole('button').count() === 0
+results.radarEndpoint = await page.evaluate(async () => {
+  const response = await fetch('/api/v1/market-radar', { cache: 'no-store' })
+  const body = await response.json()
+  return response.ok
+    && Array.isArray(body.routes)
+    && body.routes.length === 3
+    && body.routes.every((route) => route.read_only === true && ['live', 'review', 'rejected'].includes(route.status))
+    && body.routes.every((route) => route.volume_24h.value === null && route.costs.estimate.value === null)
+})
+results.monitorRadarOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
+await page.screenshot({ path: new URL('watchlist-market-radar.png', screenshotDir).pathname, fullPage: true })
 
 await page.close()
 page = await desktop.newPage()
@@ -422,6 +475,7 @@ results.docsPerformance = await page.getByRole('heading', { name: 'Public Muppet
 results.docsPerformanceMarketplace = await page.getByText(/select any two Muppets to compare/i).count() === 1
 results.docsCreatorProfiles = await page.getByText(/Every creator wallet has a shareable/i).count() === 1
 results.docsSystemPulse = await page.getByText(/combines decoded transaction events and recorded keeper decisions/i).count() === 1
+results.docsMonitor = await page.getByRole('heading', { name: 'Watchlists and Market Radar' }).count() === 1
 results.docsAlgorithm = await page.getByRole('heading', { name: 'The backend algorithm' }).count() === 1
 results.docsBoundary = await page.getByText(/real USDG, WETH, Morpho, Uniswap and EZManager/i).count() === 1
 results.docsLiveContracts = await page.getByText(/0x570F0FEBFE8b33F37D01f7153F0F85E59FfcE460/i).count() === 1
@@ -515,6 +569,14 @@ await mobilePage.goto(`${baseUrl}/app/muppet/1`, { waitUntil: 'domcontentloaded'
 await mobilePage.getByRole('heading', { name: 'range fox' }).waitFor({ timeout: 60_000 })
 results.mobilePerformanceOverflow = await mobilePage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
 results.mobilePerformanceKeyVisible = await mobilePage.getByRole('heading', { name: 'Agent Key market' }).count() === 1
+await mobilePage.goto(`${baseUrl}/app/watchlist`, { waitUntil: 'domcontentloaded' })
+await mobilePage.getByRole('heading', { name: 'Watchlist.' }).waitFor({ timeout: 60_000 })
+await mobilePage.getByRole('button', { name: /Market Radar/ }).click()
+await mobilePage.locator('.radar-row').first().waitFor({ timeout: 60_000 })
+results.mobileMonitorOverflow = await mobilePage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
+results.mobileRadarScrollsInside = await mobilePage.locator('.radar-table-wrap').evaluate((node) => node.scrollWidth > node.clientWidth)
+results.mobileNavItems = await mobilePage.locator('.mobile-app-nav button').count()
+await mobilePage.screenshot({ path: new URL('market-radar-mobile.png', screenshotDir).pathname, fullPage: false })
 await mobile.close()
 
 const mobileCommand = await mobileBrowser.newContext({ viewport: { width: 320, height: 720 } })
@@ -562,6 +624,8 @@ const marketStateValid = results.marketRows > 0
     && results.performanceMarketOracle
     && results.performanceMarketKeeper === results.marketCards
     && results.performanceMarketEndpoint
+    && results.marketFollowControl
+    && results.marketFollowPersisted
     && results.comparisonSelected === 2
     && results.comparisonCards === 2
     && results.comparisonAssetsExplicit
@@ -678,12 +742,30 @@ const failed =
   || results.performanceReceipts < 1
   || !results.performanceKeySeparate
   || !results.performanceNoHistoricalApy
+  || !results.performanceFollowControl
   || results.performanceOverflow
+  || results.monitorTitle !== 'Watchlist and Market Radar | LIQUIDMUPPETS'
+  || results.monitorFollowedRows !== 1
+  || !results.monitorBrowserLocal
+  || !results.monitorNoWalletNeeded
+  || results.monitorWatchlistOverflow
+  || results.monitorAlerts < 1
+  || !results.monitorAlertBoundaries
+  || results.monitorUnreadBefore < 1
+  || !results.monitorUnreadClears
+  || results.radarRows !== 3
+  || !results.radarReadOnly
+  || !results.radarStatuses.every((status) => /live|review|rejected/i.test(status))
+  || !results.radarMissingStaysMissing
+  || !results.radarExactMarkets
+  || !results.radarNoExecution
+  || !results.radarEndpoint
+  || results.monitorRadarOverflow
   || !results.portfolioHonestCopy
   || !results.portfolioConnectState
   || !results.portfolioChainNumberRemoved
   || results.docsTitle !== 'Docs | LIQUIDMUPPETS'
-  || results.docsSections !== 16
+  || results.docsSections !== 17
   || !results.docsTokenGate
   || !results.docsSevenPets
   || !results.docsFeeReserve
@@ -691,6 +773,7 @@ const failed =
   || !results.docsPerformanceMarketplace
   || !results.docsCreatorProfiles
   || !results.docsSystemPulse
+  || !results.docsMonitor
   || !results.docsAlgorithm
   || !results.docsBoundary
   || !results.docsLiveContracts
@@ -714,6 +797,9 @@ const failed =
   || results.mobileDocsOverflow
   || results.mobilePerformanceOverflow
   || !results.mobilePerformanceKeyVisible
+  || results.mobileMonitorOverflow
+  || !results.mobileRadarScrollsInside
+  || results.mobileNavItems !== 6
   || !results.mobileNavVisible
   || results.mobileCommandCenterOverflow
   || results.mobileCommandColumns !== 1

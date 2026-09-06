@@ -17,7 +17,7 @@ export function App() {
     document.body.dataset.surface = view === 'landing' ? 'landing' : 'app'
     document.title = view === 'landing'
       ? 'LIQUIDMUPPETS | onchain liquidity agents'
-      : `${view === 'marketplace' ? 'Pet Marketplace' : view === 'performance' ? 'Muppet Performance' : view === 'creator' ? 'Creator Profile' : view === 'pulse' ? 'System Pulse' : view[0].toUpperCase() + view.slice(1)} | LIQUIDMUPPETS`
+      : `${view === 'marketplace' ? 'Pet Marketplace' : view === 'performance' ? 'Muppet Performance' : view === 'creator' ? 'Creator Profile' : view === 'pulse' ? 'System Pulse' : view === 'monitor' ? 'Watchlist and Market Radar' : view[0].toUpperCase() + view.slice(1)} | LIQUIDMUPPETS`
     window.scrollTo({ top: 0 })
   }, [view])
 

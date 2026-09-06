@@ -17,6 +17,7 @@ import { MuppetPerformancePage } from '../pages/MuppetPerformancePage'
 import { PortfolioPage } from '../pages/PortfolioPage'
 import { CreatorProfilePage } from '../pages/CreatorProfilePage'
 import { SystemPulsePage } from '../pages/SystemPulsePage'
+import { MonitorPage } from '../pages/MonitorPage'
 
 interface AppShellProps {
   view: Exclude<View, 'landing'>
@@ -109,6 +110,9 @@ export function AppShell({ view, performanceAgentId, creatorAddress, onNavigate 
           <button className={view === 'pulse' ? 'active' : ''} onClick={() => onNavigate('pulse')} type="button">
             Pulse
           </button>
+          <button className={view === 'monitor' ? 'active' : ''} onClick={() => onNavigate('monitor')} type="button">
+            Monitor
+          </button>
           <button className={view === 'portfolio' ? 'active' : ''} onClick={() => onNavigate('portfolio')} type="button">
             Portfolio
           </button>
@@ -154,11 +158,13 @@ export function AppShell({ view, performanceAgentId, creatorAddress, onNavigate 
         {view === 'performance' && <MuppetPerformancePage agentId={performanceAgentId} />}
         {view === 'creator' && <CreatorProfilePage creatorAddress={creatorAddress} />}
         {view === 'pulse' && <SystemPulsePage />}
+        {view === 'monitor' && <MonitorPage />}
       </main>
 
       <nav className="mobile-app-nav" aria-label="Mobile app navigation">
         <button type="button" className={view === 'marketplace' || view === 'performance' || view === 'creator' ? 'active' : ''} onClick={() => onNavigate('marketplace')}>Market</button>
         <button type="button" className={view === 'pulse' ? 'active' : ''} onClick={() => onNavigate('pulse')}>Pulse</button>
+        <button type="button" className={view === 'monitor' ? 'active' : ''} onClick={() => onNavigate('monitor')}>Watch</button>
         <button type="button" className={view === 'portfolio' ? 'active' : ''} onClick={() => onNavigate('portfolio')}>Portfolio</button>
         <button type="button" className={view === 'create' ? 'active' : ''} onClick={() => onNavigate('create')}>Launch</button>
         <button type="button" className={view === 'docs' ? 'active' : ''} onClick={() => onNavigate('docs')}>Docs</button>

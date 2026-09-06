@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import Settings, settings
 from app.database import Database, KeeperRunRecord
-from app.routers import access, activity, keeper, performance, profiles, public, strategies, system
+from app.routers import access, activity, keeper, performance, profiles, public, radar, strategies, system
 from app.services.activity import ActivityService
 from app.services.chain import ChainService
 from app.services.performance import PerformanceService
@@ -60,7 +60,7 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
 
     app = FastAPI(
         title="LiquidMuppets Strategy API",
-        version="0.4.0",
+        version="0.5.0",
         docs_url="/api/docs",
         openapi_url="/api/openapi.json",
         lifespan=lifespan,
@@ -86,6 +86,7 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
     app.include_router(profiles.router, prefix="/api/v1")
     app.include_router(activity.router, prefix="/api/v1")
     app.include_router(performance.router, prefix="/api/v1")
+    app.include_router(radar.router, prefix="/api/v1")
     app.include_router(public.router, prefix="/api/v1")
     return app
 

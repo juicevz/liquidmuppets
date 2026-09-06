@@ -4,6 +4,8 @@ type IconName =
   | 'alert'
   | 'arrow'
   | 'bars'
+  | 'bell'
+  | 'bookmark'
   | 'check'
   | 'chevron'
   | 'clock'
@@ -26,6 +28,8 @@ const paths: Record<IconName, ReactNode> = {
   alert: <><path d="M12 3 2.8 20h18.4L12 3Z" /><path d="M12 9v5m0 3h.01" /></>,
   arrow: <path d="M5 12h14m-5-5 5 5-5 5" />,
   bars: <path d="M5 7h14M5 12h14M5 17h14" />,
+  bell: <><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" /><path d="M10 21h4" /></>,
+  bookmark: <path d="M6 4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18l-6-4-6 4V4Z" />,
   check: <path d="m5 12 4 4L19 6" />,
   chevron: <path d="m9 18 6-6-6-6" />,
   clock: <><circle cx="12" cy="12" r="8" /><path d="M12 8v5l3 2" /></>,

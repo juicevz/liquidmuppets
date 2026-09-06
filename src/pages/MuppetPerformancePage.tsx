@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { formatUnits } from 'viem'
 import { Icon } from '../components/Icon'
+import { FollowButton } from '../components/FollowButton'
 import { getPet } from '../data/pets'
 import {
   fetchAgentActivity,
@@ -126,6 +127,7 @@ export function MuppetPerformancePage({ agentId }: MuppetPerformancePageProps) {
           </div>
         </div>
         <div className="performance-actions">
+          <FollowButton agentId={performance.agent.id} agentName={performance.agent.name} />
           <button type="button" onClick={() => void sharePage()}><Icon name="receipt" />{shareState}</button>
           <button type="button" onClick={() => void load()}><Icon name="spark" />Refresh</button>
         </div>

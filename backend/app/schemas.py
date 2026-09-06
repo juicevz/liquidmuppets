@@ -8,6 +8,8 @@ from pydantic import BaseModel, Field, field_validator
 TaskId = Literal[0, 1, 2]
 StrategyAction = Literal["allocate", "hold", "recall"]
 ExecutionMode = Literal["active", "reserve"]
+RadarStatus = Literal["live", "review", "rejected"]
+RadarAvailability = Literal["available", "not_exposed", "not_applicable"]
 
 
 class SafetyGate(BaseModel):
@@ -74,6 +76,65 @@ class StrategyPreviewResponse(BaseModel):
     selected_pool_id: str | None
     reason: str
     candidates: list[CandidateDecision]
+
+
+class RadarMetric(BaseModel):
+    availability: RadarAvailability
+    value: str | None = None
+    unit: str | None = None
+    detail: str
+    source: str
+
+
+class RadarOracle(BaseModel):
+    status: str
+    updated_at: datetime | None = None
+    age_seconds: int | None = None
+    detail: str
+
+
+class RadarCosts(BaseModel):
+    protocol_fee_bps: int
+    max_execution_slippage_bps: int | None = None
+    estimate: RadarMetric
+    detail: str
+
+
+class MarketRadarRoute(BaseModel):
+    id: str
+    task_id: TaskId
+    task_label: str
+    route: str
+    asset_address: str | None = None
+    asset_symbol: str
+    venue: str
+    pair: str | None = None
+    pool: str | None = None
+    market_id: str | None = None
+    approved: bool
+    read_only: bool
+    status: RadarStatus
+    reason: str
+    health_status: str
+    health_detail: str
+    observed_at: datetime | None = None
+    refresh_failed_at: datetime | None = None
+    monitored_muppets: int
+    cached_observations: int
+    liquidity: RadarMetric
+    volume_24h: RadarMetric
+    pool_age: RadarMetric
+    capacity: RadarMetric
+    oracle: RadarOracle
+    costs: RadarCosts
+    checks: list[SafetyGate]
+
+
+class MarketRadarResponse(BaseModel):
+    generated_at: datetime
+    explorer_url: str
+    boundary: str
+    routes: list[MarketRadarRoute]
 
 
 class KeeperRunRequest(BaseModel):

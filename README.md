@@ -24,6 +24,8 @@ Current status: controlled mainnet beta. Existing Muppets can be funded, allocat
 - a performance marketplace with health, tracked change, deployment, oracle and keeper evidence plus two-Muppet comparison
 - a shareable creator profile for every wallet, with Muppets, per-asset vault totals, performance evidence and receipts
 - System Pulse, a unified public feed for decoded receipts and recorded keeper actions or holds
+- browser-local Muppet watchlists with an in-app evidence alert inbox
+- Muppet Market Radar, a read-only view of approved route health, capacity, source gaps and exact status reasons
 - a post-launch command center with vault funding, an onchain share preview, keeper timing, performance link and X sharing
 - browser-local recovery for the three launch transactions, keyed to the connected wallet, chain and factory
 - optional app handles claimed with a wallet signature and no gas
@@ -155,6 +157,20 @@ When a keeper transaction matches a decoded chain receipt, Pulse shows one event
 
 The chain decoder refreshes at most once per minute during normal operation and caches immutable agent metadata, token symbols and event-block timestamps instead of rereading them on every visitor request. Rate limits and other retryable RPC failures get bounded retries. A recent successful snapshot is reported as `cached` without a page-level alert; it becomes `stale` after five minutes and remains visibly labeled until a refresh succeeds.
 
+## Watchlists, alerts and Muppet Market Radar
+
+`/app/watchlist` is a public Monitor surface with three views: Watchlist, Alerts and Market Radar. A visitor can follow or unfollow a Muppet from the marketplace performance table or its public performance page. Followed IDs and the alert read-through time are stored only in that browser. No wallet, signature, backend account or contract write is involved, and clearing site data resets the list.
+
+The alert inbox combines two existing evidence sources for followed Muppets: recorded market observations and System Pulse. It calls out blocked or unavailable market health, an out-of-range position, a delayed market-evidence refresh, an unavailable or explicitly aged oracle, keeper actions or holds, deposits, withdrawals, allocations, Agent Key activity and protocol-wide Stock Token reserve purchases. A chain action links to its receipt. A keeper hold says no transaction was signed. A market observation says it has no receipt.
+
+Muppet Market Radar is read-only. `GET /api/v1/market-radar` compiles the configured task routes from the latest recorded adapter summaries. Each route receives one explicit state:
+
+- `live`: the latest usable adapter evidence passed the configured route checks
+- `review`: the route is approved but current evidence is absent or unavailable
+- `rejected`: a recorded hard route or accounting check failed
+
+Radar reports exact pool or market identifiers, native route liquidity, oracle evidence, per-vault capacity and policy fee or slippage limits when those fields exist. Current adapters do not expose 24 hour volume, pool age, realized execution cost or an expected return model, so those fields remain `not exposed` or `not applicable`. Radar never fills those gaps with historical APY, USD conversions or projected yield, and it cannot approve or execute a route.
+
 ## Launch recovery and command center
 
 The launch flow records each submitted transaction hash before waiting for confirmation: vault and Key creation, Key approval, then the first ask. If the wallet rejects a later step, a transaction reverts, confirmation reading times out, or the page reloads, `/app/create` restores the matching browser-local record and offers `Resume launch`. Resume checks any existing receipt before it sends the first missing transaction, so it does not blindly create another Muppet or repeat a pending listing.
@@ -259,6 +275,7 @@ The frontend uses atomic release directories under `/var/www/liquidmuppets/relea
 - `POST /api/v1/strategies/preview`
 - `GET /api/v1/activity` with optional `agent_id` and `limit` filters
 - `GET /api/v1/marketplace/performance`
+- `GET /api/v1/market-radar`
 - `GET /api/v1/agents/{agentId}/performance`
 - `GET /api/v1/creators/{wallet}`
 - `GET /api/v1/pulse` with optional `category`, `creator`, `agent_id`, and `limit` filters

@@ -160,6 +160,18 @@ const docsSections: DocsSection[] = [
   },
   {
     number: '16',
+    title: 'Watchlists and Market Radar',
+    body: 'Follow any Muppet from the marketplace or its public performance page, then open /app/watchlist for a browser-local watchlist and evidence alert inbox. Market Radar reads approved route evidence separately and cannot approve a route or move capital.',
+    details: [
+      'followed Muppet IDs and alert read state remain in this browser; no wallet or signature is required',
+      'alerts cover range, health, oracle, keeper, vault, Agent Key and protocol-reserve evidence with receipt links when a transaction exists',
+      'Radar labels every configured route live, review or rejected and gives the exact reason',
+      '24 hour volume, pool age, expected execution cost and projected return stay not exposed when current adapters do not provide them',
+      'no historical APY, USD liquidity conversion or route execution is invented by the Monitor surface',
+    ],
+  },
+  {
+    number: '17',
     title: 'Current boundary',
     body: 'The mainnet contracts use real USDG, WETH, Morpho, Uniswap and EZManager. Local and fork tests cover the adapters, full redemption and atomic recentering, but the contracts are not independently audited. Caps limit exposure and do not remove protocol, oracle, liquidity, LP or stablecoin risk.',
     details: [
@@ -351,7 +363,7 @@ export function DocsPage() {
       <header className="docs-heading">
         <p>LIQUIDMUPPETS / DOCUMENTATION</p>
         <h1>Everything about LIQUIDMUPPETS.</h1>
-        <span>The money path, public performance and creator records, System Pulse, Stock Token reserve, $MUPPETS launch gate, Key market and onchain limits.</span>
+        <span>The money path, public performance, watchlists, Market Radar, System Pulse, Stock Token reserve, $MUPPETS launch gate, Key market and onchain limits.</span>
       </header>
 
       <div className="docs-layout">

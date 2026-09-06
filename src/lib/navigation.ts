@@ -7,6 +7,7 @@ export const pathForView: Record<Exclude<View, 'performance' | 'creator'>, strin
   create: '/app/create',
   docs: '/docs',
   pulse: '/app/pulse',
+  monitor: '/app/watchlist',
 }
 
 export function viewFromPath(pathname: string): View {
@@ -14,6 +15,7 @@ export function viewFromPath(pathname: string): View {
 
   if (/^\/app\/muppet\/\d+$/.test(path)) return 'performance'
   if (/^\/app\/creator\/0x[a-fA-F0-9]{40}$/.test(path)) return 'creator'
+  if (path === '/app/watchlist') return 'monitor'
   if (path === '/app/pulse') return 'pulse'
   if (path === '/app/create') return 'create'
   if (path === '/app/portfolio') return 'portfolio'

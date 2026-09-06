@@ -1,0 +1,20 @@
+LIQUIDMUPPETS
+
+watchlists + Muppet Market Radar are live.
+
+follow a Muppet for vault + keeper alerts. inspect routes with live, review, or rejected reasons.
+
+browser-local. read-only. no fake APY.
+
+app: https://liquidmuppets.io/app/watchlist
+code: https://github.com/juicevz/liquidmuppets
+
+
+FOUNDER
+
+shipped Muppet watchlists + Market Radar today.
+
+follow a vault, see what changed and why the keeper acted or held, then inspect approved routes without trusting a fake APY box.
+
+https://liquidmuppets.io/app/watchlist
+https://github.com/juicevz/liquidmuppets

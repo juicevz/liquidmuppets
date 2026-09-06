@@ -264,6 +264,72 @@ export function fetchMarketplacePerformance(): Promise<MarketplacePerformanceRes
   return request('/marketplace/performance', { cache: 'no-store' })
 }
 
+export type RadarStatus = 'live' | 'review' | 'rejected'
+export type RadarAvailability = 'available' | 'not_exposed' | 'not_applicable'
+
+export interface RadarMetric {
+  availability: RadarAvailability
+  value: string | null
+  unit: string | null
+  detail: string
+  source: string
+}
+
+export interface RadarOracle {
+  status: string
+  updated_at: string | null
+  age_seconds: number | null
+  detail: string
+}
+
+export interface RadarCosts {
+  protocol_fee_bps: number
+  max_execution_slippage_bps: number | null
+  estimate: RadarMetric
+  detail: string
+}
+
+export interface MarketRadarRoute {
+  id: string
+  task_id: number
+  task_label: string
+  route: string
+  asset_address: `0x${string}` | null
+  asset_symbol: string
+  venue: string
+  pair: string | null
+  pool: `0x${string}` | null
+  market_id: string | null
+  approved: boolean
+  read_only: boolean
+  status: RadarStatus
+  reason: string
+  health_status: string
+  health_detail: string
+  observed_at: string | null
+  refresh_failed_at: string | null
+  monitored_muppets: number
+  cached_observations: number
+  liquidity: RadarMetric
+  volume_24h: RadarMetric
+  pool_age: RadarMetric
+  capacity: RadarMetric
+  oracle: RadarOracle
+  costs: RadarCosts
+  checks: Array<{ label: string; value: string }>
+}
+
+export interface MarketRadarResponse {
+  generated_at: string
+  explorer_url: string
+  boundary: string
+  routes: MarketRadarRoute[]
+}
+
+export function fetchMarketRadar(): Promise<MarketRadarResponse> {
+  return request('/market-radar', { cache: 'no-store' })
+}
+
 export interface CreatorAssetTotal {
   address: `0x${string}`
   symbol: string

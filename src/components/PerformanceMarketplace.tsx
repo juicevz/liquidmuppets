@@ -4,6 +4,7 @@ import type { MarketplacePerformanceSummary } from '../lib/api'
 import { performancePath } from '../lib/navigation'
 import type { ChainAgent } from '../lib/protocol'
 import { Icon } from './Icon'
+import { FollowButton } from './FollowButton'
 
 interface PerformanceMarketplaceProps {
   agents: ChainAgent[]
@@ -55,7 +56,7 @@ export function PerformanceMarketplace({
               <span role="columnheader">market health</span>
               <span role="columnheader">oracle</span>
               <span role="columnheader">last keeper</span>
-              <span role="columnheader">compare</span>
+              <span role="columnheader">monitor / compare</span>
             </div>
 
             {agents.map((agent) => {
@@ -110,6 +111,7 @@ export function PerformanceMarketplace({
                       : <><strong>{summary ? 'no decision' : 'pending'}</strong><small>{summary ? 'nothing recorded yet' : 'reading keeper record'}</small></>}
                   </span>
                   <span className="performance-market-compare" role="cell">
+                    <FollowButton agentId={agentId} agentName={agent.name} compact />
                     <button
                       type="button"
                       className={isSelected ? 'selected' : ''}

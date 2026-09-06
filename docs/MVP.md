@@ -13,7 +13,7 @@ A qualifying creator chooses one of seven cosmetic pets, assigns one of three en
 
 - gated feature: launching a new Muppet through `/app/create`
 - minimum balance: `15,000 $MUPPETS`
-- public without the token: landing, docs, marketplace, activity, Muppet performance, creator profiles, System Pulse and portfolio reads
+- public without the token: landing, docs, marketplace, activity, Muppet performance, creator profiles, System Pulse, watchlists, Market Radar and portfolio reads
 - balance verification: FastAPI reads `balanceOf(wallet)` from Robinhood Chain; the browser checks again before sending the first transaction
 - token address: `0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189`
 
@@ -154,9 +154,17 @@ A claimed app handle is displayed as a wallet-signed label. It does not verify a
 
 The chain decoder refreshes at most once per minute during normal operation and caches immutable agent metadata, token symbols and event-block timestamps. Retryable RPC failures receive bounded retries. A recent successful snapshot is reported as `cached` without a page-level warning; it becomes `stale` after five minutes and remains visibly labeled until a refresh succeeds. Persisted keeper decisions remain available throughout.
 
+### Watchlists and Muppet Market Radar
+
+`/app/watchlist` is the public Monitor route. Follow and unfollow controls appear in the marketplace performance table and on every public Muppet performance page. Versioned browser storage keeps only public Muppet IDs and the alert read-through timestamp. No wallet connection, signature, API account or contract transaction is required. Clearing the browser's site data removes that local state.
+
+The Alerts view derives warnings from recorded evidence for followed Muppets and from System Pulse. It covers out-of-range positions, blocked or unavailable market health, delayed market-evidence refreshes, explicitly aged or unavailable oracles, keeper actions and holds, deposits, withdrawals, allocations, Agent Key activity and protocol-wide Stock Token reserve purchases. A transaction-backed action links to its receipt. Keeper holds and market observations keep their no-transaction boundary explicit.
+
+The Market Radar beta is read-only. `GET /api/v1/market-radar` groups the latest recorded adapter evidence by configured task route and returns `live`, `review`, or `rejected` with the exact reason. It exposes the exact pool or Morpho market, native liquidity evidence, oracle boundary, policy capacity, protocol fee and maximum slippage when available. The current adapters do not expose 24 hour volume, pool age, realized execution cost or an expected-return model. Those values remain `not exposed` or `not applicable`; the app does not derive USD liquidity, historical APY or projected yield. Radar cannot approve a route or move capital.
+
 ## User flow
 
-1. Browse agents, markets, public creator profiles, System Pulse and documentation without connecting a wallet or holding `$MUPPETS`.
+1. Browse agents, markets, public creator profiles, System Pulse, watchlists, Market Radar and documentation without connecting a wallet or holding `$MUPPETS`.
 2. Connect an EVM wallet on Robinhood Chain mainnet.
 3. Hold at least `15,000 $MUPPETS` to unlock agent launch through the app.
 4. Pick any of the seven pet appearances.
@@ -234,6 +242,7 @@ The API reads deployment configuration from environment variables and validates 
 - cache the activity response briefly to avoid repeated wide log scans
 - assemble public creator profiles from persisted performance summaries without summing unlike assets
 - merge keeper decisions with matching chain receipts for the filtered System Pulse feed
+- compile read-only Market Radar route states from persisted adapter summaries without triggering new chain reads
 - issue short-lived profile challenges and verify signed claims
 - expose strategy parameters and transaction previews without signing them
 - relay only allowlisted read-only JSON-RPC methods for the browser
