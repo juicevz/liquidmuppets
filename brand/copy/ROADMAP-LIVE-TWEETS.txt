@@ -1,0 +1,32 @@
+LIQUIDMUPPETS
+
+the LiquidMuppets public roadmap is live.
+
+it separates what is shipped from what still needs verification:
+
+• reliability and public protocol records
+• Safe ownership and source verification
+• FactoryV2 activation with the 15,000 $MUPPETS rule onchain
+• reviewed NVDA, AAPL, SPY and meme routes
+
+no fake dates. no invented APY. no candidate marked live before its evidence passes.
+
+roadmap:
+https://liquidmuppets.io/#roadmap
+
+code and full docs:
+https://github.com/juicevz/liquidmuppets
+
+
+FOUNDER
+
+pushed the liquidmuppets roadmap live.
+
+i wanted one place where people can see what is actually running, what still needs the Safe and source verification, and which strategy routes are only under review.
+
+the order is simple: harden the machine, move control to the Safe, activate FactoryV2, then expand routes only when the venue and exit evidence holds up.
+
+no dates i made up for a graphic. if the evidence changes, the order can change too.
+
+https://liquidmuppets.io/#roadmap
+https://github.com/juicevz/liquidmuppets

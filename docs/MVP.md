@@ -53,6 +53,17 @@ FactoryV2 adds:
 
 The migration leaves new launches disabled. `scripts/verify-factory-v2.sh` submits the new factory, Key market and NVDA adapter sources to Blockscout, rechecks Safe ownership and the disabled launch switch, then prints the Safe calldata needed to activate V2 after review.
 
+## Public roadmap
+
+The site exposes a four-phase roadmap backed by the current release and repository state:
+
+1. `shipped · market core`: public performance and creator pages, System Pulse, watchlists, alerts, Market Radar, three live task routes, and the 26-route Stock Token reserve
+2. `next · resilience`: configure an independent production RPC fallback, complete source verification, move protocol ownership to a verified Safe, and commission an independent contract review
+3. `conditional · FactoryV2 permissioning`: simulate and broadcast after Safe approval, enforce the 15,000 `$MUPPETS` balance onchain while the tokens remain in the wallet, preserve V1 positions and markets, then enable launches through a separate Safe transaction
+4. `conditional · route review`: activate NVDA/USDG only after verified FactoryV2 activation, leave AAPL/USDG and SPY/USDG disabled until venue approval, keep meme/WETH disabled until every liquidity, age, volume, oracle, and exit gate passes, and expose new market evidence only when adapters source it
+
+`Shipped` means live or published. Later work remains conditional on verification and venue evidence. The roadmap has no dates, completion percentages, projected returns, or invented historical APY. Its sequence can change when evidence changes.
+
 ## Three live tasks and four reviewed candidates
 
 ### Stable yield

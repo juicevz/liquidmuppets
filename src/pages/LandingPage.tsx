@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { View } from '../types'
 import { pets } from '../data/pets'
+import { publicRoadmap, roadmapBoundary, roadmapRepository, roadmapSequenceNote } from '../data/roadmap'
 import { Brand } from '../components/Brand'
 import { DarkNoiseField } from '../components/DarkNoiseField'
 import { HeaderSocialLinks } from '../components/HeaderSocialLinks'
@@ -128,6 +129,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
           <a href="#about">About</a>
           <a href="#agents">Muppets</a>
           <a href="#safety">Safety</a>
+          <a href="#roadmap">Roadmap</a>
           <a href="/docs" onClick={(event) => { event.preventDefault(); onNavigate('docs') }}>Docs</a>
         </nav>
         <div className="landing-header-actions">
@@ -393,7 +395,40 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
           </div>
           </section>
 
-          <section className="final-cta section-shell" data-chapter="07 / DEPLOY" data-reveal>
+          <section className="roadmap-section section-shell" id="roadmap" data-chapter="07 / ROADMAP">
+            <div className="roadmap-heading" data-reveal>
+              <div>
+                <h2>Public work, in order.</h2>
+                <p>{roadmapBoundary}</p>
+              </div>
+              <div className="roadmap-links">
+                <a href={roadmapRepository} target="_blank" rel="noreferrer">
+                  Public repository <Icon name="arrow" />
+                </a>
+                <span>{roadmapSequenceNote}</span>
+              </div>
+            </div>
+
+            <ol className="roadmap-ledger" data-reveal>
+              {publicRoadmap.map((phase) => (
+                <li className={`roadmap-card roadmap-card-${phase.state}`} key={phase.number}>
+                  <article>
+                    <header>
+                      <span className={`roadmap-status roadmap-status-${phase.state}`}><i aria-hidden="true" />{phase.status}</span>
+                      <small>phase {phase.number}</small>
+                    </header>
+                    <h3>{phase.title}</h3>
+                    {phase.track && <b>{phase.track}</b>}
+                    <ul>
+                      {phase.items.map((item) => <li key={item}><i aria-hidden="true" />{item}</li>)}
+                    </ul>
+                  </article>
+                </li>
+              ))}
+            </ol>
+          </section>
+
+          <section className="final-cta section-shell" data-chapter="08 / DEPLOY" data-reveal>
           <div className="final-orbit" aria-hidden="true" />
           <h2>Launch the play, then earn the market.</h2>
           <p>Hold 15,000 $MUPPETS, then deploy one strategy vault, one permission policy and one fungible Agent Key market.</p>
@@ -407,7 +442,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
 
       <footer className="landing-footer">
         <div><Brand /><p>An interface for permissioned onchain agents.</p></div>
-        <div><span>PRODUCT</span><a href="#product">How it works</a><button onClick={() => onNavigate('marketplace')}>Key market</button><button onClick={() => onNavigate('create')}>Launch</button></div>
+        <div><span>PRODUCT</span><a href="#product">How it works</a><a href="#roadmap">Roadmap</a><button onClick={() => onNavigate('marketplace')}>Key market</button><button onClick={() => onNavigate('create')}>Launch</button></div>
         <div><span>READ</span><a href="/docs" onClick={(event) => { event.preventDefault(); onNavigate('docs') }}>LIQUIDMUPPETS docs</a><a href="https://x.com/AMBF" target="_blank" rel="noreferrer">X / @AMBF</a><a href="https://docs.morpho.org/" target="_blank" rel="noreferrer">Morpho</a></div>
         <div className="footer-note">Public browsing is open. App launch requires 15,000 $MUPPETS. Experimental mainnet software using real assets and unaudited contracts.</div>
       </footer>

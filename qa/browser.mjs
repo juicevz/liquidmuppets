@@ -155,6 +155,10 @@ results.heroAgentCount = await page.locator('.pixel-agent').count()
 results.storyLeaves = await page.locator('.folio-index li').count()
 results.strategyCards = await page.locator('.strategy-roles .type-grid article').count()
 results.petPreviewCards = await page.locator('.landing-pet-card').count()
+results.roadmapPhases = await page.locator('#roadmap .roadmap-card').count()
+results.roadmapShipped = await page.locator('#roadmap .roadmap-card-shipped').count()
+results.roadmapRepository = await page.getByRole('link', { name: /Public repository/i }).getAttribute('href')
+results.roadmapBoundary = await page.getByText(/Shipped means live or published/i).count() === 1
 results.explicitMainnetBoundary = await page.getByText(/unaudited contracts/i).count() > 0
 const soundDock = page.getByRole('button', { name: /Open soundtrack controls/i })
 results.soundDockVisible = await soundDock.isVisible()
@@ -486,6 +490,7 @@ results.docsCreatorProfiles = await page.getByText(/Every creator wallet has a s
 results.docsSystemPulse = await page.getByText(/combines decoded transaction events and recorded keeper decisions/i).count() === 1
 results.docsMonitor = await page.getByRole('heading', { name: 'Watchlists and Market Radar' }).count() === 1
 results.docsAlgorithm = await page.getByRole('heading', { name: 'The backend algorithm' }).count() === 1
+results.docsRoadmap = await page.getByRole('heading', { name: 'Public roadmap' }).count() === 1
 results.docsBoundary = await page.getByText(/real USDG, WETH, Morpho, Uniswap and EZManager/i).count() === 1
 results.docsLiveContracts = await page.getByText(/0x570F0FEBFE8b33F37D01f7153F0F85E59FfcE460/i).count() === 1
 results.docsVisuals = await page.locator('.docs-visual').count()
@@ -673,6 +678,10 @@ const failed =
   || results.storyLeaves !== 4
   || results.strategyCards !== 3
   || results.petPreviewCards !== 7
+  || results.roadmapPhases !== 4
+  || results.roadmapShipped !== 1
+  || results.roadmapRepository !== 'https://github.com/juicevz/liquidmuppets'
+  || !results.roadmapBoundary
   || !results.explicitMainnetBoundary
   || !results.soundDockVisible
   || results.soundDockPosition !== 'fixed'
@@ -780,7 +789,7 @@ const failed =
   || !results.portfolioConnectState
   || !results.portfolioChainNumberRemoved
   || results.docsTitle !== 'Docs | LIQUIDMUPPETS'
-  || results.docsSections !== 19
+  || results.docsSections !== 20
   || !results.docsTokenGate
   || !results.docsSevenPets
   || !results.docsFeeReserve
@@ -790,6 +799,7 @@ const failed =
   || !results.docsSystemPulse
   || !results.docsMonitor
   || !results.docsAlgorithm
+  || !results.docsRoadmap
   || !results.docsBoundary
   || !results.docsLiveContracts
   || results.docsVisuals !== 8

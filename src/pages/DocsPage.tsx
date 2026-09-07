@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { pets } from '../data/pets'
+import { publicRoadmap, roadmapBoundary, roadmapRepository, roadmapSequenceNote } from '../data/roadmap'
 import blueDocsPortrait from '../assets/docs-pets/blue.webp'
 import sageDocsPortrait from '../assets/docs-pets/sage.webp'
 import stoneDocsPortrait from '../assets/docs-pets/stone.webp'
@@ -195,6 +196,15 @@ const docsSections: DocsSection[] = [
   },
   {
     number: '19',
+    title: 'Public roadmap',
+    body: `${roadmapBoundary} The public repository is ${roadmapRepository}.`,
+    details: [
+      ...publicRoadmap.map((phase) => `phase ${phase.number} · ${phase.status} · ${phase.title}: ${phase.items.join('; ')}`),
+      roadmapSequenceNote,
+    ],
+  },
+  {
+    number: '20',
     title: 'Current boundary',
     body: 'The mainnet contracts use real USDG, WETH, Morpho, Uniswap and EZManager. Local and fork tests cover the adapters, full redemption and atomic recentering, but the contracts are not independently audited. Caps limit exposure and do not remove protocol, oracle, liquidity, LP or stablecoin risk.',
     details: [

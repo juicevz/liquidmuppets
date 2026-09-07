@@ -55,6 +55,19 @@ FactoryV2 also carries a review catalog for the next route set:
 
 Review candidates cannot be launched. They are displayed so the missing evidence is public instead of being represented as a live strategy.
 
+## Public roadmap
+
+The live site publishes the work in four evidence-based phases. `Shipped` means live or published. Every later item remains conditional on source verification, Safe approval, independent review, or venue evidence. There are no invented dates, completion percentages, or historical APY claims.
+
+| Phase | State | Work |
+| --- | --- | --- |
+| 01 · Market core | shipped | public performance and creator pages; System Pulse; watchlists, alerts and Market Radar; three live task routes and the 26-route Stock Token reserve |
+| 02 · Resilience | next | independent production RPC fallback; source verification; verified Safe ownership; independent contract review |
+| 03 · Permissioning | conditional | simulate and broadcast FactoryV2 after Safe approval; enforce the 15,000 `$MUPPETS` rule onchain; preserve V1 positions and markets; enable launches through a separate Safe transaction |
+| 04 · Asset expansion | conditional | activate NVDA/USDG only after verified FactoryV2 activation; retain AAPL/USDG and SPY/USDG as disabled venue candidates; keep meme/WETH disabled until every route gate passes; expose new market evidence only when adapters source it |
+
+The sequence can change when evidence changes. The website and this repository use the same roadmap boundaries.
+
 ## Deployed contracts
 
 Current deployment block: `52653314`.
