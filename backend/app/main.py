@@ -12,10 +12,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import Settings, settings
 from app.database import Database, KeeperRunRecord
-from app.routers import access, activity, keeper, performance, profiles, public, radar, strategies, system
+from app.routers import access, activity, keeper, performance, profiles, proofs, public, radar, strategies, system
 from app.services.activity import ActivityService
 from app.services.chain import ChainService
 from app.services.performance import PerformanceService
+from app.services.proofs import PROOF_BOUNDARY, ProofService
 from app.services.public_data import PublicDataService
 from app.services.token_gate import TokenGateService
 
@@ -29,6 +30,7 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
     token_gate = TokenGateService(app_settings, chain.web3)
     performance_service = PerformanceService(app_settings, database, chain)
     public_data_service = PublicDataService(app_settings, database, activity_service, token_gate)
+    proof_service = ProofService(app_settings, database, activity_service, chain)
 
     @asynccontextmanager
     async def lifespan(live_app: FastAPI) -> AsyncIterator[None]:
@@ -45,9 +47,11 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
         keeper_task = None
         performance_task = None
         activity_task = None
+        proof_task = None
         if app_settings.factory_address:
             performance_task = asyncio.create_task(_performance_loop(performance_service, app_settings, stop))
             activity_task = asyncio.create_task(_activity_loop(activity_service, app_settings, stop))
+            proof_task = asyncio.create_task(_proof_loop(proof_service, app_settings, stop))
         if (
             app_settings.auto_keeper_enabled
             and app_settings.keeper_private_key
@@ -64,11 +68,13 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
                 await performance_task
             if activity_task is not None:
                 await activity_task
+            if proof_task is not None:
+                await proof_task
             rpc_client.close()
 
     app = FastAPI(
         title="LiquidMuppets Strategy API",
-        version="0.7.0",
+        version="0.8.0",
         docs_url="/api/docs",
         openapi_url="/api/openapi.json",
         lifespan=lifespan,
@@ -80,6 +86,8 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
     app.state.performance = performance_service
     app.state.public_data = public_data_service
     app.state.token_gate = token_gate
+    app.state.proofs = proof_service
+    app.state.proofs_boundary = PROOF_BOUNDARY
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(app_settings.cors_origins),
@@ -96,6 +104,8 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
     app.include_router(performance.router, prefix="/api/v1")
     app.include_router(radar.router, prefix="/api/v1")
     app.include_router(public.router, prefix="/api/v1")
+    app.include_router(proofs.api_router, prefix="/api/v1")
+    app.include_router(proofs.share_router)
     return app
 
 
@@ -135,6 +145,25 @@ async def _performance_loop(
             await asyncio.wait_for(
                 stop.wait(),
                 timeout=max(30, app_settings.performance_checkpoint_interval_seconds),
+            )
+        except TimeoutError:
+            continue
+
+
+async def _proof_loop(
+    proof_service: ProofService,
+    app_settings: Settings,
+    stop: asyncio.Event,
+) -> None:
+    while not stop.is_set():
+        try:
+            await asyncio.to_thread(proof_service.refresh)
+        except Exception as error:
+            logger.warning("scheduled proof materialization failed: %s", type(error).__name__)
+        try:
+            await asyncio.wait_for(
+                stop.wait(),
+                timeout=max(30, app_settings.activity_refresh_interval_seconds),
             )
         except TimeoutError:
             continue

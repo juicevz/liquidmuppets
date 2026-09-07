@@ -25,6 +25,7 @@ class Settings:
     rpc_fallback_urls: tuple[str, ...] = _csv("RPC_FALLBACK_URLS")
     browser_rpc_url: str = getenv("BROWSER_RPC_URL", "/api/v1/rpc")
     explorer_url: str = getenv("EXPLORER_URL", "https://robinhoodchain.blockscout.com")
+    public_base_url: str = getenv("PUBLIC_BASE_URL", "https://liquidmuppets.io").rstrip("/")
     deployment_block: int = int(getenv("DEPLOYMENT_BLOCK", "0"))
     factory_version: int = int(getenv("FACTORY_VERSION", "1"))
     factory_address: str = getenv("FACTORY_ADDRESS", "")

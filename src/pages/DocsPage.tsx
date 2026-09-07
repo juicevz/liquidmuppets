@@ -166,6 +166,18 @@ const docsSections: DocsSection[] = [
   },
   {
     number: '16',
+    title: 'Automatic Muppet Proof Cards',
+    body: 'Every meaningful recorded event can become a durable /proof/{id} share page and an /app/proof/{id} evidence view. Cards cover Muppet launches, first deposits, keeper actions, range changes, whole-percentage flow-adjusted NAV milestones since tracking began, Agent Key fills and Stock Token reserve purchase receipts.',
+    details: [
+      'each card carries the Muppet, exact asset, pool or market, latest labeled health observation, UTC timestamp, receipt state and canonical $MUPPETS address',
+      'routine keeper holds are grouped into one daily card per Muppet so scheduled checks do not bury meaningful events',
+      'holds and checkpoint milestones explicitly say no transaction was signed rather than inventing a receipt',
+      'milestones use recorded cash-flow-adjusted change and never project or annualize APY',
+      'the public share URL renders server-side social metadata with a 1200 by 630 PNG and links back to the full in-app evidence view',
+    ],
+  },
+  {
+    number: '17',
     title: 'Watchlists and Market Radar',
     body: 'Follow any Muppet from the marketplace or its public performance page, then open /app/watchlist for a browser-local watchlist and evidence alert inbox. Market Radar separates three live routes from four FactoryV2 review candidates and cannot approve a route or move capital.',
     details: [
@@ -177,7 +189,7 @@ const docsSections: DocsSection[] = [
     ],
   },
   {
-    number: '17',
+    number: '18',
     title: 'Indexer and RPC reliability',
     body: 'System Pulse now indexes only new confirmed blocks plus a short reorg window. Decoded events, scan progress and the last healthy fee-reserve response survive API restarts in SQLite. Public pages keep the last successful timestamp visible when an upstream read fails.',
     details: [
@@ -188,7 +200,7 @@ const docsSections: DocsSection[] = [
     ],
   },
   {
-    number: '18',
+    number: '19',
     title: 'FactoryV2 and reviewed templates',
     body: 'FactoryV2 implements one reusable creator slot per 15,000 $MUPPETS onchain, exact task and adapter registration, defensive, balanced and active presets, V1 read compatibility, and contract-governed ownership. Every legacy or V2 Muppet consumes one slot. It ships launch-disabled until Blockscout verification and an explicit Safe activation.',
     details: [
@@ -201,7 +213,7 @@ const docsSections: DocsSection[] = [
     ],
   },
   {
-    number: '19',
+    number: '20',
     title: 'Public roadmap',
     body: `${roadmapBoundary} The current implementation and full operating notes stay available in the public repository.`,
     link: { label: 'Open the public repository', href: roadmapRepository },
@@ -211,7 +223,7 @@ const docsSections: DocsSection[] = [
     ],
   },
   {
-    number: '20',
+    number: '21',
     title: 'Current boundary',
     body: 'The mainnet contracts use real USDG, WETH, Morpho, Uniswap and EZManager. Local and fork tests cover the adapters, full redemption and atomic recentering, but the contracts are not independently audited. Caps limit exposure and do not remove protocol, oracle, liquidity, LP or stablecoin risk.',
     details: [
@@ -403,7 +415,7 @@ export function DocsPage() {
       <header className="docs-heading">
         <p>LIQUIDMUPPETS / DOCUMENTATION</p>
         <h1>Everything about LIQUIDMUPPETS.</h1>
-        <span>The money path, public performance, watchlists, Market Radar, System Pulse, Stock Token reserve, $MUPPETS launch gate, Key market and onchain limits.</span>
+        <span>The money path, public performance, automatic Proof Cards, watchlists, Market Radar, System Pulse, Stock Token reserve, $MUPPETS launch gate, Key market and onchain limits.</span>
       </header>
 
       <div className="docs-layout">

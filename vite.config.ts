@@ -8,6 +8,7 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       '/api': 'http://127.0.0.1:8000',
+      '/proof': 'http://127.0.0.1:8000',
     },
   },
   preview: {

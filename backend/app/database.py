@@ -41,6 +41,16 @@ class PerformanceCheckpointRecord:
     cumulative_withdrawals: str
 
 
+@dataclass(frozen=True)
+class ProofCardRecord:
+    proof_id: str
+    kind: str
+    event_timestamp: str
+    agent_id: int | None
+    creator: str | None
+    payload: dict[str, object]
+
+
 class Database:
     def __init__(self, path: Path) -> None:
         self.path = path
@@ -181,6 +191,25 @@ class Database:
                     payload TEXT NOT NULL,
                     observed_at TEXT NOT NULL
                 )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS proof_cards (
+                    proof_id TEXT PRIMARY KEY,
+                    kind TEXT NOT NULL,
+                    event_timestamp TEXT NOT NULL,
+                    agent_id INTEGER,
+                    creator TEXT,
+                    payload TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE INDEX IF NOT EXISTS proof_cards_time
+                ON proof_cards (event_timestamp DESC, proof_id DESC)
                 """
             )
 
@@ -389,6 +418,120 @@ class Database:
                     """,
                     (agent_id, bounded),
                 ).fetchall()
+        return [json.loads(str(row["payload"])) for row in rows]
+
+    def list_proof_activity_events(self, limit: int = 10_000) -> list[dict[str, object]]:
+        bounded = max(1, min(limit, 10_000))
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT payload FROM activity_events
+                WHERE json_extract(payload, '$.action') IN (
+                    'launched', 'deposited', 'bought', 'sold',
+                    'opened range', 'closed range', 'reserve bought'
+                )
+                ORDER BY block_number DESC, log_index DESC
+                LIMIT ?
+                """,
+                (bounded,),
+            ).fetchall()
+        return [json.loads(str(row["payload"])) for row in rows]
+
+    def first_activity_event_ids(self, action: str) -> set[str]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT payload FROM activity_events
+                WHERE json_extract(payload, '$.action') = ?
+                ORDER BY block_number ASC, log_index ASC
+                """,
+                (action,),
+            ).fetchall()
+        first_by_agent: dict[int, str] = {}
+        for row in rows:
+            payload = json.loads(str(row["payload"]))
+            agent_id = payload.get("agent_id")
+            event_id = payload.get("id")
+            if isinstance(agent_id, int) and isinstance(event_id, str):
+                first_by_agent.setdefault(agent_id, event_id)
+        return set(first_by_agent.values())
+
+    def list_all_keeper_runs(self, limit: int = 10_000) -> list[dict[str, object]]:
+        bounded = max(1, min(limit, 10_000))
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM keeper_runs ORDER BY id DESC LIMIT ?",
+                (bounded,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def store_proof_card(self, record: ProofCardRecord, *, replace: bool = False) -> None:
+        now = datetime.now(UTC).isoformat()
+        values = (
+            record.proof_id,
+            record.kind,
+            record.event_timestamp,
+            record.agent_id,
+            record.creator.lower() if record.creator else None,
+            json.dumps(record.payload, separators=(",", ":"), sort_keys=True),
+            now,
+        )
+        with self.connect() as connection:
+            if replace:
+                connection.execute(
+                    """
+                    INSERT INTO proof_cards (
+                        proof_id, kind, event_timestamp, agent_id, creator, payload, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(proof_id) DO UPDATE SET
+                        kind = excluded.kind,
+                        event_timestamp = excluded.event_timestamp,
+                        agent_id = excluded.agent_id,
+                        creator = excluded.creator,
+                        payload = excluded.payload,
+                        updated_at = excluded.updated_at
+                    """,
+                    values,
+                )
+            else:
+                connection.execute(
+                    """
+                    INSERT OR IGNORE INTO proof_cards (
+                        proof_id, kind, event_timestamp, agent_id, creator, payload, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    values,
+                )
+
+    def get_proof_card(self, proof_id: str) -> dict[str, object] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT payload FROM proof_cards WHERE proof_id = ?",
+                (proof_id,),
+            ).fetchone()
+        return json.loads(str(row["payload"])) if row else None
+
+    def list_proof_cards(
+        self,
+        limit: int = 50,
+        *,
+        kind: str | None = None,
+        creator: str | None = None,
+        agent_id: int | None = None,
+    ) -> list[dict[str, object]]:
+        bounded = max(1, min(limit, 200))
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT payload FROM proof_cards
+                WHERE (? IS NULL OR kind = ?)
+                  AND (? IS NULL OR LOWER(creator) = LOWER(?))
+                  AND (? IS NULL OR agent_id = ?)
+                ORDER BY event_timestamp DESC, proof_id DESC
+                LIMIT ?
+                """,
+                (kind, kind, creator, creator, agent_id, agent_id, bounded),
+            ).fetchall()
         return [json.loads(str(row["payload"])) for row in rows]
 
     def list_activity_orders(self) -> list[tuple[str, str, int, str, int]]:

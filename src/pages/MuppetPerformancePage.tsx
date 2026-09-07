@@ -128,6 +128,7 @@ export function MuppetPerformancePage({ agentId }: MuppetPerformancePageProps) {
         </div>
         <div className="performance-actions">
           <FollowButton agentId={performance.agent.id} agentName={performance.agent.name} />
+          <a href={`/app/proofs?agent_id=${performance.agent.id}`}><Icon name="spark" />Proof cards</a>
           <button type="button" onClick={() => void sharePage()}><Icon name="receipt" />{shareState}</button>
           <button type="button" onClick={() => void load()}><Icon name="spark" />Refresh</button>
         </div>

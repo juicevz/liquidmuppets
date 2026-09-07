@@ -107,7 +107,10 @@ export function CreatorProfilePage({ creatorAddress }: CreatorProfilePageProps) 
           <div><h1>{displayName}</h1>{profile.handle && <span className="creator-verified"><Icon name="check" />wallet signed</span>}</div>
           <a href={`${profile.explorer_url}/address/${profile.wallet}`} target="_blank" rel="noreferrer">{profile.wallet} <Icon name="arrow" /></a>
         </div>
-        <button className="creator-copy" type="button" onClick={() => void copyProfile()}><Icon name={copied ? 'check' : 'receipt'} />{copied ? 'Copied' : 'Copy profile URL'}</button>
+        <div className="creator-identity-actions">
+          <a className="creator-copy" href={`/app/proofs?creator=${profile.wallet}`}><Icon name="spark" />Proof cards</a>
+          <button className="creator-copy" type="button" onClick={() => void copyProfile()}><Icon name={copied ? 'check' : 'receipt'} />{copied ? 'Copied' : 'Copy profile URL'}</button>
+        </div>
       </header>
 
       <section className="creator-record-strip">

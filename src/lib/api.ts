@@ -407,6 +407,8 @@ export interface PulseItem {
   status: string | null
   tx_hash: `0x${string}` | null
   block_number: number | null
+  proof_id?: string | null
+  proof_url?: string | null
 }
 
 export interface PulseResponse {
@@ -429,6 +431,91 @@ export function fetchSystemPulse(options: {
   if (options.creator) params.set('creator', options.creator)
   if (options.agentId !== undefined) params.set('agent_id', String(options.agentId))
   return request(`/pulse?${params.toString()}`, { cache: 'no-store' })
+}
+
+export type ProofKind =
+  | 'muppet_launch'
+  | 'first_deposit'
+  | 'keeper_action'
+  | 'keeper_daily_summary'
+  | 'range_change'
+  | 'nav_milestone'
+  | 'agent_key_fill'
+  | 'reserve_purchase'
+
+export interface ProofRecord {
+  id: string
+  kind: ProofKind
+  category_label: string
+  title: string
+  summary: string
+  timestamp: string
+  action: string
+  reason: string | null
+  event_count: number
+  subject: {
+    agent_id: number | null
+    name: string
+    pet_id: number | null
+    creator: `0x${string}` | null
+    performance_url: string | null
+  }
+  asset: { symbol: string; address: `0x${string}` | null }
+  market: {
+    venue: string
+    pair: string | null
+    pool: `0x${string}` | null
+    market_id: string | null
+    range: {
+      status: string
+      position_key: string | null
+      lower_tick: number
+      upper_tick: number
+      current_tick: number
+      in_range: boolean | null
+    } | null
+    health_status: string
+    health_detail: string
+    observed_at: string | null
+  }
+  receipt: {
+    state: 'confirmed' | 'no_transaction'
+    tx_hash: `0x${string}` | null
+    url: string | null
+    block_number: number | null
+  }
+  facts: Array<{ label: string; value: string }>
+  token_symbol: string
+  token_address: `0x${string}` | null
+  public_url: string
+  app_url: string
+  image_url: string
+  share_text: string
+  boundary: string
+  no_apy_projection: true
+}
+
+export interface ProofListResponse {
+  generated_at: string
+  boundary: string
+  items: ProofRecord[]
+}
+
+export function fetchProofs(options: {
+  limit?: number
+  kind?: ProofKind
+  creator?: string
+  agentId?: number
+} = {}): Promise<ProofListResponse> {
+  const params = new URLSearchParams({ limit: String(options.limit ?? 50) })
+  if (options.kind) params.set('kind', options.kind)
+  if (options.creator) params.set('creator', options.creator)
+  if (options.agentId !== undefined) params.set('agent_id', String(options.agentId))
+  return request(`/proofs?${params.toString()}`, { cache: 'no-store' })
+}
+
+export function fetchProof(proofId: string): Promise<ProofRecord> {
+  return request(`/proofs/${proofId}`, { cache: 'no-store' })
 }
 
 export interface RwaReserveRoute {

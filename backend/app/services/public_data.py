@@ -10,6 +10,7 @@ from web3 import Web3
 from app.config import Settings
 from app.database import Database
 from app.services.activity import ActivityService
+from app.services.proofs import keeper_hold_proof_id, proof_id_for_chain_event, public_proof_url
 from app.services.token_gate import TokenGateService
 
 _KEY_ACTIONS = {"listed", "bought", "bid", "sold", "bound"}
@@ -139,6 +140,7 @@ class PublicDataService:
             for row in keeper_rows
             if isinstance(row.get("tx_hash"), str) and row.get("tx_hash")
         }
+        first_deposit_ids = self.database.first_activity_event_ids("deposited")
 
         chain_status = "available"
         try:
@@ -183,6 +185,13 @@ class PublicDataService:
             }
             if item["creator"] is None and isinstance(item["agent_id"], int):
                 item["creator"] = _summary_creator_address(by_agent.get(int(item["agent_id"])))
+            proof_id = proof_id_for_chain_event(
+                row,
+                first_deposit_ids=first_deposit_ids,
+                keeper_run=keeper,
+            )
+            item["proof_id"] = proof_id
+            item["proof_url"] = public_proof_url(self.settings, proof_id) if proof_id else None
             items.append(item)
             timestamp = str(row.get("timestamp") or "")
             if timestamp and (latest_chain_record_at is None or timestamp > latest_chain_record_at):
@@ -201,6 +210,19 @@ class PublicDataService:
             decimals = 18 if task_id == 3 else _safe_int(asset.get("decimals"))
             value_symbol = "ETH" if task_id == 3 else str(asset.get("symbol") or "assets")
             agent = _mapping(summary.get("agent")) if summary else {}
+            proof_id = None
+            reserve_subject = (
+                task_id == 3
+                and str(row.get("vault") or "").lower() == self.settings.fee_rwa_reserve_address.lower()
+            )
+            if action == "hold" and (summary is not None or reserve_subject):
+                proof_id = keeper_hold_proof_id(
+                    row.get("created_at"),
+                    agent.get("id") if isinstance(agent.get("id"), int) else None,
+                    reserve=reserve_subject,
+                )
+            elif task_id not in {1, 3}:
+                proof_id = f"keeper-action-{_safe_int(row.get('id'))}"
             items.append(
                 {
                     "id": f"keeper:{row['id']}",
@@ -222,6 +244,8 @@ class PublicDataService:
                     "status": row.get("status"),
                     "tx_hash": tx_hash or None,
                     "block_number": None,
+                    "proof_id": proof_id,
+                    "proof_url": public_proof_url(self.settings, proof_id) if proof_id else None,
                 }
             )
 

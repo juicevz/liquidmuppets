@@ -278,6 +278,8 @@ class PulseItem(BaseModel):
     status: str | None = None
     tx_hash: str | None = None
     block_number: int | None = None
+    proof_id: str | None = None
+    proof_url: str | None = None
 
 
 class PulseSourceStatus(BaseModel):
@@ -292,6 +294,94 @@ class PulseResponse(BaseModel):
     limit: int
     source_status: PulseSourceStatus
     items: list[PulseItem]
+
+
+ProofKind = Literal[
+    "muppet_launch",
+    "first_deposit",
+    "keeper_action",
+    "keeper_daily_summary",
+    "range_change",
+    "nav_milestone",
+    "agent_key_fill",
+    "reserve_purchase",
+]
+
+
+class ProofSubject(BaseModel):
+    agent_id: int | None
+    name: str
+    pet_id: int | None
+    creator: str | None
+    performance_url: str | None
+
+
+class ProofAsset(BaseModel):
+    symbol: str
+    address: str | None
+
+
+class ProofMarketRange(BaseModel):
+    status: str
+    position_key: str | None
+    lower_tick: int
+    upper_tick: int
+    current_tick: int
+    in_range: bool | None
+
+
+class ProofMarket(BaseModel):
+    venue: str
+    pair: str | None
+    pool: str | None
+    market_id: str | None
+    range: ProofMarketRange | None
+    health_status: str
+    health_detail: str
+    observed_at: datetime | None
+
+
+class ProofReceipt(BaseModel):
+    state: Literal["confirmed", "no_transaction"]
+    tx_hash: str | None
+    url: str | None
+    block_number: int | None
+
+
+class ProofFact(BaseModel):
+    label: str
+    value: str
+
+
+class ProofCard(BaseModel):
+    id: str
+    kind: ProofKind
+    category_label: str
+    title: str
+    summary: str
+    timestamp: datetime
+    action: str
+    reason: str | None
+    event_count: int
+    subject: ProofSubject
+    asset: ProofAsset
+    market: ProofMarket
+    receipt: ProofReceipt
+    facts: list[ProofFact]
+    token_symbol: str
+    token_address: str | None
+    public_url: str
+    app_url: str
+    image_url: str
+    share_text: str
+    boundary: str
+    no_apy_projection: Literal[True]
+
+
+class ProofListResponse(BaseModel):
+    generated_at: datetime
+    boundary: str
+    items: list[ProofCard]
 
 
 class CreatorAssetTotal(BaseModel):

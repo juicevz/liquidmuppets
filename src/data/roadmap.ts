@@ -18,6 +18,7 @@ export const publicRoadmap: RoadmapPhase[] = [
     items: [
       'Public performance pages and creator profiles',
       '$MUPPETS Creator Slots in the app, API and public profiles',
+      'Automatic proof cards and durable share URLs for meaningful records',
       'System Pulse with restart-safe incremental indexing',
       'Watchlists, alerts and Market Radar',
       'Three live task routes and a 26-route Stock Token reserve',

@@ -1,0 +1,20 @@
+LIQUIDMUPPETS
+
+proof cards are live.
+
+launches, first deposits, keeper actions, range changes, tracked NAV milestones, Agent Key fills and reserve receipts now get durable public URLs.
+
+routine holds are grouped daily. no invented APY.
+
+github.com/juicevz/liquidmuppets
+
+
+FOUNDER
+
+just pushed Muppet proof cards live.
+
+the useful stuff now has its own public URL: launches, first deposits, keeper moves, range changes, tracked NAV milestones, Key fills and reserve buys.
+
+holds get grouped daily so the feed stays readable.
+
+github.com/juicevz/liquidmuppets

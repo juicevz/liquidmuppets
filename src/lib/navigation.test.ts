@@ -5,6 +5,8 @@ import {
   pathForView,
   performanceAgentIdFromPath,
   performancePath,
+  proofIdFromPath,
+  proofPath,
   viewFromPath,
 } from './navigation'
 
@@ -17,9 +19,18 @@ describe('viewFromPath', () => {
     expect(viewFromPath('/app/create')).toBe('create')
     expect(viewFromPath('/app/muppet/42')).toBe('performance')
     expect(viewFromPath('/app/creator/0x1111111111111111111111111111111111111111')).toBe('creator')
+    expect(viewFromPath('/app/proofs')).toBe('proofs')
+    expect(viewFromPath('/app/proof/muppet-launch-abc12345')).toBe('proof')
     expect(viewFromPath('/app/pulse')).toBe('pulse')
     expect(viewFromPath('/app/watchlist')).toBe('monitor')
     expect(viewFromPath('/docs')).toBe('docs')
+  })
+
+  it('builds and parses public proof paths', () => {
+    const proofId = 'muppet-launch-abc12345'
+    expect(proofPath(proofId)).toBe(`/app/proof/${proofId}`)
+    expect(proofIdFromPath(`/app/proof/${proofId}`)).toBe(proofId)
+    expect(proofIdFromPath('/app/proof/not_VALID')).toBeNull()
   })
 
   it('fails safely to the landing page', () => {

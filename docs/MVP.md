@@ -14,7 +14,7 @@ A qualifying creator chooses one of seven cosmetic pets, assigns one of three en
 - capacity formula: `slots = floor(wallet balance / 15,000)`
 - one available slot permits one new Muppet through `/app/create`
 - one used slot funds one featured Muppet on the public creator profile
-- public without the token: landing, docs, marketplace, activity, Muppet performance, creator profiles, System Pulse, watchlists, Market Radar and portfolio reads
+- public without the token: landing, docs, marketplace, activity, Muppet performance, creator profiles, System Pulse, Proof Cards, watchlists, Market Radar and portfolio reads
 - capacity verification: FastAPI reads `balanceOf(wallet)` and `getCreatorAgentIds(wallet)` from Robinhood Chain; the browser checks both again before sending the first transaction
 - token address: `0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189`
 
@@ -60,7 +60,7 @@ The migration leaves new launches disabled. `scripts/verify-factory-v2.sh` submi
 
 The site exposes a four-phase roadmap backed by the current release and repository state:
 
-1. `shipped · market core`: public performance and creator pages, `$MUPPETS` Creator Slots, System Pulse, watchlists, alerts, Market Radar, three live task routes, and the 26-route Stock Token reserve
+1. `shipped · market core`: public performance and creator pages, `$MUPPETS` Creator Slots, automatic Proof Cards, System Pulse, watchlists, alerts, Market Radar, three live task routes, and the 26-route Stock Token reserve
 2. `next · resilience`: configure an independent production RPC fallback, complete source verification, move protocol ownership to a verified Safe, and commission an independent contract review
 3. `conditional · FactoryV2 permissioning`: simulate and broadcast after Safe approval, enforce one creator slot per 15,000 `$MUPPETS` onchain while the tokens remain in the wallet, preserve V1 positions and markets, then enable launches through a separate Safe transaction
 4. `conditional · route review`: activate NVDA/USDG only after verified FactoryV2 activation, leave AAPL/USDG and SPY/USDG disabled until venue approval, keep meme/WETH disabled until every liquidity, age, volume, oracle, and exit gate passes, and expose new market evidence only when adapters source it
@@ -211,6 +211,14 @@ The chain decoder refreshes in the background at most once per minute during nor
 
 Chain reads, the activity indexer and the browser's read-only RPC relay share an ordered provider pool. Transport failures, rate limits and retryable upstream JSON-RPC errors move the request to the next configured endpoint. The last healthy fee-reserve response also persists across restarts. Robinhood's public RPC is rate-limited; an independent production fallback must be supplied through `RPC_FALLBACK_URLS` using a provider account or separately operated node.
 
+### Automatic Muppet Proof Cards
+
+`/app/proofs` is the public gallery for persistent evidence cards. The backend creates a card for every Muppet launch, first deposit, keeper action, range change, whole-percentage flow-adjusted NAV milestone since tracking began, Agent Key fill and Stock Token reserve purchase. It combines a close and reopen in the same transaction into one range-change record. Repeated keeper holds are grouped into one card per Muppet per UTC day and update that card's event count.
+
+Each card records the Muppet, creator, native asset, exact pool or market, latest health label and its separate observation time, event timestamp, keeper reason when available, receipt state and canonical `$MUPPETS` address. Chain-backed records link to their transaction. Holds and NAV checkpoints explicitly carry no receipt. Key fills remain visibly separate from vault performance.
+
+The stable public URL is `/proof/{proofId}` and the complete app view is `/app/proof/{proofId}`. The public route renders social metadata server-side and points to a generated 1200 by 630 PNG, with SVG available separately for inspection. Proof rows persist in SQLite so links survive API restarts. A NAV milestone is emitted only when recorded flow-adjusted change crosses a new positive or negative whole-percentage high-water mark. It is neither projected nor annualized APY, and no history is invented before tracking began.
+
 ### Watchlists and Muppet Market Radar
 
 `/app/watchlist` is the public Monitor route. Follow and unfollow controls appear in the marketplace performance table and on every public Muppet performance page. Versioned browser storage keeps only public Muppet IDs and the alert read-through timestamp. No wallet connection, signature, API account or contract transaction is required. Clearing the browser's site data removes that local state.
@@ -221,7 +229,7 @@ The Market Radar beta is read-only. `GET /api/v1/market-radar` groups the latest
 
 ## User flow
 
-1. Browse agents, markets, public creator profiles, System Pulse, watchlists, Market Radar and documentation without connecting a wallet or holding `$MUPPETS`.
+1. Browse agents, markets, public creator profiles, System Pulse, Proof Cards, watchlists, Market Radar and documentation without connecting a wallet or holding `$MUPPETS`.
 2. Connect an EVM wallet on Robinhood Chain mainnet.
 3. Hold `15,000 $MUPPETS` per Muppet you want to operate. The first launch threshold is 15,000, the second is 30,000, and each later threshold adds 15,000.
 4. Pick any of the seven pet appearances.
@@ -301,6 +309,7 @@ The API reads deployment configuration from environment variables and validates 
 - fail over read requests across an ordered set of independently configured RPC endpoints
 - assemble public creator profiles from persisted performance summaries without summing unlike assets
 - merge keeper decisions with matching chain receipts for the filtered System Pulse feed
+- materialize durable Proof Cards from persisted events, keeper decisions and checkpoint milestones
 - compile read-only Market Radar route states from persisted adapter summaries without triggering new chain reads
 - issue short-lived profile challenges and verify signed claims
 - expose strategy parameters and transaction previews without signing them
@@ -308,7 +317,7 @@ The API reads deployment configuration from environment variables and validates 
 - validate that the encrypted keeper key derives to A5 and that A5 is allowed by both keeper contracts before any scheduled signing
 - check all live vaults and the fee reserve every five minutes, record every decision, and sign only executable actions
 
-SQLite stores public profile claims, challenges, keeper-run metadata, performance checkpoints, decoded activity, index progress and last healthy service snapshots. A claimed handle is normalized and unique. Challenges expire after 10 minutes and cannot be reused.
+SQLite stores public profile claims, challenges, keeper-run metadata, performance checkpoints, decoded activity, Proof Cards, index progress and last healthy service snapshots. A claimed handle is normalized and unique. Challenges expire after 10 minutes and cannot be reused. `PUBLIC_BASE_URL` supplies the canonical origin for proof, image and app links.
 
 Launch recovery and the post-launch command state are frontend-only. They are not added to SQLite and do not add a custodial backend path.
 

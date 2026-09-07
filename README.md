@@ -25,6 +25,7 @@ Current status: controlled mainnet beta. Existing Muppets can be funded, allocat
 - a shareable creator profile for every wallet, with Muppets, per-asset vault totals, performance evidence and receipts
 - live Creator Slot balance, used, available, next-threshold and featured-placement state on launch and creator pages
 - System Pulse, a unified public feed for decoded receipts and recorded keeper actions or holds
+- automatic Proof Cards with durable public URLs for meaningful protocol records
 - browser-local Muppet watchlists with an in-app evidence alert inbox
 - Muppet Market Radar, a read-only view of approved route health, capacity, source gaps and exact status reasons
 - a post-launch command center with vault funding, an onchain share preview, keeper timing, performance link and X sharing
@@ -62,7 +63,7 @@ The live site publishes the work in four evidence-based phases. `Shipped` means 
 
 | Phase | State | Work |
 | --- | --- | --- |
-| 01 · Market core | shipped | public performance and creator pages; `$MUPPETS` Creator Slots; System Pulse; watchlists, alerts and Market Radar; three live task routes and the 26-route Stock Token reserve |
+| 01 · Market core | shipped | public performance and creator pages; `$MUPPETS` Creator Slots; automatic Proof Cards; System Pulse; watchlists, alerts and Market Radar; three live task routes and the 26-route Stock Token reserve |
 | 02 · Resilience | next | independent production RPC fallback; source verification; verified Safe ownership; independent contract review |
 | 03 · Permissioning | conditional | simulate and broadcast FactoryV2 after Safe approval; enforce one creator slot per 15,000 `$MUPPETS` onchain; preserve V1 positions and markets; enable launches through a separate Safe transaction |
 | 04 · Asset expansion | conditional | activate NVDA/USDG only after verified FactoryV2 activation; retain AAPL/USDG and SPY/USDG as disabled venue candidates; keep meme/WETH disabled until every route gate passes; expose new market evidence only when adapters source it |
@@ -193,6 +194,14 @@ The chain decoder refreshes in the background at most once per minute during nor
 
 Activity events, scan progress and the last healthy fee-reserve response survive API restarts in SQLite. Chain, activity and browser read-relay requests use the configured ordered RPC pool and move to the next endpoint on transport, rate-limit or upstream failures. Robinhood's public endpoint is rate-limited and is not represented as an independent fallback; production should set `RPC_FALLBACK_URLS` to one or more separately operated provider endpoints.
 
+## Automatic Muppet Proof Cards
+
+`/app/proofs` turns recorded protocol evidence into durable, shareable cards. A card is materialized for each Muppet launch, first vault deposit, keeper action, range change, whole-percentage flow-adjusted NAV milestone since tracking began, Agent Key fill and Stock Token reserve purchase. Routine keeper holds are grouped into one summary per Muppet per UTC day so five-minute checks do not bury meaningful activity.
+
+Each record stores the Muppet, creator, asset, exact pool or market, latest labeled market-health observation, event timestamp, reason, receipt state and canonical `$MUPPETS` address. Transaction-backed actions link to their receipt. Keeper holds and checkpoint milestones explicitly say that no transaction was signed. Agent Key fills remain separate from vault ownership and performance.
+
+The public share page is `/proof/{proofId}`. It renders its own title, description and social-card metadata on the server, links back to `/app/proof/{proofId}`, and exposes a generated 1200 by 630 PNG at `/api/v1/proofs/{proofId}/card.png`. An inspectable SVG is also available at `/api/v1/proofs/{proofId}/card.svg`. Proof rows persist in SQLite, so their IDs and URLs survive API restarts. Flow-adjusted milestones advance only when a recorded whole-percentage high-water mark is crossed. They are not APY, are never annualized, and do not reconstruct history before the first checkpoint.
+
 ## Watchlists, alerts and Muppet Market Radar
 
 `/app/watchlist` is a public Monitor surface with three views: Watchlist, Alerts and Market Radar. A visitor can follow or unfollow a Muppet from the marketplace performance table or its public performance page. Followed IDs and the alert read-through time are stored only in that browser. No wallet, signature, backend account or contract write is involved, and clearing site data resets the list.
@@ -315,7 +324,7 @@ WRITE_DEPLOYMENT_RECEIPT=true SAFE_MULTISIG=0x... forge script script/DeployFact
 
 The migration receipt is written with `deployed-pending-verification`. The verification script checks all three new contracts, confirms Safe ownership and confirms launches are still disabled, then prints the exact Safe calldata for `setLaunchesEnabled(true)`. Update the API and frontend to V2 only after that Safe transaction confirms.
 
-The frontend uses atomic release directories under `/var/www/liquidmuppets/releases/` with `/var/www/liquidmuppets/current` as the active symlink. The API runs as the unprivileged `liquidmuppets` user from `/opt/liquidmuppets-api/current`, reads public runtime values from `/etc/liquidmuppets/api.env` and `/etc/liquidmuppets/runtime-public.env`, reads the keeper secret only from mode-0600 `/etc/liquidmuppets/keeper.env`, and writes profiles, keeper decisions, performance checkpoints, and marketplace performance summaries to SQLite under `/var/lib/liquidmuppets`. Creator profiles and Pulse are read models over those persisted records plus decoded chain events.
+The frontend uses atomic release directories under `/var/www/liquidmuppets/releases/` with `/var/www/liquidmuppets/current` as the active symlink. The API runs as the unprivileged `liquidmuppets` user from `/opt/liquidmuppets-api/current`, reads public runtime values from `/etc/liquidmuppets/api.env` and `/etc/liquidmuppets/runtime-public.env`, reads the keeper secret only from mode-0600 `/etc/liquidmuppets/keeper.env`, and writes profiles, keeper decisions, performance checkpoints, marketplace performance summaries and Proof Cards to SQLite under `/var/lib/liquidmuppets`. Set `PUBLIC_BASE_URL` to the public origin used in durable proof, image and app URLs. Creator profiles, Pulse and Proof Cards are read models over persisted records plus decoded chain events.
 
 ## API
 
@@ -331,6 +340,11 @@ The frontend uses atomic release directories under `/var/www/liquidmuppets/relea
 - `GET /api/v1/agents/{agentId}/performance`
 - `GET /api/v1/creators/{wallet}`
 - `GET /api/v1/pulse` with optional `category`, `creator`, `agent_id`, and `limit` filters
+- `GET /api/v1/proofs` with optional `kind`, `creator`, `agent_id`, and `limit` filters
+- `GET /api/v1/proofs/{proofId}`
+- `GET /api/v1/proofs/{proofId}/card.png`
+- `GET /api/v1/proofs/{proofId}/card.svg`
+- `GET /proof/{proofId}` for the server-rendered public share page
 - `POST /api/v1/profiles/challenge`
 - `POST /api/v1/profiles/claim`
 - `GET /api/v1/profiles/{wallet}`

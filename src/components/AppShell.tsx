@@ -18,11 +18,14 @@ import { PortfolioPage } from '../pages/PortfolioPage'
 import { CreatorProfilePage } from '../pages/CreatorProfilePage'
 import { SystemPulsePage } from '../pages/SystemPulsePage'
 import { MonitorPage } from '../pages/MonitorPage'
+import { ProofPage } from '../pages/ProofPage'
+import { ProofsPage } from '../pages/ProofsPage'
 
 interface AppShellProps {
   view: Exclude<View, 'landing'>
   performanceAgentId: number | null
   creatorAddress: string | null
+  proofId: string | null
   onNavigate: (view: View) => void
 }
 
@@ -33,7 +36,7 @@ type WalletState =
   | { status: 'missing' }
   | { status: 'error'; message: string }
 
-export function AppShell({ view, performanceAgentId, creatorAddress, onNavigate }: AppShellProps) {
+export function AppShell({ view, performanceAgentId, creatorAddress, proofId, onNavigate }: AppShellProps) {
   const [wallet, setWallet] = useState<WalletState>({ status: 'idle' })
   const [handle, setHandle] = useState<string | null>(null)
   const [showHandle, setShowHandle] = useState(false)
@@ -107,7 +110,7 @@ export function AppShell({ view, performanceAgentId, creatorAddress, onNavigate 
           <button className={view === 'marketplace' || view === 'performance' || view === 'creator' ? 'active' : ''} onClick={() => onNavigate('marketplace')} type="button">
             Marketplace
           </button>
-          <button className={view === 'pulse' ? 'active' : ''} onClick={() => onNavigate('pulse')} type="button">
+          <button className={view === 'pulse' || view === 'proofs' || view === 'proof' ? 'active' : ''} onClick={() => onNavigate('pulse')} type="button">
             Pulse
           </button>
           <button className={view === 'monitor' ? 'active' : ''} onClick={() => onNavigate('monitor')} type="button">
@@ -158,12 +161,14 @@ export function AppShell({ view, performanceAgentId, creatorAddress, onNavigate 
         {view === 'performance' && <MuppetPerformancePage agentId={performanceAgentId} />}
         {view === 'creator' && <CreatorProfilePage creatorAddress={creatorAddress} />}
         {view === 'pulse' && <SystemPulsePage />}
+        {view === 'proofs' && <ProofsPage />}
+        {view === 'proof' && <ProofPage proofId={proofId} />}
         {view === 'monitor' && <MonitorPage />}
       </main>
 
       <nav className="mobile-app-nav" aria-label="Mobile app navigation">
         <button type="button" className={view === 'marketplace' || view === 'performance' || view === 'creator' ? 'active' : ''} onClick={() => onNavigate('marketplace')}>Market</button>
-        <button type="button" className={view === 'pulse' ? 'active' : ''} onClick={() => onNavigate('pulse')}>Pulse</button>
+        <button type="button" className={view === 'pulse' || view === 'proofs' || view === 'proof' ? 'active' : ''} onClick={() => onNavigate('pulse')}>Pulse</button>
         <button type="button" className={view === 'monitor' ? 'active' : ''} onClick={() => onNavigate('monitor')}>Watch</button>
         <button type="button" className={view === 'portfolio' ? 'active' : ''} onClick={() => onNavigate('portfolio')}>Portfolio</button>
         <button type="button" className={view === 'create' ? 'active' : ''} onClick={() => onNavigate('create')}>Launch</button>

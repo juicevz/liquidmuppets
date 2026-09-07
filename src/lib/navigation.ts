@@ -1,12 +1,13 @@
 import type { View } from '../types'
 
-export const pathForView: Record<Exclude<View, 'performance' | 'creator'>, string> = {
+export const pathForView: Record<Exclude<View, 'performance' | 'creator' | 'proof'>, string> = {
   landing: '/',
   marketplace: '/app',
   portfolio: '/app/portfolio',
   create: '/app/create',
   docs: '/docs',
   pulse: '/app/pulse',
+  proofs: '/app/proofs',
   monitor: '/app/watchlist',
 }
 
@@ -15,6 +16,8 @@ export function viewFromPath(pathname: string): View {
 
   if (/^\/app\/muppet\/\d+$/.test(path)) return 'performance'
   if (/^\/app\/creator\/0x[a-fA-F0-9]{40}$/.test(path)) return 'creator'
+  if (/^\/app\/proof\/[a-z0-9-]+$/.test(path)) return 'proof'
+  if (path === '/app/proofs') return 'proofs'
   if (path === '/app/watchlist') return 'monitor'
   if (path === '/app/pulse') return 'pulse'
   if (path === '/app/create') return 'create'
@@ -41,5 +44,14 @@ export function creatorPath(wallet: string): string {
 
 export function creatorAddressFromPath(pathname: string): string | null {
   const match = pathname.replace(/\/+$/, '').match(/^\/app\/creator\/(0x[a-fA-F0-9]{40})$/)
+  return match?.[1] ?? null
+}
+
+export function proofPath(proofId: string): string {
+  return `/app/proof/${proofId}`
+}
+
+export function proofIdFromPath(pathname: string): string | null {
+  const match = pathname.replace(/\/+$/, '').match(/^\/app\/proof\/([a-z0-9-]+)$/)
   return match?.[1] ?? null
 }

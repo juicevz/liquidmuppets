@@ -196,9 +196,13 @@ def test_pulse_merges_keeper_reason_and_keeps_holds_without_receipts(tmp_path: P
     assert receipt["source"] == "chain"
     assert receipt["reason"] == "idle capital crossed the target threshold"
     assert receipt["facets"] == ["vault", "keeper"]
+    assert receipt["proof_id"] == "keeper-action-1"
+    assert receipt["proof_url"].endswith("/proof/keeper-action-1")
     assert hold["action"] == "keeper held"
     assert hold["value"] is None
     assert hold["reason"] == "vault remains inside its target allocation"
+    assert hold["proof_id"].startswith("keeper-holds-")
+    assert hold["proof_url"].endswith(f"/proof/{hold['proof_id']}")
 
 
 def test_public_record_routes_reject_invalid_wallets(tmp_path: Path) -> None:

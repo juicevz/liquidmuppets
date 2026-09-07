@@ -57,6 +57,7 @@ export function SystemPulsePage() {
           <span className="pulse-eyebrow"><i />public protocol record</span>
           <h1>System Pulse.</h1>
           <p>Deposits, withdrawals, allocations, keeper decisions, range changes, Agent Key trades, and Stock Token purchases in one readable feed.</p>
+          <a className="pulse-proof-library" href="/app/proofs"><Icon name="spark" />Open automatic Proof Cards <Icon name="arrow" /></a>
         </div>
         <div className="pulse-heading-state">
           <span><small>chain decoder</small><strong className={pulse?.source_status.chain === 'cached' ? 'source-cached' : pulse?.source_status.chain !== 'available' ? 'source-down' : ''}>{pulse?.source_status.chain ?? 'reading'}</strong></span>

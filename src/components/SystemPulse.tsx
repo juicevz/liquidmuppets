@@ -1,5 +1,5 @@
 import { Icon } from './Icon'
-import { creatorPath, performancePath } from '../lib/navigation'
+import { creatorPath, performancePath, proofPath } from '../lib/navigation'
 import { shortenAddress } from '../lib/format'
 import type { PulseItem } from '../lib/api'
 
@@ -63,13 +63,16 @@ export function SystemPulse({ items, explorerUrl, compact = false }: SystemPulse
                       <span>creator <a href={creatorPath(item.creator)}>{item.creator_handle ? `@${item.creator_handle}` : shortenAddress(item.creator)}</a></span>
                     )}
                   </div>
-                  {item.tx_hash ? (
-                    <a className="pulse-receipt" href={`${explorerUrl}/tx/${item.tx_hash}`} target="_blank" rel="noreferrer">
-                      receipt <Icon name="arrow" />
-                    </a>
-                  ) : (
-                    <span className="pulse-no-receipt"><Icon name="pause" />No transaction signed</span>
-                  )}
+                  <div className="pulse-record-links">
+                    {item.proof_id && <a className="pulse-proof" href={proofPath(item.proof_id)}>proof card <Icon name="spark" /></a>}
+                    {item.tx_hash ? (
+                      <a className="pulse-receipt" href={`${explorerUrl}/tx/${item.tx_hash}`} target="_blank" rel="noreferrer">
+                        receipt <Icon name="arrow" />
+                      </a>
+                    ) : (
+                      <span className="pulse-no-receipt"><Icon name="pause" />No transaction signed</span>
+                    )}
+                  </div>
                 </footer>
               </div>
             </article>

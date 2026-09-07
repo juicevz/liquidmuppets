@@ -456,6 +456,111 @@ await page.screenshot({ path: new URL('muppet-performance.png', screenshotDir).p
 
 await page.close()
 page = await desktop.newPage()
+watch(page, 'proof-cards')
+await page.goto(`${baseUrl}/app/proofs`, { waitUntil: 'domcontentloaded' })
+await page.getByRole('heading', { name: 'Proof Cards.' }).waitFor({ timeout: 60_000 })
+await page.locator('.proofs-grid-item').first().waitFor({ timeout: 60_000 })
+const proofApiEvidence = await page.evaluate(async ({ tokenAddress }) => {
+  const [proofResponse, pulseResponse] = await Promise.all([
+    fetch('/api/v1/proofs?limit=100', { cache: 'no-store' }),
+    fetch('/api/v1/pulse?limit=200', { cache: 'no-store' }),
+  ])
+  const proofs = await proofResponse.json()
+  const pulse = await pulseResponse.json()
+  const items = Array.isArray(proofs.items) ? proofs.items : []
+  const holds = Array.isArray(pulse.items)
+    ? pulse.items.filter((item) => item.action === 'keeper held')
+    : []
+  const detail = items.find((item) => item.market?.pool || item.market?.market_id) ?? items[0]
+  return {
+    ready: proofResponse.ok && pulseResponse.ok && items.length > 0,
+    detailId: detail?.id ?? null,
+    exactEvidence: items.every((item) => item.subject?.name
+      && item.asset?.symbol
+      && item.market?.health_status
+      && item.timestamp
+      && item.receipt?.state
+      && String(item.token_address).toLowerCase() === tokenAddress.toLowerCase()),
+    durableUrls: items.every((item) => item.public_url?.endsWith(`/proof/${item.id}`)
+      && item.app_url?.endsWith(`/app/proof/${item.id}`)
+      && item.image_url?.endsWith(`/api/v1/proofs/${item.id}/card.png`)),
+    noApy: items.every((item) => item.no_apy_projection === true),
+    dailySummary: items.some((item) => item.kind === 'keeper_daily_summary'
+      && item.event_count > 1
+      && item.receipt?.state === 'no_transaction'),
+    pulseGrouped: holds.length > 1
+      && holds.every((item) => item.proof_id && item.proof_url?.endsWith(`/proof/${item.proof_id}`))
+      && new Set(holds.map((item) => item.proof_id)).size < holds.length,
+  }
+}, { tokenAddress: expectedMuppetsToken })
+if (!proofApiEvidence.detailId) throw new Error('No durable Proof Card was available for browser QA.')
+const proofDetailId = proofApiEvidence.detailId
+results.proofApiReady = proofApiEvidence.ready
+results.proofExactEvidence = proofApiEvidence.exactEvidence
+results.proofDurableUrls = proofApiEvidence.durableUrls
+results.proofNoApy = proofApiEvidence.noApy
+results.proofDailySummary = proofApiEvidence.dailySummary
+results.proofPulseGrouped = proofApiEvidence.pulseGrouped
+results.proofGalleryCards = await page.locator('.proofs-grid-item').count()
+results.proofFilterButtons = await page.getByRole('group', { name: 'Filter Proof Cards' }).locator('button').count()
+results.proofGalleryPublicLinks = await page.getByRole('link', { name: 'Public URL' }).count()
+results.proofGalleryShareLinks = await page.getByRole('link', { name: 'Share on X' }).count()
+results.proofGalleryTokenAddress = await page.locator('.proof-card-visual footer code').evaluateAll((nodes, tokenAddress) => (
+  nodes.every((node) => node.textContent?.toLowerCase() === String(tokenAddress).toLowerCase())
+), expectedMuppetsToken)
+results.proofGalleryOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
+await page.screenshot({ path: new URL('proof-cards-gallery.png', screenshotDir).pathname, fullPage: false })
+
+await page.goto(`${baseUrl}/app/proof/${proofDetailId}`, { waitUntil: 'domcontentloaded' })
+await page.locator('.proof-card-visual').waitFor({ timeout: 60_000 })
+results.proofDetailEvent = await page.getByRole('heading', { name: 'What happened' }).count() === 1
+results.proofDetailMarket = await page.getByRole('heading', { name: 'Latest observed health' }).count() === 1
+results.proofDetailActions = await page.getByRole('button', { name: 'Copy proof URL' }).count() === 1
+  && await page.getByRole('link', { name: 'Share on X' }).count() === 1
+  && await page.getByRole('link', { name: 'Open card image' }).count() === 1
+results.proofDetailBoundary = await page.getByText(/Recorded evidence only/i).count() > 0
+  && await page.getByText(/no APY projection/i).count() > 0
+results.proofDetailReceiptBoundary = await page.getByRole('link', { name: 'Open transaction receipt' }).count() === 1
+  || await page.getByText(/No transaction was signed/i).count() > 0
+results.proofDetailTokenAddress = (await page.locator('.proof-card-visual footer code').innerText()).toLowerCase() === expectedMuppetsToken.toLowerCase()
+results.proofDetailOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
+const proofServerEvidence = await page.evaluate(async ({ proofId, tokenAddress }) => {
+  const [publicResponse, imageResponse, sourceResponse] = await Promise.all([
+    fetch(`/proof/${proofId}`, { cache: 'no-store' }),
+    fetch(`/api/v1/proofs/${proofId}/card.png`, { cache: 'no-store' }),
+    fetch(`/api/v1/proofs/${proofId}/card.svg`, { cache: 'no-store' }),
+  ])
+  const [publicPage, imageBuffer, source] = await Promise.all([
+    publicResponse.text(),
+    imageResponse.arrayBuffer(),
+    sourceResponse.text(),
+  ])
+  const signature = Array.from(new Uint8Array(imageBuffer).slice(0, 8)).join(',')
+  return {
+    publicPage: publicResponse.ok
+      && publicResponse.headers.get('content-type')?.includes('text/html')
+      && publicPage.includes('twitter:card')
+      && publicPage.includes('og:image')
+      && publicPage.includes('image/png')
+      && publicPage.includes(`/app/proof/${proofId}`)
+      && publicPage.toLowerCase().includes(tokenAddress.toLowerCase()),
+    image: imageResponse.ok
+      && imageResponse.headers.get('content-type')?.includes('image/png')
+      && signature === '137,80,78,71,13,10,26,10'
+      && imageBuffer.byteLength > 10_000,
+    source: sourceResponse.ok
+      && sourceResponse.headers.get('content-type')?.includes('image/svg+xml')
+      && source.includes('width="1200" height="630"')
+      && source.toLowerCase().includes(tokenAddress.toLowerCase()),
+  }
+}, { proofId: proofDetailId, tokenAddress: expectedMuppetsToken })
+results.proofServerSharePage = proofServerEvidence.publicPage
+results.proofGeneratedImage = proofServerEvidence.image
+results.proofInspectableSvg = proofServerEvidence.source
+await page.screenshot({ path: new URL('proof-card-detail.png', screenshotDir).pathname, fullPage: false })
+
+await page.close()
+page = await desktop.newPage()
 watch(page, 'creator-slots')
 await page.goto(`${baseUrl}/app/creator/${expectedDevWallet}`, { waitUntil: 'domcontentloaded' })
 await page.getByRole('heading', { name: 'Creator Slots' }).waitFor({ timeout: 60_000 })
@@ -536,6 +641,7 @@ results.docsPerformance = await page.getByRole('heading', { name: 'Public Muppet
 results.docsPerformanceMarketplace = await page.getByText(/select any two Muppets to compare/i).count() === 1
 results.docsCreatorProfiles = await page.getByText(/Every creator wallet has a shareable/i).count() === 1
 results.docsSystemPulse = await page.getByText(/combines decoded transaction events and recorded keeper decisions/i).count() === 1
+results.docsProofCards = await page.getByRole('heading', { name: 'Automatic Muppet Proof Cards' }).count() === 1
 results.docsMonitor = await page.getByRole('heading', { name: 'Watchlists and Market Radar' }).count() === 1
 results.docsAlgorithm = await page.getByRole('heading', { name: 'The backend algorithm' }).count() === 1
 results.docsRoadmap = await page.getByRole('heading', { name: 'Public roadmap' }).count() === 1
@@ -635,6 +741,10 @@ await mobilePage.goto(`${baseUrl}/app/creator/${expectedDevWallet}`, { waitUntil
 await mobilePage.getByRole('heading', { name: 'Creator Slots' }).waitFor({ timeout: 60_000 })
 results.mobileCreatorOverflow = await mobilePage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
 results.mobileCreatorSlotColumns = await mobilePage.locator('.creator-slots-grid').evaluate((node) => getComputedStyle(node).gridTemplateColumns.split(' ').length)
+await mobilePage.goto(`${baseUrl}/app/proofs`, { waitUntil: 'domcontentloaded' })
+await mobilePage.locator('.proofs-grid-item').first().waitFor({ timeout: 60_000 })
+results.mobileProofOverflow = await mobilePage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
+results.mobileProofColumns = await mobilePage.locator('.proofs-grid').evaluate((node) => getComputedStyle(node).gridTemplateColumns.split(' ').length)
 await mobilePage.goto(`${baseUrl}/app/watchlist`, { waitUntil: 'domcontentloaded' })
 await mobilePage.getByRole('heading', { name: 'Watchlist.' }).waitFor({ timeout: 60_000 })
 await mobilePage.getByRole('button', { name: /Market Radar/ }).click()
@@ -679,6 +789,10 @@ results.narrowDocsOverflow = await narrowPage.evaluate(() => document.documentEl
 await narrowPage.goto(`${baseUrl}/app/muppet/1`, { waitUntil: 'domcontentloaded' })
 await narrowPage.getByRole('heading', { name: 'range fox' }).waitFor({ timeout: 60_000 })
 results.narrowPerformanceOverflow = await narrowPage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
+await narrowPage.goto(`${baseUrl}/app/proof/${proofDetailId}`, { waitUntil: 'domcontentloaded' })
+await narrowPage.locator('.proof-card-visual').waitFor({ timeout: 60_000 })
+results.narrowProofOverflow = await narrowPage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
+results.narrowProofColumns = await narrowPage.locator('.proof-detail-grid').evaluate((node) => getComputedStyle(node).gridTemplateColumns.split(' ').length)
 await narrowPage.goto(`${baseUrl}/app/creator/${expectedDevWallet}`, { waitUntil: 'domcontentloaded' })
 await narrowPage.getByRole('heading', { name: 'Creator Slots' }).waitFor({ timeout: 60_000 })
 results.narrowCreatorOverflow = await narrowPage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
@@ -827,6 +941,28 @@ const failed =
   || !results.performanceNoHistoricalApy
   || !results.performanceFollowControl
   || results.performanceOverflow
+  || !results.proofApiReady
+  || !results.proofExactEvidence
+  || !results.proofDurableUrls
+  || !results.proofNoApy
+  || !results.proofDailySummary
+  || !results.proofPulseGrouped
+  || results.proofGalleryCards < 1
+  || results.proofFilterButtons !== 9
+  || results.proofGalleryPublicLinks !== results.proofGalleryCards
+  || results.proofGalleryShareLinks !== results.proofGalleryCards
+  || !results.proofGalleryTokenAddress
+  || results.proofGalleryOverflow
+  || !results.proofDetailEvent
+  || !results.proofDetailMarket
+  || !results.proofDetailActions
+  || !results.proofDetailBoundary
+  || !results.proofDetailReceiptBoundary
+  || !results.proofDetailTokenAddress
+  || results.proofDetailOverflow
+  || !results.proofServerSharePage
+  || !results.proofGeneratedImage
+  || !results.proofInspectableSvg
   || results.creatorSlotsUsed !== '3'
   || results.creatorSlotsAvailable !== '0'
   || results.creatorNextLaunchThreshold !== '60,000 $MUPPETS'
@@ -858,7 +994,7 @@ const failed =
   || !results.portfolioConnectState
   || !results.portfolioChainNumberRemoved
   || results.docsTitle !== 'Docs | LIQUIDMUPPETS'
-  || results.docsSections !== 20
+  || results.docsSections !== 21
   || !results.docsTokenGate
   || !results.docsCreatorSlotFormula
   || !results.docsSevenPets
@@ -867,6 +1003,7 @@ const failed =
   || !results.docsPerformanceMarketplace
   || !results.docsCreatorProfiles
   || !results.docsSystemPulse
+  || !results.docsProofCards
   || !results.docsMonitor
   || !results.docsAlgorithm
   || !results.docsRoadmap
@@ -894,6 +1031,8 @@ const failed =
   || !results.mobilePerformanceKeyVisible
   || results.mobileCreatorOverflow
   || results.mobileCreatorSlotColumns !== 2
+  || results.mobileProofOverflow
+  || results.mobileProofColumns !== 1
   || results.mobileMonitorOverflow
   || !results.mobileRadarScrollsInside
   || results.mobileNavItems !== 6
@@ -906,6 +1045,8 @@ const failed =
   || results.narrowComparisonColumns !== 1
   || results.narrowDocsOverflow
   || results.narrowPerformanceOverflow
+  || results.narrowProofOverflow
+  || results.narrowProofColumns !== 1
   || results.narrowCreatorOverflow
   || results.narrowCreatorSlotColumns !== 1
   || !results.narrowHeaderVisible
