@@ -12,7 +12,7 @@ interface ProtocolState {
   refresh: () => void
 }
 
-export function useProtocol(walletAddress?: string): ProtocolState {
+export function useProtocol(walletAddress?: string, enabled = true): ProtocolState {
   const [config, setConfig] = useState<ProtocolConfig | null>(null)
   const [snapshot, setSnapshot] = useState<ProtocolSnapshot | null>(null)
   const [tasks, setTasks] = useState<StrategyTaskDefinition[]>([])
@@ -23,6 +23,14 @@ export function useProtocol(walletAddress?: string): ProtocolState {
 
   useEffect(() => {
     let active = true
+    if (!enabled) {
+      setConfig(null)
+      setSnapshot(null)
+      setTasks([])
+      setLoading(false)
+      setError('')
+      return () => { active = false }
+    }
     setLoading(true)
     setError('')
 
@@ -55,7 +63,7 @@ export function useProtocol(walletAddress?: string): ProtocolState {
 
     void load()
     return () => { active = false }
-  }, [refreshToken, walletAddress])
+  }, [enabled, refreshToken, walletAddress])
 
   return { config, snapshot, tasks, loading, error, refresh }
 }

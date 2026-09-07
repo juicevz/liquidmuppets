@@ -24,6 +24,7 @@ describe('viewFromPath', () => {
     expect(viewFromPath('/app/proof/muppet-launch-abc12345')).toBe('proof')
     expect(viewFromPath('/app/pulse')).toBe('pulse')
     expect(viewFromPath('/app/watchlist')).toBe('monitor')
+    expect(viewFromPath('/app/revenue')).toBe('revenue')
     expect(viewFromPath('/docs')).toBe('docs')
   })
 

@@ -22,6 +22,7 @@ export const publicRoadmap: RoadmapPhase[] = [
       'System Pulse with restart-safe incremental indexing',
       'Watchlists, alerts and Market Radar',
       'Three live task routes and a 26-route Stock Token reserve',
+      'Public Revenue Engine page and tested Agent Bond contract package',
     ],
   },
   {
@@ -34,6 +35,8 @@ export const publicRoadmap: RoadmapPhase[] = [
       'Complete source verification',
       'Move protocol ownership to a verified Safe',
       'Commission an independent contract review',
+      'Deploy and verify the Revenue Router and Agent Bond under the Safe',
+      'Activate Pons buyback and point creator fees to the Revenue Router',
     ],
   },
   {
@@ -44,7 +47,7 @@ export const publicRoadmap: RoadmapPhase[] = [
     track: 'FactoryV2',
     items: [
       'Simulate and broadcast migration after Safe approval',
-      'Enforce one creator slot per 15,000 $MUPPETS onchain while tokens remain in the wallet',
+      'Enforce one creator slot per 15,000 liquid or Agent-Bonded $MUPPETS onchain',
       'Preserve V1 vaults, withdrawals, policies and Key markets',
       'Enable new launches through a separate Safe transaction',
     ],

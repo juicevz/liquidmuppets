@@ -33,6 +33,16 @@ FACTORY_CREATOR_ABI = [
     }
 ]
 
+AGENT_BOND_BALANCE_ABI = [
+    {
+        "type": "function",
+        "name": "bondedBalance",
+        "stateMutability": "view",
+        "inputs": [{"name": "account", "type": "address"}],
+        "outputs": [{"type": "uint256"}],
+    }
+]
+
 
 def format_token_amount(value: int, decimals: int) -> str:
     if decimals == 0:
@@ -65,6 +75,10 @@ class TokenGateService:
             "decimals": None,
             "balance": None,
             "balanceRaw": None,
+            "walletBalance": None,
+            "walletBalanceRaw": None,
+            "bondedBalance": None,
+            "bondedBalanceRaw": None,
             "minimumRaw": None,
             "slotSize": str(self.settings.muppets_token_minimum),
             "slotSizeRaw": None,
@@ -104,7 +118,15 @@ class TokenGateService:
             decimals = int(token.functions.decimals().call())
             if decimals < 0 or decimals > 36:
                 raise ValueError("token decimals are outside the supported range")
-            balance = int(token.functions.balanceOf(wallet_address).call())
+            wallet_balance = int(token.functions.balanceOf(wallet_address).call())
+            bonded_balance = 0
+            if Web3.is_address(self.settings.agent_bond_address):
+                bond_address = Web3.to_checksum_address(self.settings.agent_bond_address)
+                if len(self.web3.eth.get_code(bond_address)) == 0:
+                    raise ValueError("configured Agent Bond address has no runtime code")
+                bond = self.web3.eth.contract(address=bond_address, abi=AGENT_BOND_BALANCE_ABI)
+                bonded_balance = int(bond.functions.bondedBalance(wallet_address).call())
+            balance = wallet_balance + bonded_balance
             slots_used = len(factory.functions.getCreatorAgentIds(wallet_address).call())
         except Exception:
             result["reason"] = "access_check_unavailable"
@@ -125,6 +147,10 @@ class TokenGateService:
                 "decimals": decimals,
                 "balance": format_token_amount(balance, decimals),
                 "balanceRaw": str(balance),
+                "walletBalance": format_token_amount(wallet_balance, decimals),
+                "walletBalanceRaw": str(wallet_balance),
+                "bondedBalance": format_token_amount(bonded_balance, decimals),
+                "bondedBalanceRaw": str(bonded_balance),
                 "minimumRaw": str(minimum_raw),
                 "slotSizeRaw": str(minimum_raw),
                 "slotCount": slot_count,

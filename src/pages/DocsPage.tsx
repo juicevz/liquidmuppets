@@ -41,9 +41,10 @@ const docsSections: DocsSection[] = [
   {
     number: '02',
     title: '$MUPPETS Creator Slots',
-    body: 'Every public page remains open. Active slots equal floor(wallet balance / 15,000). One available slot permits one new Muppet and one featured Muppet on the creator profile. The API reads the canonical token balance and that wallet’s existing factory Muppets, then the browser repeats both reads immediately before the first launch transaction.',
+    body: 'Every public page remains open. Active slots equal floor((liquid balance + Agent-Bonded balance) / 15,000). One available slot permits one new Muppet and one featured Muppet on the creator profile. The API reads the canonical token, optional Agent Bond, and that wallet’s existing factory Muppets before a launch.',
     details: [
-      'the balance remains in the wallet and is not spent, locked or burned',
+      'tokens remain liquid unless the holder deliberately places them in a 30 day Agent Bond',
+      'Agent-Bonded $MUPPETS continue to fund Creator Slot capacity in FactoryV2',
       'creator pages show balance, unlocked slots, used slots, available slots and the exact next-launch threshold',
       'the newest Muppets fill currently funded featured placements; every Muppet remains in the full public record',
       'a lower balance pauses additional launches and over-capacity featured placement only; existing vaults, withdrawals and Agent Key markets remain available',
@@ -67,7 +68,7 @@ const docsSections: DocsSection[] = [
   {
     number: '05',
     title: 'Marketplace fee reserve',
-    body: 'Every settled Key trade sends the 3% marketplace fee directly to FeeRwaReserve. At 0.0001 ETH, the private keeper can convert native ETH to USDG and buy the next eligible Robinhood Stock Token. The contract rotates across 26 enabled routes and caps each cycle at 0.01 ETH.',
+    body: 'Every settled Key trade currently sends the 3% marketplace fee directly to FeeRwaReserve. At 0.0001 ETH, the private keeper can convert native ETH to USDG and buy the next eligible Robinhood Stock Token. The contract rotates across 26 enabled routes and caps each cycle at 0.01 ETH. After the verified Revenue Engine migration, Key fees enter the source-accounted router before its fixed split.',
     details: [
       'the first 0.01 ETH bootstrap bought 0.076456289003050387 AAPL Stock Token',
       'each route requires live USDG pool liquidity, a fresh Chainlink price, and oraclePaused() = false',
@@ -98,7 +99,7 @@ const docsSections: DocsSection[] = [
   {
     number: '09',
     title: 'Agent Keys and their market',
-    body: 'The current factory creates a fixed-supply, zero-decimal ERC-20 Agent Key with each Muppet. No Key is approved or listed in the launch transaction. After launch, the creator can optionally approve a chosen quantity and open the first ask in a clearly separate flow. The actual floor is always the cheapest active ask. The native marketplace supports partial asks, bids, buys and sells. Its 3% fill fee goes to the Stock Token reserve.',
+    body: 'The current factory creates a fixed-supply, zero-decimal ERC-20 Agent Key with each Muppet. No Key is approved or listed in the launch transaction. After launch, the creator can optionally approve a chosen quantity and open the first ask in a clearly separate flow. The actual floor is always the cheapest active ask. The native marketplace supports partial asks, bids, buys and sells. Its 3% fill fee currently goes directly to the Stock Token reserve.',
     details: ['Key ownership is not vault ownership', 'Key price does not change vault share price', 'current utility is trading and permanent onchain binding'],
     visual: 'keys',
   },
@@ -109,6 +110,23 @@ const docsSections: DocsSection[] = [
   },
   {
     number: '11',
+    title: 'Revenue Engine and Agent Bonds',
+    body: 'The public Revenue Engine page and tested contract package are shipped, but the new contracts are not yet deployed on mainnet. One reward unit requires 15,000 bonded $MUPPETS plus one unused, permanently bound Agent Key. The token lock lasts 30 days. After verified activation, creator revenue and Key-market fees can route weekly, with 50% delivered as WETH to reward units, 30% sent to the existing Stock Token reserve, and 20% sent to keeper and operating costs.',
+    details: [
+      'the target 3% $MUPPETS trade-fee route is 0.300% Pons protocol, 0.350% Pons buyback, 1.175% Agent Bond rewards, 0.705% Stock Token reserve and 0.470% keeper and operations',
+      'the Pons protocol and buyback portions happen before the 2.350% creator revenue enters the LiquidMuppets router',
+      'third-party or seeded funding is accounted separately and cannot appear as protocol revenue',
+      'revenue accumulates between weekly routes; a zero-revenue week distributes zero',
+      'WETH rewards use a cumulative per-unit accounting model with no holder loop and no token emissions',
+      'unbonding returns $MUPPETS after the lock, while the Agent Key remains permanently bound',
+      'the public /app/revenue page shows live Pons configuration, activation checks, totals, wallet units and exact receipts since deployment',
+      'mainnet activation remains pending verified deployment, Safe ownership, independent review, Pons buyback activation and creator-recipient routing',
+    ],
+    link: { label: 'Open the public revenue record', href: '/app/revenue' },
+    visual: 'keys',
+  },
+  {
+    number: '12',
     title: 'How to use the live loop',
     body: 'Connect an EVM wallet on Robinhood Chain mainnet. The launch page shows live Creator Slot capacity. A first Muppet needs 15,000 $MUPPETS, a second needs 30,000, and each later Muppet adds another 15,000 threshold. Creation now has three stages: pet and name, one live job, then launch and fund. Launch uses one wallet confirmation. Funding remains a separate asset approval and vault deposit. Opening an Agent Key market is optional and separate after launch.',
     details: [
@@ -121,13 +139,13 @@ const docsSections: DocsSection[] = [
     visual: 'steps',
   },
   {
-    number: '12',
+    number: '13',
     title: 'Public activity and handles',
     body: 'The marketplace tape decodes launches, listings, fills, deposits, withdrawals, allocations, recalls and Key binding from mainnet logs. A wallet can sign an app-handle claim with no gas. If no handle is claimed, the tape shows the shortened wallet instead.',
     details: ['green values mark buys, deposits, launches and allocations', 'red values mark sells, withdrawals and recalls', 'asks and bids are neutral until they fill', 'an app handle proves wallet control, not ownership of an external social account'],
   },
   {
-    number: '13',
+    number: '14',
     title: 'Public Muppet performance',
     body: 'Every Muppet has a shareable /app/muppet/{id} page. The marketplace also places its recorded change, deployed percentage, health, oracle boundary and latest keeper decision in one performance table. Select any two Muppets to compare their evidence side by side without converting assets or equalizing different tracking periods.',
     details: [
@@ -141,7 +159,7 @@ const docsSections: DocsSection[] = [
     ],
   },
   {
-    number: '14',
+    number: '15',
     title: 'Public creator profiles',
     body: 'Every creator wallet has a shareable /app/creator/{wallet} page. It shows that wallet’s live $MUPPETS balance, Creator Slots used and available, next-launch threshold, currently funded featured Muppets, recorded vault evidence and transaction receipts. Combined capital remains grouped by native asset, so USDG and WETH are never added into one number.',
     details: [
@@ -153,7 +171,7 @@ const docsSections: DocsSection[] = [
     ],
   },
   {
-    number: '15',
+    number: '16',
     title: 'System Pulse',
     body: 'System Pulse combines decoded transaction events and recorded keeper decisions into one reverse-chronological public feed. It covers launches, deposits, withdrawals, allocations, recalls, range changes, Key orders and fills, bindings, keeper actions and holds, and Stock Token reserve purchases.',
     details: [
@@ -166,7 +184,7 @@ const docsSections: DocsSection[] = [
     ],
   },
   {
-    number: '16',
+    number: '17',
     title: 'Automatic Muppet Proof Cards',
     body: 'Every meaningful recorded event can become a durable /proof/{id} share page and an /app/proof/{id} evidence view. Cards cover Muppet launches, first deposits, keeper actions, range changes, whole-percentage flow-adjusted NAV milestones since tracking began, Agent Key fills and Stock Token reserve purchase receipts.',
     details: [
@@ -178,7 +196,7 @@ const docsSections: DocsSection[] = [
     ],
   },
   {
-    number: '17',
+    number: '18',
     title: 'Watchlists and Market Radar',
     body: 'Follow any Muppet from the marketplace or its public performance page, then open /app/watchlist for a browser-local watchlist and evidence alert inbox. Market Radar separates three live routes from four FactoryV2 review candidates and cannot approve a route or move capital.',
     details: [
@@ -190,7 +208,7 @@ const docsSections: DocsSection[] = [
     ],
   },
   {
-    number: '18',
+    number: '19',
     title: 'Indexer and RPC reliability',
     body: 'System Pulse now indexes only new confirmed blocks plus a short reorg window. Decoded events, scan progress and the last healthy fee-reserve response survive API restarts in SQLite. Public pages keep the last successful timestamp visible when an upstream read fails.',
     details: [
@@ -201,9 +219,9 @@ const docsSections: DocsSection[] = [
     ],
   },
   {
-    number: '19',
+    number: '20',
     title: 'FactoryV2 and reviewed templates',
-    body: 'FactoryV2 implements one reusable creator slot per 15,000 $MUPPETS onchain, exact task and adapter registration, defensive, balanced and active presets, V1 read compatibility, and contract-governed ownership. Every legacy or V2 Muppet consumes one slot. It ships launch-disabled until Blockscout verification and an explicit Safe activation.',
+    body: 'FactoryV2 implements one reusable creator slot per 15,000 liquid or Agent-Bonded $MUPPETS onchain, exact task and adapter registration, defensive, balanced and active presets, V1 read compatibility, and contract-governed ownership. Every legacy or V2 Muppet consumes one slot. It ships launch-disabled until Blockscout verification and an explicit Safe activation.',
     details: [
       'existing V1 vaults, withdrawals, policies and Key orders stay on their original contracts',
       'dropping below capacity cannot disable an existing vault or Agent Key market; it only blocks another launch',
@@ -214,7 +232,7 @@ const docsSections: DocsSection[] = [
     ],
   },
   {
-    number: '20',
+    number: '21',
     title: 'Public roadmap',
     body: `${roadmapBoundary} The current implementation and full operating notes stay available in the public repository.`,
     link: { label: 'Open the public repository', href: roadmapRepository },
@@ -224,7 +242,7 @@ const docsSections: DocsSection[] = [
     ],
   },
   {
-    number: '21',
+    number: '22',
     title: 'Current boundary',
     body: 'The mainnet contracts use real USDG, WETH, Morpho, Uniswap and EZManager. Local and fork tests cover the adapters, full redemption and atomic recentering, but the contracts are not independently audited. Caps limit exposure and do not remove protocol, oracle, liquidity, LP or stablecoin risk.',
     details: [
@@ -416,7 +434,7 @@ export function DocsPage() {
       <header className="docs-heading">
         <p>LIQUIDMUPPETS / DOCUMENTATION</p>
         <h1>Everything about LIQUIDMUPPETS.</h1>
-        <span>The money path, public performance, automatic Proof Cards, watchlists, Market Radar, System Pulse, Stock Token reserve, $MUPPETS launch gate, Key market and onchain limits.</span>
+        <span>The money path, public performance, automatic Proof Cards, watchlists, Market Radar, System Pulse, Revenue Engine, Agent Bonds, Stock Token reserve, $MUPPETS launch gate, Key market and onchain limits.</span>
       </header>
 
       <div className="docs-layout">

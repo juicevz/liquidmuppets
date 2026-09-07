@@ -34,7 +34,7 @@ export function CreatorSlots({
       </header>
 
       <div className="creator-slots-grid">
-        <span><small>wallet balance</small><strong>{access?.balance !== null && access?.balance !== undefined ? `${formatToken(access.balance)} $MUPPETS` : connected ? 'unavailable' : 'connect wallet'}</strong></span>
+        <span><small>slot balance</small><strong>{access?.balance !== null && access?.balance !== undefined ? `${formatToken(access.balance)} $MUPPETS` : connected ? 'unavailable' : 'connect wallet'}</strong></span>
         <span><small>slots unlocked</small><strong>{access?.slotCount ?? '—'}</strong></span>
         <span><small>slots used</small><strong>{access?.slotsUsed ?? '—'}</strong></span>
         <span><small>slots available</small><strong>{access?.slotsAvailable ?? '—'}</strong></span>
@@ -42,7 +42,8 @@ export function CreatorSlots({
       </div>
 
       <div className="creator-slots-copy">
-        <p><strong>{formatToken(effectiveSlotSize)} $MUPPETS per slot.</strong> One slot supports one launched Muppet and one featured placement. Tokens stay liquid in the wallet.</p>
+        <p><strong>{formatToken(effectiveSlotSize)} $MUPPETS per slot.</strong> One slot supports one launched Muppet and one featured placement. Liquid tokens stay in the wallet, and tokens in an active Agent Bond still count.</p>
+        {access?.bondedBalance && access.bondedBalance !== '0' && <p>{formatToken(access.walletBalance ?? '0')} liquid + {formatToken(access.bondedBalance)} bonded $MUPPETS currently fund this capacity.</p>}
         <p>{overCapacity > 0
           ? `${overCapacity} Muppet${overCapacity === 1 ? ' is' : 's are'} over current capacity. Existing vaults, withdrawals and Agent Key markets remain available.`
           : 'A lower balance only pauses additional launches and any featured placement above current capacity.'}</p>

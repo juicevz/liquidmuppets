@@ -1,0 +1,7 @@
+pushed the revenue engine.
+
+15,000 $MUPPETS + one permanently bound Key creates one reward unit. actual protocol revenue can settle in WETH. zero revenue means zero rewards.
+
+contracts are tested. mainnet activation waits for the safe.
+
+https://github.com/juicevz/liquidmuppets

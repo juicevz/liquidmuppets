@@ -35,6 +35,19 @@ class Settings:
     key_marketplace_address: str = getenv("KEY_MARKETPLACE_ADDRESS", "")
     legacy_key_marketplace_address: str = getenv("LEGACY_KEY_MARKETPLACE_ADDRESS", "")
     fee_rwa_reserve_address: str = getenv("FEE_RWA_RESERVE_ADDRESS", "")
+    revenue_router_address: str = getenv("REVENUE_ROUTER_ADDRESS", "")
+    agent_bond_address: str = getenv("AGENT_BOND_ADDRESS", "")
+    revenue_deployment_block: int = int(getenv("REVENUE_DEPLOYMENT_BLOCK", "0"))
+    pons_fee_policy_address: str = getenv(
+        "PONS_FEE_POLICY_ADDRESS", "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044"
+    )
+    pons_fee_escrow_address: str = getenv(
+        "PONS_FEE_ESCROW_ADDRESS", "0xd3AFEB2a57f70eF218Aa82451c51B2fb0416Ac9e"
+    )
+    pons_curve_address: str = getenv("PONS_CURVE_ADDRESS", "0x006A81aCf6087Efd637461f3068a5160611A477B")
+    pons_pool_id: str = getenv(
+        "PONS_POOL_ID", "0x917d90894a647c3cb4f7bad482a1b3276f643f69a36278371acbf4afaa16b128"
+    )
     test_usdg_address: str = getenv("TEST_USDG_ADDRESS", "")
     test_weth_address: str = getenv("TEST_WETH_ADDRESS", "")
     stable_pool_address: str = getenv("STABLE_POOL_ADDRESS", "")

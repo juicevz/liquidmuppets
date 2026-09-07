@@ -1,0 +1,345 @@
+import { useEffect, useState } from 'react'
+import { formatEther, type Address, type Hash } from 'viem'
+import { Icon } from '../components/Icon'
+import { fetchRevenue, type RevenueState } from '../lib/api'
+import { shortenAddress } from '../lib/format'
+import { useProtocol } from '../hooks/useProtocol'
+import { getInjectedProvider } from '../lib/protocol'
+import {
+  bindKeys,
+  bondAgentKeyUnit,
+  claimAgentBondReward,
+  readAgentBondKeyPosition,
+  unbondAgentKeyUnit,
+  type AgentBondKeyPosition,
+  type ChainAgent,
+} from '../lib/protocol'
+
+interface RevenuePageProps {
+  walletAddress?: string
+  onConnect: () => Promise<void>
+}
+
+export function RevenuePage({ walletAddress, onConnect }: RevenuePageProps) {
+  const [state, setState] = useState<RevenueState | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [refreshToken, setRefreshToken] = useState(0)
+  const [positions, setPositions] = useState<Record<string, AgentBondKeyPosition>>({})
+  const [action, setAction] = useState('')
+  const [actionError, setActionError] = useState('')
+  const [actionReceipts, setActionReceipts] = useState<Hash[]>([])
+  const protocol = useProtocol(walletAddress, state?.status === 'live' && Boolean(walletAddress))
+
+  useEffect(() => {
+    let active = true
+    let running = false
+    const load = async () => {
+      if (running) return
+      running = true
+      try {
+        const next = await fetchRevenue(walletAddress)
+        if (!active) return
+        setState(next)
+        setError('')
+      } catch (reason) {
+        if (active) setError(reason instanceof Error ? reason.message : 'Revenue evidence is reconnecting.')
+      } finally {
+        if (active) setLoading(false)
+        running = false
+      }
+    }
+    void load()
+    const timer = window.setInterval(() => void load(), 30_000)
+    return () => {
+      active = false
+      window.clearInterval(timer)
+    }
+  }, [walletAddress, refreshToken])
+
+  useEffect(() => {
+    if (state?.status !== 'live' || !walletAddress || !protocol.config || !protocol.snapshot) {
+      setPositions({})
+      return undefined
+    }
+    let active = true
+    Promise.all(protocol.snapshot.agents.map(async (agent) => [
+      agent.key.address.toLowerCase(),
+      await readAgentBondKeyPosition(protocol.config!, walletAddress as Address, agent.key.address),
+    ] as const))
+      .then((rows) => {
+        if (active) setPositions(Object.fromEntries(rows))
+      })
+      .catch((reason) => {
+        if (active) setActionError(reason instanceof Error ? reason.message : 'Agent Bond positions are reconnecting.')
+      })
+    return () => { active = false }
+  }, [protocol.config, protocol.snapshot, state?.status, walletAddress])
+
+  if (loading && !state) {
+    return <div className="app-page revenue-page revenue-state"><Icon name="clock" /><p>Reading the public revenue record.</p></div>
+  }
+
+  if (!state) {
+    return <div className="app-page revenue-page revenue-state" role="alert"><Icon name="alert" /><h1>Revenue record unavailable.</h1><p>{error}</p></div>
+  }
+
+  const isLive = state.status === 'live'
+  const totalRevenue = BigInt(state.router.total_revenue_routed ?? '0')
+  const totalRewards = BigInt(state.router.total_bond_rewards_delivered ?? '0')
+  const rewardUnits = BigInt(state.bond.total_reward_units ?? '0')
+  const walletAgents = protocol.snapshot?.agents.filter((agent) => {
+    const position = positions[agent.key.address.toLowerCase()]
+    return agent.key.walletBalance > 0n || agent.key.walletBound > 0n || (position?.committedUnits ?? 0n) > 0n
+  }) ?? []
+
+  const runAction = async (label: string, task: () => Promise<Hash[]>) => {
+    setAction(label)
+    setActionError('')
+    setActionReceipts([])
+    try {
+      const receipts = await task()
+      setActionReceipts(receipts)
+      protocol.refresh()
+      setRefreshToken((value) => value + 1)
+    } catch (reason) {
+      setActionError(reason instanceof Error ? reason.message : 'The wallet transaction did not complete.')
+    } finally {
+      setAction('')
+    }
+  }
+
+  const actionContext = () => {
+    const provider = getInjectedProvider()
+    if (!provider) throw new Error('No injected wallet found.')
+    if (!walletAddress || !protocol.config) throw new Error('Connect a wallet and wait for protocol configuration.')
+    return { provider, account: walletAddress as Address, config: protocol.config }
+  }
+
+  return (
+    <div className="app-page revenue-page">
+      <header className="revenue-hero">
+        <div>
+          <span className="revenue-kicker"><i aria-hidden="true" />public revenue record</span>
+          <h1>Revenue Engine.</h1>
+          <p>Bond 15,000 $MUPPETS with one permanently bound Agent Key to create one reward unit. Verified creator and Key-market revenue is routed weekly. Rewards settle in WETH.</p>
+        </div>
+        <div className={`revenue-release-state ${isLive ? 'is-live' : 'is-pending'}`}>
+          <small>{isLive ? 'mainnet state' : 'release state'}</small>
+          <strong>{isLive ? 'active' : 'activation pending'}</strong>
+          <p>{state.status_detail}</p>
+        </div>
+      </header>
+
+      {error && <div className="pulse-error" role="status"><Icon name="alert" />{error}</div>}
+
+      <section className="revenue-summary" aria-label="Revenue summary">
+        <span><small>reward unit</small><strong>15,000 $MUPPETS + 1 Key</strong></span>
+        <span><small>distribution</small><strong>weekly WETH</strong></span>
+        <span><small>reward units</small><strong>{formatInteger(rewardUnits)}</strong></span>
+        <span><small>routed revenue</small><strong>{formatNative(totalRevenue)} ETH</strong></span>
+        <span><small>WETH delivered</small><strong>{formatNative(totalRewards)} WETH</strong></span>
+      </section>
+
+      <section className="revenue-route" aria-labelledby="revenue-route-title">
+        <header>
+          <div><small>target route · total token trade fee stays 3%</small><h2 id="revenue-route-title">Where the fee goes</h2></div>
+          <p>The router receives the creator portion after Pons handles its protocol share and built-in buyback. Key-market fees are recorded as a separate source.</p>
+        </header>
+        <div className="revenue-route-grid">
+          {state.target_fee_route.map((route, index) => (
+            <article className={`revenue-route-${route.id}`} key={route.id}>
+              <span>{String(index + 1).padStart(2, '0')}</span>
+              <strong>{route.percent}</strong>
+              <p>{route.label}</p>
+            </article>
+          ))}
+        </div>
+        <div className="revenue-router-split">
+          <span><small>creator revenue enters router</small><strong>2.350%</strong></span>
+          <i aria-hidden="true" />
+          <span><small>Agent Bonds</small><strong>{state.router_split.agent_bonds}</strong></span>
+          <span><small>Stock reserve</small><strong>{state.router_split.stock_reserve}</strong></span>
+          <span><small>keeper + ops</small><strong>{state.router_split.operations}</strong></span>
+        </div>
+      </section>
+
+      <div className="revenue-two-column">
+        <section className="revenue-bond" aria-labelledby="revenue-bond-title">
+          <header><small>one unit at a time</small><h2 id="revenue-bond-title">Agent Bond</h2></header>
+          <ol>
+            <li><span>01</span><div><strong>Bind one Agent Key</strong><p>Binding is permanent. The Key becomes non-transferable and remains separate from vault ownership.</p></div></li>
+            <li><span>02</span><div><strong>Bond 15,000 $MUPPETS</strong><p>The token lock lasts 30 days. Bonded tokens still count toward FactoryV2 Creator Slots.</p></div></li>
+            <li><span>03</span><div><strong>Claim recorded WETH</strong><p>Your units receive their pro-rata share when a weekly route contains real revenue. A zero-revenue week pays zero.</p></div></li>
+          </ol>
+          <div className="revenue-wallet-card">
+            {!walletAddress ? (
+              <><span><Icon name="wallet" />wallet position</span><p>Connect to read your reward units and pending WETH.</p><button type="button" onClick={() => void onConnect()}>Connect Rabby</button></>
+            ) : !state.wallet?.available ? (
+              <><span><Icon name="wallet" />{shortenAddress(walletAddress)}</span><p>Agent Bond transactions remain unavailable until the verified mainnet contracts are configured and active.</p><button type="button" disabled>Activation pending</button></>
+            ) : (
+              <>
+                <span><Icon name="wallet" />{shortenAddress(walletAddress)}</span>
+                <div className="revenue-wallet-values">
+                  <b><small>units</small>{state.wallet.reward_units ?? '0'}</b>
+                  <b><small>bonded</small>{formatTokenRaw(state.wallet.bonded_muppets_raw ?? '0')} $MUPPETS</b>
+                  <b><small>claimable</small>{formatNative(BigInt(state.wallet.pending_weth_raw ?? '0'))} WETH</b>
+                </div>
+                <p>Each action is sent through your wallet. Binding is permanent. Bonded $MUPPETS unlock after 30 days.</p>
+                {BigInt(state.wallet.pending_weth_raw ?? '0') > 0n && (
+                  <button type="button" disabled={Boolean(action)} onClick={() => void runAction('claim', async () => {
+                    const { config, provider, account } = actionContext()
+                    return [await claimAgentBondReward(config, provider, account)]
+                  })}>{action === 'claim' ? 'Waiting for wallet' : 'Claim WETH'}</button>
+                )}
+              </>
+            )}
+          </div>
+          {state.status === 'live' && walletAddress && state.wallet?.available && (
+            <div className="revenue-agent-controls">
+              <header><span>eligible Agent Keys</span><small>one bound Key per unit</small></header>
+              {walletAgents.map((agent) => (
+                <RevenueAgentControl
+                  agent={agent}
+                  position={positions[agent.key.address.toLowerCase()]}
+                  busy={Boolean(action)}
+                  action={action}
+                  onBind={() => {
+                    if (!window.confirm('Binding one Agent Key is permanent. Continue?')) return
+                    void runAction(`bind-${agent.key.address}`, async () => {
+                      const { config, provider, account } = actionContext()
+                      return [await bindKeys(config, provider, account, agent, 1)]
+                    })
+                  }}
+                  onBond={() => void runAction(`bond-${agent.key.address}`, async () => {
+                    const { config, provider, account } = actionContext()
+                    return bondAgentKeyUnit(config, provider, account, agent.key.address)
+                  })}
+                  onUnbond={() => void runAction(`unbond-${agent.key.address}`, async () => {
+                    const { config, provider, account } = actionContext()
+                    return [await unbondAgentKeyUnit(config, provider, account, agent.key.address)]
+                  })}
+                  key={agent.key.address}
+                />
+              ))}
+              {!protocol.loading && walletAgents.length === 0 && <p>No transferable or bound Agent Key was found in this wallet.</p>}
+              {(protocol.loading || (walletAgents.length > 0 && Object.keys(positions).length === 0)) && <p>Reading Agent Key positions.</p>}
+            </div>
+          )}
+          {(actionError || actionReceipts.length > 0) && (
+            <div className={`revenue-action-result ${actionError ? 'is-error' : ''}`} role="status">
+              {actionError || 'Transaction confirmed.'}
+              {!actionError && actionReceipts.map((hash) => <a href={`${state.network.explorer_url}/tx/${hash}`} target="_blank" rel="noreferrer" key={hash}>{shortenAddress(hash)} <Icon name="arrow" /></a>)}
+            </div>
+          )}
+        </section>
+
+        <section className="revenue-evidence" aria-labelledby="revenue-evidence-title">
+          <header><small>current chain evidence</small><h2 id="revenue-evidence-title">Activation record</h2></header>
+          <div className="revenue-checks">
+            {state.activation_checks.map((check) => <span className={check.complete ? 'complete' : ''} key={check.label}><i aria-hidden="true" />{check.label}<b>{check.complete ? 'confirmed' : 'pending'}</b></span>)}
+          </div>
+          <dl className="revenue-pons-state">
+            <div><dt>Pons read</dt><dd>{state.pons.available ? `block ${state.pons.block_number?.toLocaleString()}` : 'unavailable'}</dd></div>
+            <div><dt>current creator revenue</dt><dd>{state.pons.current_creator_revenue ?? 'unavailable'}</dd></div>
+            <div><dt>built-in buyback</dt><dd>{state.pons.buyback_enabled ? 'enabled' : 'off'}</dd></div>
+            <div><dt>fee recipient</dt><dd>{state.pons.creator_fee_recipient ? shortenAddress(state.pons.creator_fee_recipient) : 'unavailable'}</dd></div>
+          </dl>
+          <p className="revenue-observed">{state.pons.observed_at ? `Observed ${formatUtc(state.pons.observed_at)}.` : state.pons.error}</p>
+          <div className="revenue-contract-links">
+            {contractLink(state.network.explorer_url, state.contracts.revenue_router, 'Revenue Router')}
+            {contractLink(state.network.explorer_url, state.contracts.agent_bond, 'Agent Bond')}
+            {contractLink(state.network.explorer_url, state.contracts.stock_reserve, 'Stock reserve')}
+            {contractLink(state.network.explorer_url, state.contracts.pons_fee_policy, 'Pons fee policy')}
+          </div>
+        </section>
+      </div>
+
+      <section className="revenue-receipts" aria-labelledby="revenue-receipts-title">
+        <header>
+          <div><small>since tracking began</small><h2 id="revenue-receipts-title">Revenue receipts</h2></div>
+          <span>{state.tracking_started_at ? formatUtc(state.tracking_started_at) : 'starts at contract deployment'}</span>
+        </header>
+        {state.receipts.length > 0 ? (
+          <div>{state.receipts.map((receipt) => <a href={receipt.url} target="_blank" rel="noreferrer" key={receipt.tx_hash}><span><i aria-hidden="true" />{receipt.action}</span><b>block {receipt.block_number.toLocaleString()}</b><small>{formatUtc(receipt.timestamp)} · {shortenAddress(receipt.tx_hash)}</small><Icon name="arrow" /></a>)}</div>
+        ) : (
+          <div className="revenue-empty"><Icon name="receipt" /><strong>No revenue receipt yet.</strong><p>The page will begin at the deployment block. It does not backfill a pretend reward history or APY.</p></div>
+        )}
+      </section>
+
+      <section className="revenue-boundary">
+        <span>read this first</span>
+        <div>{state.boundaries.map((boundary) => <p key={boundary}><i aria-hidden="true" />{boundary}</p>)}</div>
+      </section>
+    </div>
+  )
+}
+
+function RevenueAgentControl({
+  agent,
+  position,
+  busy,
+  action,
+  onBind,
+  onBond,
+  onUnbond,
+}: {
+  agent: ChainAgent
+  position?: AgentBondKeyPosition
+  busy: boolean
+  action: string
+  onBind: () => void
+  onBond: () => void
+  onUnbond: () => void
+}) {
+  const actionId = agent.key.address
+  const unlockReady = Boolean(position?.committedUnits && position.lockedUntil <= Math.floor(Date.now() / 1_000))
+  return (
+    <article>
+      <div><strong>{agent.name}</strong><small>${agent.key.symbol} · {shortenAddress(agent.key.address)}</small></div>
+      <span><small>transferable</small><b>{agent.key.walletBalance.toString()}</b></span>
+      <span><small>bound free</small><b>{position?.availableBoundKeys.toString() ?? '…'}</b></span>
+      <span><small>units</small><b>{position?.committedUnits.toString() ?? '…'}</b></span>
+      <div className="revenue-agent-actions">
+        {(position?.availableBoundKeys ?? 0n) > 0n ? (
+          <button type="button" disabled={busy} onClick={onBond}>{action === `bond-${actionId}` ? 'Waiting' : 'Bond 15,000'}</button>
+        ) : agent.key.walletBalance > 0n ? (
+          <button type="button" disabled={busy} onClick={onBind}>{action === `bind-${actionId}` ? 'Waiting' : 'Bind 1 Key'}</button>
+        ) : null}
+        {(position?.committedUnits ?? 0n) > 0n && (
+          <button className="secondary" type="button" disabled={busy || !unlockReady} onClick={onUnbond} title={unlockReady ? 'Return 15,000 MUPPETS' : `Unlocks ${formatUtc(new Date((position?.lockedUntil ?? 0) * 1_000).toISOString())}`}>
+            {action === `unbond-${actionId}` ? 'Waiting' : unlockReady ? 'Unbond 1' : `Locked until ${shortDate(position?.lockedUntil ?? 0)}`}
+          </button>
+        )}
+      </div>
+    </article>
+  )
+}
+
+function contractLink(explorer: string, address: string | null, label: string) {
+  if (!address) return <span className="is-pending" key={label}>{label} · pending</span>
+  return <a href={`${explorer}/address/${address}`} target="_blank" rel="noreferrer" key={label}>{label} <Icon name="arrow" /></a>
+}
+
+function formatNative(value: bigint): string {
+  const [whole, fraction = ''] = formatEther(value).split('.')
+  const trimmed = fraction.slice(0, 6).replace(/0+$/, '')
+  return trimmed ? `${whole}.${trimmed}` : whole
+}
+
+function formatTokenRaw(value: string): string {
+  const whole = BigInt(value) / 10n ** 18n
+  return whole.toLocaleString('en-US')
+}
+
+function formatInteger(value: bigint): string {
+  return value.toLocaleString('en-US')
+}
+
+function formatUtc(value: string): string {
+  return new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }).format(new Date(value)) + ' UTC'
+}
+
+function shortDate(timestamp: number): string {
+  return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(timestamp * 1_000))
+}

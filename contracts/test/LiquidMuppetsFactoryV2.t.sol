@@ -8,11 +8,23 @@ import {MockERC20} from "../src/mocks/MockERC20.sol";
 import {MockYieldPool} from "../src/mocks/MockYieldPool.sol";
 import {PolicyExecutor} from "../src/PolicyExecutor.sol";
 import {LiquidMuppetsFactory} from "../src/LiquidMuppetsFactory.sol";
-import {ILegacyLiquidMuppetsFactory, LiquidMuppetsFactoryV2} from "../src/LiquidMuppetsFactoryV2.sol";
+import {
+    ILegacyLiquidMuppetsFactory,
+    IMuppetBondBalance,
+    LiquidMuppetsFactoryV2
+} from "../src/LiquidMuppetsFactoryV2.sol";
 import {StrategyVault} from "../src/StrategyVault.sol";
 import {KeyMarketplace} from "../src/KeyMarketplace.sol";
 
 contract GovernanceHarness {}
+
+contract MockBondBalance is IMuppetBondBalance {
+    mapping(address account => uint256 amount) public bondedBalance;
+
+    function setBondedBalance(address account, uint256 amount) external {
+        bondedBalance[account] = amount;
+    }
+}
 
 contract LiquidMuppetsFactoryV2Test is Test {
     MockERC20 internal asset;
@@ -23,6 +35,7 @@ contract LiquidMuppetsFactoryV2Test is Test {
     KeyMarketplace internal marketV2;
     LiquidMuppetsFactory internal legacyFactory;
     LiquidMuppetsFactoryV2 internal factoryV2;
+    MockBondBalance internal bondBalance;
 
     address internal legacyCreator = makeAddr("legacyCreator");
     address internal creator = makeAddr("creator");
@@ -55,9 +68,11 @@ contract LiquidMuppetsFactoryV2Test is Test {
         legacyFactory.createAgent(0, 0, "legacy frog", "LFROG", 100, 0.01 ether);
 
         marketV2 = new KeyMarketplace(address(this), treasury, 300);
+        bondBalance = new MockBondBalance();
         factoryV2 = new LiquidMuppetsFactoryV2(
             address(this),
             accessToken,
+            bondBalance,
             15_000 ether,
             policy,
             marketV2,
@@ -123,6 +138,29 @@ contract LiquidMuppetsFactoryV2Test is Test {
         assertEq(factoryV2.newAgentCount(), 2);
     }
 
+    function testBondedMuppetsStillCountTowardCreatorSlots() public {
+        accessToken.mint(creator, 15_000 ether);
+        bondBalance.setBondedBalance(creator, 15_000 ether);
+
+        vm.startPrank(creator);
+        factoryV2.createAgent(1, 3, "liquid slot", "LIQ", 100, 0.01 ether);
+        factoryV2.createAgent(2, 3, "bonded slot", "BOND", 100, 0.01 ether);
+        vm.stopPrank();
+
+        (uint256 balance, uint256 slots, uint256 used, uint256 available, uint256 nextRequired) =
+            factoryV2.creatorSlotState(creator);
+        assertEq(balance, 30_000 ether);
+        assertEq(slots, 2);
+        assertEq(used, 2);
+        assertEq(available, 0);
+        assertEq(nextRequired, 45_000 ether);
+
+        (uint256 liquid, uint256 bonded, uint256 total) = factoryV2.creatorAccessBalances(creator);
+        assertEq(liquid, 15_000 ether);
+        assertEq(bonded, 15_000 ether);
+        assertEq(total, 30_000 ether);
+    }
+
     function testLegacyMuppetConsumesOneCreatorSlot() public {
         accessToken.mint(legacyCreator, 15_000 ether);
         vm.expectRevert(
@@ -145,8 +183,7 @@ contract LiquidMuppetsFactoryV2Test is Test {
     function testBalanceDropDoesNotTouchExistingVaultOrAgentKeyMarket() public {
         accessToken.mint(creator, 15_000 ether);
         vm.prank(creator);
-        (, address vaultAddress, address key) =
-            factoryV2.createAgent(1, 3, "independent fox", "IFX", 100, 0.01 ether);
+        (, address vaultAddress, address key) = factoryV2.createAgent(1, 3, "independent fox", "IFX", 100, 0.01 ether);
 
         vm.prank(creator);
         accessToken.transfer(makeAddr("receiver"), 15_000 ether);
@@ -238,7 +275,13 @@ contract LiquidMuppetsFactoryV2Test is Test {
         address eoaOwner = makeAddr("temporaryDeployer");
         KeyMarketplace anotherMarket = new KeyMarketplace(address(this), treasury, 300);
         LiquidMuppetsFactoryV2 anotherFactory = new LiquidMuppetsFactoryV2(
-            eoaOwner, accessToken, 15_000 ether, policy, anotherMarket, ILegacyLiquidMuppetsFactory(address(0))
+            eoaOwner,
+            accessToken,
+            IMuppetBondBalance(address(0)),
+            15_000 ether,
+            policy,
+            anotherMarket,
+            ILegacyLiquidMuppetsFactory(address(0))
         );
         accessToken.mint(creator, 15_000 ether);
 

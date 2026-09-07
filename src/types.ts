@@ -1,4 +1,4 @@
-export type View = 'landing' | 'about' | 'marketplace' | 'portfolio' | 'create' | 'docs' | 'performance' | 'creator' | 'pulse' | 'proofs' | 'proof' | 'monitor'
+export type View = 'landing' | 'about' | 'marketplace' | 'portfolio' | 'create' | 'docs' | 'performance' | 'creator' | 'pulse' | 'proofs' | 'proof' | 'monitor' | 'revenue'
 
 export type StrategyTaskId = 0 | 1 | 2 | 3 | 4 | 5 | 6
 

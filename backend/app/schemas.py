@@ -186,6 +186,10 @@ class TokenAccessResponse(BaseModel):
     decimals: int | None
     balance: str | None
     balanceRaw: str | None
+    walletBalance: str | None
+    walletBalanceRaw: str | None
+    bondedBalance: str | None
+    bondedBalanceRaw: str | None
     minimumRaw: str | None
     slotSize: str
     slotSizeRaw: str | None

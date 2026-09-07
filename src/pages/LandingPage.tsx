@@ -442,7 +442,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
 
       <footer className="landing-footer">
         <div><Brand /><p>An interface for permissioned onchain agents.</p></div>
-        <div><span>PRODUCT</span><a href="#product">How it works</a><a href="#roadmap">Roadmap</a><button onClick={() => onNavigate('marketplace')}>Key market</button><button onClick={() => onNavigate('create')}>Launch</button></div>
+        <div><span>PRODUCT</span><a href="#product">How it works</a><a href="#roadmap">Roadmap</a><button onClick={() => onNavigate('marketplace')}>Key market</button><button onClick={() => onNavigate('revenue')}>Revenue</button><button onClick={() => onNavigate('create')}>Launch</button></div>
         <div><span>READ</span><a href="/docs" onClick={(event) => { event.preventDefault(); onNavigate('docs') }}>LIQUIDMUPPETS docs</a><a href="https://x.com/AMBF" target="_blank" rel="noreferrer">X / @AMBF</a><a href="https://docs.morpho.org/" target="_blank" rel="noreferrer">Morpho</a></div>
         <div className="footer-note">Public browsing is open. App launch requires 15,000 $MUPPETS. Experimental mainnet software using real assets and unaudited contracts.</div>
       </footer>

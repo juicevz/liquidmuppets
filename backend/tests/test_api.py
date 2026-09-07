@@ -107,6 +107,51 @@ def test_contract_config_exposes_fee_reserve(tmp_path: Path) -> None:
     assert response.json()["feeRwaReserve"] == reserve
 
 
+def test_contract_config_exposes_revenue_contracts(tmp_path: Path) -> None:
+    router = "0x1111111111111111111111111111111111111111"
+    bond = "0x2222222222222222222222222222222222222222"
+    app = create_app(
+        Settings(
+            database_path=tmp_path / "test.sqlite3",
+            rpc_url="http://127.0.0.1:1",
+            revenue_router_address=router,
+            agent_bond_address=bond,
+        )
+    )
+    with TestClient(app) as client:
+        response = client.get("/api/v1/contracts")
+
+    assert response.status_code == 200
+    assert response.json()["revenueRouter"] == router
+    assert response.json()["agentBond"] == bond
+
+
+def test_revenue_api_keeps_activation_and_wallet_state_explicit(tmp_path: Path) -> None:
+    wallet = "0x3333333333333333333333333333333333333333"
+    app = create_app(Settings(database_path=tmp_path / "test.sqlite3", rpc_url="http://127.0.0.1:1"))
+    app.state.revenue = MagicMock()
+    app.state.revenue.read.return_value = {
+        "status": "activation_pending",
+        "wallet": {"address": wallet, "available": False},
+        "receipts": [],
+    }
+
+    with TestClient(app) as client:
+        response = client.get(f"/api/v1/revenue?wallet={wallet}")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "activation_pending"
+    assert response.json()["wallet"]["available"] is False
+    app.state.revenue.read.assert_called_once_with(wallet)
+
+
+def test_revenue_api_rejects_an_invalid_wallet(tmp_path: Path) -> None:
+    app = create_app(Settings(database_path=tmp_path / "test.sqlite3", rpc_url="http://127.0.0.1:1"))
+    with TestClient(app) as client:
+        response = client.get("/api/v1/revenue?wallet=not-a-wallet")
+    assert response.status_code == 422
+
+
 def test_activity_api_filters_receipts_by_agent(tmp_path: Path) -> None:
     app = create_app(Settings(database_path=tmp_path / "test.sqlite3", rpc_url="http://127.0.0.1:1"))
     row = {
@@ -294,6 +339,35 @@ def test_token_gate_requires_one_slot_per_existing_muppet() -> None:
     assert result["overCapacity"] == 0
     assert result["requiredForNextLaunch"] == "45000"
     assert result["reason"] == "capacity_full"
+
+
+def test_token_gate_counts_agent_bonded_muppets_as_creator_capacity() -> None:
+    settings = Settings(
+        muppets_token_address="0x2222222222222222222222222222222222222222",
+        muppets_token_minimum=15_000,
+        factory_address="0x3333333333333333333333333333333333333333",
+        agent_bond_address="0x4444444444444444444444444444444444444444",
+    )
+    fake_web3 = MagicMock()
+    fake_web3.eth.get_code.return_value = b"\x60"
+    fake_token = MagicMock()
+    fake_factory = MagicMock()
+    fake_bond = MagicMock()
+    fake_web3.eth.contract.side_effect = [fake_token, fake_factory, fake_bond]
+    fake_token.functions.decimals.return_value.call.return_value = 18
+    fake_token.functions.balanceOf.return_value.call.return_value = 15_000 * 10**18
+    fake_bond.functions.bondedBalance.return_value.call.return_value = 15_000 * 10**18
+    fake_factory.functions.getCreatorAgentIds.return_value.call.return_value = [0]
+
+    result = TokenGateService(settings, fake_web3).check("0x1111111111111111111111111111111111111111")
+
+    assert result["walletBalance"] == "15000"
+    assert result["bondedBalance"] == "15000"
+    assert result["balance"] == "30000"
+    assert result["slotCount"] == 2
+    assert result["slotsUsed"] == 1
+    assert result["slotsAvailable"] == 1
+    assert result["eligible"] is True
 
 
 def test_token_amount_formatting_is_exact() -> None:

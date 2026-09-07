@@ -1,8 +1,8 @@
 # LIQUIDMUPPETS
 
-LIQUIDMUPPETS is a Robinhood Chain mainnet marketplace for policy-bounded onchain agents. A Muppet is an onchain vault with one job: pick a cosmetic pet, choose one live vault route, then launch and fund it. Public browsing remains open. Every `15,000 $MUPPETS` held unlocks one active Creator Slot. One available slot permits one new Muppet and one featured Muppet on the creator profile.
+LIQUIDMUPPETS is a Robinhood Chain mainnet marketplace for policy-bounded onchain agents. A Muppet is an onchain vault with one job: pick a cosmetic pet, choose one live vault route, then launch and fund it. Public browsing remains open. Every `15,000 $MUPPETS` held unlocks one active Creator Slot. One available slot permits one new Muppet and one featured Muppet on the creator profile. FactoryV2 also counts $MUPPETS deliberately locked in an Agent Bond.
 
-Creator Slots equal `floor(wallet balance / 15,000)`. The `$MUPPETS` balance remains transferable in the wallet and is not spent, locked or burned. If the balance falls, existing vaults, withdrawals and Agent Key markets remain available; only additional launches and over-capacity featured placement pause. The canonical Robinhood Chain token is `0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189`. FactoryV2 now implements this capacity rule onchain, but the current mainnet factory remains V1 until the published multisig migration is executed.
+Creator Slots currently equal `floor(wallet balance / 15,000)`. After the verified FactoryV2 and Agent Bond activation, the formula becomes `floor((liquid balance + bonded balance) / 15,000)`. Tokens remain transferable unless a holder deliberately accepts the Agent Bond's 30 day lock. If capacity falls, existing vaults, withdrawals and Agent Key markets remain available; only additional launches and over-capacity featured placement pause. The canonical Robinhood Chain token is `0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189`.
 
 Public interface: [https://liquidmuppets.io](https://liquidmuppets.io)
 
@@ -10,7 +10,7 @@ Full product explainer: [https://liquidmuppets.io/about](https://liquidmuppets.i
 
 X: [@AMBF](https://x.com/AMBF)
 
-Current status: controlled mainnet beta. Existing Muppets can be funded, allocated, traded and redeemed. Creator Slots are live in the app and API. The live V1 launch path is app and API enforced. FactoryV2, its onchain Creator Slot rule, migration script, verification step, and reviewed-route adapter are implemented in this repository but have not been broadcast to mainnet.
+Current status: controlled mainnet beta. Existing Muppets can be funded, allocated, traded and redeemed. Creator Slots are live in the app and API. The live V1 launch path is app and API enforced. FactoryV2, the Revenue Router, Agent Bond, migration script, verification step, and reviewed-route adapter are implemented and tested in this repository but have not been broadcast to mainnet. The public Revenue Engine page reports that activation boundary and does not report rewards as live.
 
 ## Live mainnet scope
 
@@ -31,11 +31,13 @@ Current status: controlled mainnet beta. Existing Muppets can be funded, allocat
 - automatic Proof Cards with durable public URLs for meaningful protocol records
 - browser-local Muppet watchlists with an in-app evidence alert inbox
 - Muppet Market Radar, a read-only view of approved route health, capacity, source gaps and exact status reasons
+- a public Revenue Engine page with the current Pons configuration, target fee path, activation checks, contract totals, wallet reward-unit state and receipts since deployment
 - a post-launch command center with vault funding, an optional separate Agent Key listing, an onchain share preview, keeper timing, performance link and X sharing
 - browser-local recovery for the single creation receipt and optional Key listing receipts, keyed to the connected wallet, chain and factory
 - optional app handles claimed with a wallet signature and no gas
 - app and API capacity gate requiring one available slot per new launch through the current V1 interface
 - FactoryV2 code with one onchain creator slot per 15,000 `$MUPPETS`, reviewed task registry, risk presets, multisig-only ownership and a post-verification launch switch
+- Revenue Router and Agent Bond contracts with exact source accounting, a weekly route, 30 day token locks, one permanently bound Key per unit and WETH rewards from recorded revenue only
 - canonical `$MUPPETS` token configured at `0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189`
 - no deployer key in the browser, API, or VPS; the limited keeper key is accepted only through the host-encrypted vault and loaded only by the private service
 
@@ -66,9 +68,9 @@ The live site publishes the work in four evidence-based phases. `Shipped` means 
 
 | Phase | State | Work |
 | --- | --- | --- |
-| 01 · Market core | shipped | public performance and creator pages; `$MUPPETS` Creator Slots; automatic Proof Cards; System Pulse; watchlists, alerts and Market Radar; three live task routes and the 26-route Stock Token reserve |
-| 02 · Resilience | next | independent production RPC fallback; source verification; verified Safe ownership; independent contract review |
-| 03 · Permissioning | conditional | simulate and broadcast FactoryV2 after Safe approval; enforce one creator slot per 15,000 `$MUPPETS` onchain; preserve V1 positions and markets; enable launches through a separate Safe transaction |
+| 01 · Market core | shipped | public performance and creator pages; `$MUPPETS` Creator Slots; automatic Proof Cards; System Pulse; watchlists, alerts and Market Radar; public Revenue Engine page and tested contract package; three live task routes and the 26-route Stock Token reserve |
+| 02 · Resilience | next | independent production RPC fallback; source verification; verified Safe ownership; independent contract review; deploy and verify the Revenue Router and Agent Bond; configure the Pons buyback and creator fee recipient |
+| 03 · Permissioning | conditional | simulate and broadcast FactoryV2 after Safe approval; enforce one creator slot per 15,000 liquid or Agent-Bonded `$MUPPETS` onchain; preserve V1 positions and markets; enable launches through a separate Safe transaction |
 | 04 · Asset expansion | conditional | activate NVDA/USDG only after verified FactoryV2 activation; retain AAPL/USDG and SPY/USDG as disabled venue candidates; keep meme/WETH disabled until every route gate passes; expose new market evidence only when adapters source it |
 
 The sequence can change when evidence changes. The website and this repository use the same roadmap boundaries.
@@ -89,9 +91,9 @@ The deployer and current owner are the dedicated address `0x30dF6f545FcD732c6596
 
 ### FactoryV2 migration package
 
-`LiquidMuppetsFactoryV2` preserves the V1 agent ID range, delegates legacy reads to V1, and deploys only new vaults and Keys. It counts legacy and V2 Muppets, then requires `(existing Muppets + 1) × 15,000 $MUPPETS` for the next launch. Tokens stay in the creator wallet. Its public `creatorSlotState` view returns balance, unlocked slots, used slots, available slots and the next-launch requirement. FactoryV2 also exposes defensive, balanced and active policy presets. Each task points to an exact asset, immutable adapter, route ID, deposit cap and allowed preset mask.
+`LiquidMuppetsFactoryV2` preserves the V1 agent ID range, delegates legacy reads to V1, and deploys only new vaults and Keys. It counts legacy and V2 Muppets, then requires `(existing Muppets + 1) × 15,000 $MUPPETS` for the next launch. Its access balance adds the liquid wallet balance and the exact amount held by `MuppetAgentBond`. Its public `creatorSlotState` view returns the combined access balance, unlocked slots, used slots, available slots and the next-launch requirement. FactoryV2 also exposes defensive, balanced and active policy presets. Each task points to an exact asset, immutable adapter, route ID, deposit cap and allowed preset mask.
 
-The deployment script creates a separate V2 Key market, deploys the fork-tested NVDA/USDG adapter, switches only future policy registration to V2, and transfers the legacy factory, both Key markets, PolicyExecutor, FeeRwaReserve and FactoryV2 to a Safe with at least two owners and a threshold of at least two. Existing V1 vault deposits, allocations, redemptions and Key orders retain their original contracts. The frontend aggregates both Key markets after migration.
+The deployment script creates a separate V2 Key market, Agent Bond, Revenue Router and the fork-tested NVDA/USDG adapter. It switches only future policy registration to V2 and transfers every protocol owner role to a Safe with at least two owners and a threshold of at least two. Existing V1 vault deposits, allocations, redemptions and Key orders retain their original contracts. The frontend aggregates both Key markets after migration.
 
 FactoryV2 launches default to off. They can only be enabled by deployed governance code after Blockscout source verification. No FactoryV2 address is listed here because no migration transaction has been broadcast.
 
@@ -126,6 +128,14 @@ current factory creates a fixed Agent Key supply with the Muppet
   -> fee enters FeeRwaReserve as native ETH
   -> private keeper converts ETH to USDG after the 0.0001 ETH threshold
   -> reserve buys the next eligible Stock Token and holds it onchain
+
+verified revenue migration
+  -> the external Pons protocol keeps 0.300% of each $MUPPETS trade
+  -> the enabled Pons buyback receives 0.350% and follows its five-year vest
+  -> 2.350% creator revenue enters MuppetRevenueRouter
+  -> 50% becomes weekly WETH rewards for Agent Bond units
+  -> 30% enters FeeRwaReserve and 20% funds keeper and operating costs
+  -> one reward unit requires 15,000 bonded $MUPPETS and one unused bound Agent Key
 ```
 
 Vault shares own the capital claim. Agent Keys are a separate market and access asset. A Key cannot redeem vault assets, and its market price does not change vault share value.
@@ -148,6 +158,24 @@ Each route uses a direct USDG pool and a Robinhood Chain Chainlink feed. A cycle
 
 The first dev-funded cycle spent `0.01 ETH`, routed `24.587800 USDG`, and bought `0.076456289003050387 AAPL`. It is recorded separately from marketplace fees. Stock Tokens are tokenized debt securities and do not grant shareholder rights in the underlying company.
 
+## Revenue Engine and Agent Bonds
+
+`MuppetRevenueRouter` records Pons creator fees, Agent Key marketplace fees and third-party funding as separate sources. Only the first two enter the revenue total. Once per seven days, any account can route accumulated revenue through an immutable 50/30/20 split: 50% wraps to WETH for Agent Bonds, 30% enters the Stock Token reserve, and 20% goes to the Safe-controlled operations treasury. If no reward unit exists, the reward share stays queued in native ETH. If no revenue arrived, no distribution can execute.
+
+`MuppetAgentBond` requires `15,000 $MUPPETS` and one unused, permanently bound Agent Key per reward unit. It accepts Keys only from approved LiquidMuppets marketplaces. Each Key-specific token position locks for 30 days. Adding to that position restarts its lock. Unbonding returns the token and releases the Key commitment, but cannot reverse the Key contract's permanent bind. WETH uses cumulative per-unit accounting, so distribution and claiming do not loop over holders.
+
+The target route for the external 3% `$MUPPETS` trade fee is exact:
+
+| Destination | Effective trade fee |
+| --- | ---: |
+| Pons protocol | 0.300% |
+| Pons built-in buyback and five-year vest | 0.350% |
+| Agent Bond WETH rewards | 1.175% |
+| LiquidMuppets Stock Token reserve | 0.705% |
+| keeper and operations | 0.470% |
+
+The current Pons buyback is still off and its creator-fee recipient does not point to the undeployed router. `/app/revenue` reads those values from chain and keeps the release labeled `activation pending`. It begins receipt history at `REVENUE_DEPLOYMENT_BLOCK`, never counts a bootstrap transfer as revenue, and never invents historical or projected APY.
+
 ## Public activity
 
 `GET /api/v1/activity` incrementally indexes the deployed contracts and returns real launches, asks, bids, fills, deposits, withdrawals, allocations, recalls, recenters, and Key bindings. The indexer starts at the deployment block once, persists decoded events and its next safe block in SQLite, then reads only the new confirmed range plus a short reorg window. The marketplace polls the persisted snapshot and links every item to its transaction.
@@ -158,7 +186,7 @@ The first dev-funded cycle spent `0.01 ETH`, routed `24.587800 USDG`, and bought
 
 `POST /api/v1/profiles/challenge` and `POST /api/v1/profiles/claim` let a wallet claim an app handle with an EIP-191 signature. The signature proves control of that wallet. It does not verify an X account or any other external identity.
 
-`GET /api/v1/access/{wallet}` reads the configured `$MUPPETS` balance and factory creator IDs on Robinhood Chain. It returns slot size, slots unlocked, used and available, funded featured placements, over-capacity count, and both the next balance-slot and next-launch thresholds. Missing token or factory configuration and unreadable contract state fail closed.
+`GET /api/v1/access/{wallet}` reads the configured liquid `$MUPPETS` balance, optional Agent-Bonded balance and factory creator IDs on Robinhood Chain. It returns slot size, slots unlocked, used and available, funded featured placements, over-capacity count, and both the next balance-slot and next-launch thresholds. Missing token or factory configuration and unreadable contract state fail closed.
 
 ## Public performance pages
 
@@ -334,7 +362,7 @@ WRITE_DEPLOYMENT_RECEIPT=true SAFE_MULTISIG=0x... forge script script/DeployFact
 ./scripts/verify-factory-v2.sh deployments/robinhood-mainnet-v2.json
 ```
 
-The migration receipt is written with `deployed-pending-verification`. The verification script checks all three new contracts, confirms Safe ownership and confirms launches are still disabled, then prints the exact Safe calldata for `setLaunchesEnabled(true)`. Update the API and frontend to V2 only after that Safe transaction confirms.
+The migration receipt is written with `deployed-pending-verification`. The verification script checks the five new contracts, confirms Safe ownership, confirms launches and revenue contracts are still disabled, and prints the Pons creator and Safe activation calldata. Update the API runtime addresses only after deployment, verification, Safe control and the external Pons transactions confirm.
 
 The frontend uses atomic release directories under `/var/www/liquidmuppets/releases/` with `/var/www/liquidmuppets/current` as the active symlink. The API runs as the unprivileged `liquidmuppets` user from `/opt/liquidmuppets-api/current`, reads public runtime values from `/etc/liquidmuppets/api.env` and `/etc/liquidmuppets/runtime-public.env`, reads the keeper secret only from mode-0600 `/etc/liquidmuppets/keeper.env`, and writes profiles, keeper decisions, performance checkpoints, marketplace performance summaries and Proof Cards to SQLite under `/var/lib/liquidmuppets`. Set `PUBLIC_BASE_URL` to the public origin used in durable proof, image and app URLs. Creator profiles, Pulse and Proof Cards are read models over persisted records plus decoded chain events.
 
@@ -343,6 +371,7 @@ The frontend uses atomic release directories under `/var/www/liquidmuppets/relea
 - `GET /api/v1/health`
 - `GET /api/v1/contracts`
 - `GET /api/v1/rwa-reserve`
+- `GET /api/v1/revenue` with an optional `wallet` query
 - `GET /api/v1/access/{wallet}`
 - `GET /api/v1/strategies`
 - `POST /api/v1/strategies/preview`
@@ -372,6 +401,9 @@ Public keeper triggering is disabled. The production scheduler is active every f
 - app launch fails closed if the canonical `$MUPPETS` balance or factory creator-count read is unavailable
 - interrupted launch recovery is stored only in the current browser; users should keep wallet receipts if they switch devices or clear site data
 - FactoryV2 implements an unbypassable one-slot-per-15,000 `$MUPPETS` rule, but it is not active until its multisig migration is broadcast, verified and enabled
+- Agent Bonds and the Revenue Router are implemented and tested but not live until the same verified Safe migration and separate Pons creator transactions complete
+- binding an Agent Key is permanent; the 30 day $MUPPETS lock is reversible only after its unlock timestamp
+- WETH rewards depend entirely on recorded revenue and can be zero; no APY is promised or projected
 - contracts are tested but not independently audited
 - stable APY is variable and can be zero
 - Morpho withdrawals depend on market liquidity

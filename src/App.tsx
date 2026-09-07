@@ -20,7 +20,7 @@ export function App() {
       ? 'LIQUIDMUPPETS | onchain liquidity agents'
       : view === 'about'
         ? 'How LIQUIDMUPPETS works'
-      : `${view === 'marketplace' ? 'Pet Marketplace' : view === 'performance' ? 'Muppet Performance' : view === 'creator' ? 'Creator Profile' : view === 'pulse' ? 'System Pulse' : view === 'proofs' ? 'Proof Cards' : view === 'proof' ? 'Public Proof' : view === 'monitor' ? 'Watchlist and Market Radar' : view[0].toUpperCase() + view.slice(1)} | LIQUIDMUPPETS`
+      : `${view === 'marketplace' ? 'Pet Marketplace' : view === 'performance' ? 'Muppet Performance' : view === 'creator' ? 'Creator Profile' : view === 'pulse' ? 'System Pulse' : view === 'proofs' ? 'Proof Cards' : view === 'proof' ? 'Public Proof' : view === 'monitor' ? 'Watchlist and Market Radar' : view === 'revenue' ? 'Revenue Engine' : view[0].toUpperCase() + view.slice(1)} | LIQUIDMUPPETS`
     window.scrollTo({ top: 0 })
   }, [view])
 

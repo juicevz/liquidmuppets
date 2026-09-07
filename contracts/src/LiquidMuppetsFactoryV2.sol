@@ -26,6 +26,10 @@ interface ILegacyLiquidMuppetsFactory {
     function getCreatorAgentIds(address creator) external view returns (uint256[] memory);
 }
 
+interface IMuppetBondBalance {
+    function bondedBalance(address account) external view returns (uint256);
+}
+
 /// @notice Gated factory and reviewed template registry for new LiquidMuppets launches.
 /// @dev Legacy agents remain addressable through the same global IDs. Existing vaults are never migrated or replaced.
 contract LiquidMuppetsFactoryV2 is Ownable {
@@ -66,6 +70,7 @@ contract LiquidMuppetsFactoryV2 is Ownable {
     }
 
     IERC20 public immutable accessToken;
+    IMuppetBondBalance public immutable agentBond;
     uint256 public immutable minimumAccessBalance;
     PolicyExecutor public immutable policyExecutor;
     KeyMarketplace public immutable keyMarketplace;
@@ -112,6 +117,7 @@ contract LiquidMuppetsFactoryV2 is Ownable {
     event LaunchesEnabledSet(bool enabled);
 
     error InvalidAccessToken();
+    error InvalidAgentBond();
     error InsufficientAccessBalance(uint256 balance, uint256 required);
     error InvalidPet();
     error InvalidTask();
@@ -126,6 +132,7 @@ contract LiquidMuppetsFactoryV2 is Ownable {
     constructor(
         address initialOwner,
         IERC20 accessToken_,
+        IMuppetBondBalance agentBond_,
         uint256 minimumAccessBalance_,
         PolicyExecutor policyExecutor_,
         KeyMarketplace keyMarketplace_,
@@ -134,10 +141,12 @@ contract LiquidMuppetsFactoryV2 is Ownable {
         if (address(accessToken_).code.length == 0 || minimumAccessBalance_ == 0) {
             revert InvalidAccessToken();
         }
+        if (address(agentBond_) != address(0) && address(agentBond_).code.length == 0) revert InvalidAgentBond();
         if (address(policyExecutor_).code.length == 0 || address(keyMarketplace_).code.length == 0) {
             revert InvalidPolicy();
         }
         accessToken = accessToken_;
+        agentBond = agentBond_;
         minimumAccessBalance = minimumAccessBalance_;
         policyExecutor = policyExecutor_;
         keyMarketplace = keyMarketplace_;
@@ -239,7 +248,7 @@ contract LiquidMuppetsFactoryV2 is Ownable {
     ) private returns (uint256 agentId, address vault, address key) {
         if (!governanceReady()) revert ContractGovernanceRequired();
         if (!launchesEnabled) revert LaunchesDisabled();
-        uint256 balance = accessToken.balanceOf(msg.sender);
+        uint256 balance = accessBalanceOf(msg.sender);
         uint256 required = (_creatorAgentCount(msg.sender) + 1) * minimumAccessBalance;
         if (balance < required) revert InsufficientAccessBalance(balance, required);
         if (petId > 6) revert InvalidPet();
@@ -329,7 +338,7 @@ contract LiquidMuppetsFactoryV2 is Ownable {
         return newAgentRecords.length;
     }
 
-    /// @notice Returns live reusable creator capacity without locking or spending the access token.
+    /// @notice Returns creator capacity from liquid plus Agent-Bonded MUPPETS.
     function creatorSlotState(address creator)
         external
         view
@@ -341,11 +350,27 @@ contract LiquidMuppetsFactoryV2 is Ownable {
             uint256 requiredForNextLaunch
         )
     {
-        balance = accessToken.balanceOf(creator);
+        balance = accessBalanceOf(creator);
         slotCount = balance / minimumAccessBalance;
         slotsUsed = _creatorAgentCount(creator);
         slotsAvailable = slotCount > slotsUsed ? slotCount - slotsUsed : 0;
         requiredForNextLaunch = (slotsUsed + 1) * minimumAccessBalance;
+    }
+
+    function accessBalanceOf(address creator) public view returns (uint256) {
+        uint256 liquidBalance = accessToken.balanceOf(creator);
+        if (address(agentBond) == address(0)) return liquidBalance;
+        return liquidBalance + agentBond.bondedBalance(creator);
+    }
+
+    function creatorAccessBalances(address creator)
+        external
+        view
+        returns (uint256 liquidBalance, uint256 bondedBalance, uint256 totalAccessBalance)
+    {
+        liquidBalance = accessToken.balanceOf(creator);
+        bondedBalance = address(agentBond) == address(0) ? 0 : agentBond.bondedBalance(creator);
+        totalAccessBalance = liquidBalance + bondedBalance;
     }
 
     function getAgent(uint256 id) public view returns (AgentRecord memory) {
@@ -379,9 +404,8 @@ contract LiquidMuppetsFactoryV2 is Ownable {
     }
 
     function _creatorAgentCount(address creator) private view returns (uint256) {
-        uint256 legacyCount = address(legacyFactory) == address(0)
-            ? 0
-            : legacyFactory.getCreatorAgentIds(creator).length;
+        uint256 legacyCount =
+            address(legacyFactory) == address(0) ? 0 : legacyFactory.getCreatorAgentIds(creator).length;
         return legacyCount + creatorNewAgentIds[creator].length;
     }
 

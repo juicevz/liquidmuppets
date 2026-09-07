@@ -8,9 +8,15 @@ import {IStrategyAdapter} from "../src/interfaces/IStrategyAdapter.sol";
 import {IEZWrapper, IUniswapV3PoolLike} from "../src/interfaces/IEZManager.sol";
 import {PolicyExecutor} from "../src/PolicyExecutor.sol";
 import {LiquidMuppetsFactory} from "../src/LiquidMuppetsFactory.sol";
-import {ILegacyLiquidMuppetsFactory, LiquidMuppetsFactoryV2} from "../src/LiquidMuppetsFactoryV2.sol";
+import {
+    ILegacyLiquidMuppetsFactory,
+    IMuppetBondBalance,
+    LiquidMuppetsFactoryV2
+} from "../src/LiquidMuppetsFactoryV2.sol";
 import {KeyMarketplace} from "../src/KeyMarketplace.sol";
 import {FeeRwaReserve} from "../src/FeeRwaReserve.sol";
+import {MuppetAgentBond} from "../src/MuppetAgentBond.sol";
+import {IMuppetAgentBondRewards, IWrappedRevenueToken, MuppetRevenueRouter} from "../src/MuppetRevenueRouter.sol";
 import {EZManagerPoolAdapter, IAggregatorV3Like} from "../src/adapters/EZManagerPoolAdapter.sol";
 
 interface ISafeLike {
@@ -22,6 +28,8 @@ interface ISafeLike {
 contract DeployFactoryV2 is Script {
     uint256 private constant CHAIN_ID = 4663;
     uint256 private constant MINIMUM_ACCESS_BALANCE = 15_000 ether;
+    uint40 private constant AGENT_BOND_LOCK = 30 days;
+    address private constant PONS_FEE_ESCROW = 0xd3AFEB2a57f70eF218Aa82451c51B2fb0416Ac9e;
     IERC20 private constant MUPPETS = IERC20(0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189);
     IERC20 private constant USDG = IERC20(0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168);
     IERC20 private constant WETH = IERC20(0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73);
@@ -58,9 +66,26 @@ contract DeployFactoryV2 is Script {
         uint256 deploymentBlock = block.number;
         vm.startBroadcast(deployerKey);
         KeyMarketplace marketV2 = new KeyMarketplace(deployer, payable(address(RESERVE)), 300);
+        MuppetAgentBond agentBond =
+            new MuppetAgentBond(deployer, MUPPETS, WETH, MINIMUM_ACCESS_BALANCE, AGENT_BOND_LOCK);
+        MuppetRevenueRouter revenueRouter = new MuppetRevenueRouter(
+            deployer,
+            PONS_FEE_ESCROW,
+            IWrappedRevenueToken(address(WETH)),
+            IMuppetAgentBondRewards(address(agentBond)),
+            payable(address(RESERVE)),
+            payable(safe)
+        );
+        agentBond.setKeyRegistry(address(LEGACY_MARKET), true);
+        agentBond.setKeyRegistry(address(marketV2), true);
+        agentBond.setRewardNotifier(address(revenueRouter));
+        revenueRouter.setMarketplace(address(LEGACY_MARKET), true);
+        revenueRouter.setMarketplace(address(marketV2), true);
+        marketV2.setTreasury(payable(address(revenueRouter)));
         LiquidMuppetsFactoryV2 factoryV2 = new LiquidMuppetsFactoryV2(
             deployer,
             MUPPETS,
+            IMuppetBondBalance(address(agentBond)),
             MINIMUM_ACCESS_BALANCE,
             POLICY,
             marketV2,
@@ -76,17 +101,24 @@ contract DeployFactoryV2 is Script {
         // This switch makes every direct V1 createAgent call revert at policy registration.
         // Existing V1 vault policies, recalls, redemptions, asks and bids remain untouched.
         POLICY.setFactory(address(factoryV2));
+        LEGACY_MARKET.setTreasury(payable(address(revenueRouter)));
 
         LEGACY_FACTORY.transferOwnership(safe);
         LEGACY_MARKET.transferOwnership(safe);
         POLICY.transferOwnership(safe);
         RESERVE.transferOwnership(safe);
+        agentBond.transferOwnership(safe);
+        revenueRouter.transferOwnership(safe);
         marketV2.transferOwnership(safe);
         factoryV2.transferOwnership(safe);
         vm.stopBroadcast();
 
         require(factoryV2.owner() == safe && factoryV2.governanceReady(), "FactoryV2 governance incomplete");
         require(!factoryV2.launchesEnabled(), "launches must remain off before source verification");
+        require(agentBond.paused() && revenueRouter.paused(), "revenue contracts must remain paused");
+        require(agentBond.rewardNotifier() == address(revenueRouter), "revenue notifier mismatch");
+        require(LEGACY_MARKET.treasury() == address(revenueRouter), "legacy market routing inactive");
+        require(marketV2.treasury() == address(revenueRouter), "V2 market routing inactive");
         require(POLICY.factory() == address(factoryV2), "FactoryV2 policy registration inactive");
         require(factoryV2.legacyAgentCount() == LEGACY_FACTORY.agentCount(), "legacy count mismatch");
 
@@ -94,6 +126,8 @@ contract DeployFactoryV2 is Script {
         console2.log("safeThreshold", threshold);
         console2.log("factoryV2", address(factoryV2));
         console2.log("keyMarketplaceV2", address(marketV2));
+        console2.log("agentBond", address(agentBond));
+        console2.log("revenueRouter", address(revenueRouter));
         console2.log("nvdaAdapter", address(nvdaAdapter));
         console2.log("legacyFactory", address(LEGACY_FACTORY));
         console2.log("legacyKeyMarketplace", address(LEGACY_MARKET));
@@ -108,12 +142,16 @@ contract DeployFactoryV2 is Script {
             vm.serializeUint(root, "safeThreshold", threshold);
             vm.serializeAddress(root, "factory", address(factoryV2));
             vm.serializeAddress(root, "keyMarketplace", address(marketV2));
+            vm.serializeAddress(root, "agentBond", address(agentBond));
+            vm.serializeAddress(root, "revenueRouter", address(revenueRouter));
+            vm.serializeAddress(root, "ponsFeeEscrow", PONS_FEE_ESCROW);
             vm.serializeAddress(root, "nvdaAdapter", address(nvdaAdapter));
             vm.serializeAddress(root, "legacyFactory", address(LEGACY_FACTORY));
             vm.serializeAddress(root, "legacyKeyMarketplace", address(LEGACY_MARKET));
             vm.serializeAddress(root, "policyExecutor", address(POLICY));
             vm.serializeAddress(root, "feeRwaReserve", address(RESERVE));
             vm.serializeAddress(root, "muppetsToken", address(MUPPETS));
+            vm.serializeAddress(root, "WETH", address(WETH));
             vm.serializeString(root, "minimumMuppetsRaw", vm.toString(MINIMUM_ACCESS_BALANCE));
             vm.serializeUint(root, "legacyAgentCount", factoryV2.legacyAgentCount());
             string memory json = vm.serializeString(root, "status", "deployed-pending-verification");

@@ -12,12 +12,25 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import Settings, settings
 from app.database import Database, KeeperRunRecord
-from app.routers import access, activity, keeper, performance, profiles, proofs, public, radar, strategies, system
+from app.routers import (
+    access,
+    activity,
+    keeper,
+    performance,
+    profiles,
+    proofs,
+    public,
+    radar,
+    revenue,
+    strategies,
+    system,
+)
 from app.services.activity import ActivityService
 from app.services.chain import ChainService
 from app.services.performance import PerformanceService
 from app.services.proofs import PROOF_BOUNDARY, ProofService
 from app.services.public_data import PublicDataService
+from app.services.revenue import RevenueService
 from app.services.token_gate import TokenGateService
 
 logger = logging.getLogger(__name__)
@@ -31,6 +44,7 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
     performance_service = PerformanceService(app_settings, database, chain)
     public_data_service = PublicDataService(app_settings, database, activity_service, token_gate)
     proof_service = ProofService(app_settings, database, activity_service, chain)
+    revenue_service = RevenueService(app_settings, chain.web3)
 
     @asynccontextmanager
     async def lifespan(live_app: FastAPI) -> AsyncIterator[None]:
@@ -74,7 +88,7 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
 
     app = FastAPI(
         title="LiquidMuppets Strategy API",
-        version="0.8.0",
+        version="0.9.0",
         docs_url="/api/docs",
         openapi_url="/api/openapi.json",
         lifespan=lifespan,
@@ -88,6 +102,7 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
     app.state.token_gate = token_gate
     app.state.proofs = proof_service
     app.state.proofs_boundary = PROOF_BOUNDARY
+    app.state.revenue = revenue_service
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(app_settings.cors_origins),
@@ -104,6 +119,7 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
     app.include_router(performance.router, prefix="/api/v1")
     app.include_router(radar.router, prefix="/api/v1")
     app.include_router(public.router, prefix="/api/v1")
+    app.include_router(revenue.router, prefix="/api/v1")
     app.include_router(proofs.api_router, prefix="/api/v1")
     app.include_router(proofs.share_router)
     return app

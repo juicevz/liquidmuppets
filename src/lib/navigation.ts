@@ -10,6 +10,7 @@ export const pathForView: Record<Exclude<View, 'performance' | 'creator' | 'proo
   pulse: '/app/pulse',
   proofs: '/app/proofs',
   monitor: '/app/watchlist',
+  revenue: '/app/revenue',
 }
 
 export function viewFromPath(pathname: string): View {
@@ -20,6 +21,7 @@ export function viewFromPath(pathname: string): View {
   if (/^\/app\/proof\/[a-z0-9-]+$/.test(path)) return 'proof'
   if (path === '/app/proofs') return 'proofs'
   if (path === '/app/watchlist') return 'monitor'
+  if (path === '/app/revenue') return 'revenue'
   if (path === '/app/pulse') return 'pulse'
   if (path === '/app/create') return 'create'
   if (path === '/app/portfolio') return 'portfolio'

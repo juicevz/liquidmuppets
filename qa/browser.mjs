@@ -139,6 +139,8 @@ const accessGateProof = await page.evaluate(async ({ tokenAddress }) => {
       liveRead: accessResponse.ok
         && access.configured === true
         && access.decimals === 18
+        && access.walletBalance === '0'
+        && access.bondedBalance === '0'
         && access.minimumRaw === '15000000000000000000000'
         && access.slotSize === '15000'
         && access.slotCount === 0
@@ -166,6 +168,8 @@ const devCapacityProof = await page.evaluate(async ({ wallet }) => {
   return accessResponse.ok
     && profileResponse.ok
     && access.balance === '0'
+    && access.walletBalance === '0'
+    && access.bondedBalance === '0'
     && access.slotCount === 0
     && access.slotsUsed === 3
     && access.slotsAvailable === 0
@@ -635,6 +639,41 @@ results.portfolioChainNumberRemoved = !((await page.locator('.portfolio-page').i
 
 await page.close()
 page = await desktop.newPage()
+watch(page, 'revenue')
+await page.goto(`${baseUrl}/app/revenue`, { waitUntil: 'networkidle' })
+await page.getByRole('heading', { name: 'Revenue Engine.' }).waitFor({ timeout: 60_000 })
+results.revenueTitle = await page.title()
+results.revenuePending = await page.getByText('activation pending', { exact: true }).count() === 1
+results.revenueFeeDestinations = await page.locator('.revenue-route-grid article').count()
+results.revenueRouterSplits = await page.locator('.revenue-router-split > span').count()
+results.revenueActivationChecks = await page.locator('.revenue-checks > span').count()
+results.revenuePonsObserved = await page.getByText(/block [\d,]+/i).count() > 0
+results.revenueBuybackOff = await page.getByText('off', { exact: true }).count() === 1
+results.revenueNoReceipt = await page.getByText('No revenue receipt yet.', { exact: true }).count() === 1
+results.revenueNoInventedHistory = await page.getByText(/does not backfill a pretend reward history or APY/i).count() === 1
+results.revenueEndpoint = await page.evaluate(async () => {
+  const response = await fetch('/api/v1/revenue', { cache: 'no-store' })
+  const body = await response.json()
+  return response.ok
+    && body.status === 'activation_pending'
+    && body.pons?.available === true
+    && body.pons?.buyback_enabled === false
+    && Array.isArray(body.target_fee_route)
+    && body.target_fee_route.length === 5
+    && body.reward_unit?.muppets === '15000'
+    && body.router_split?.agent_bonds === '50%'
+    && body.router_split?.stock_reserve === '30%'
+    && body.router_split?.operations === '20%'
+    && body.router?.deployed === false
+    && body.bond?.deployed === false
+    && Array.isArray(body.receipts)
+    && body.receipts.length === 0
+})
+results.revenueOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
+await page.screenshot({ path: new URL('revenue-engine.png', screenshotDir).pathname, fullPage: true })
+
+await page.close()
+page = await desktop.newPage()
 watch(page, 'docs')
 await page.goto(`${baseUrl}/docs`, { waitUntil: 'networkidle' })
 results.docsTitle = await page.title()
@@ -645,6 +684,8 @@ results.docsSimpleCreator = await page.getByText(/Creation now has three stages/
 results.docsOptionalKeyMarket = await page.getByText(/Opening an Agent Key market is optional and separate after launch/i).count() === 1
 results.docsSevenPets = await page.getByRole('heading', { name: 'Seven pets, three live tasks' }).count() === 1
 results.docsFeeReserve = await page.getByRole('heading', { name: 'Marketplace fee reserve' }).count() === 1
+results.docsRevenue = await page.getByRole('heading', { name: 'Revenue Engine and Agent Bonds' }).count() === 1
+results.docsRevenueBoundary = await page.getByText(/not yet deployed on mainnet/i).count() === 1
 results.docsPerformance = await page.getByRole('heading', { name: 'Public Muppet performance' }).count() === 1
 results.docsPerformanceMarketplace = await page.getByText(/select any two Muppets to compare/i).count() === 1
 results.docsCreatorProfiles = await page.getByText(/Every creator wallet has a shareable/i).count() === 1
@@ -744,6 +785,9 @@ results.mobileLaunchOverflow = await mobilePage.evaluate(() => document.document
 await mobilePage.screenshot({ path: new URL('launch-mobile.png', screenshotDir).pathname, fullPage: false })
 await mobilePage.goto(`${baseUrl}/docs`, { waitUntil: 'networkidle' })
 results.mobileDocsOverflow = await mobilePage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
+await mobilePage.goto(`${baseUrl}/app/revenue`, { waitUntil: 'networkidle' })
+await mobilePage.getByRole('heading', { name: 'Revenue Engine.' }).waitFor({ timeout: 60_000 })
+results.mobileRevenueOverflow = await mobilePage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
 await mobilePage.goto(`${baseUrl}/app/muppet/1`, { waitUntil: 'domcontentloaded' })
 await mobilePage.getByRole('heading', { name: 'range fox' }).waitFor({ timeout: 60_000 })
 results.mobilePerformanceOverflow = await mobilePage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
@@ -797,6 +841,9 @@ results.narrowAppOverflow = await narrowPage.evaluate(() => document.documentEle
 results.narrowHeaderVisible = await narrowPage.locator('.mobile-app-nav').isVisible()
 await narrowPage.goto(`${baseUrl}/docs`, { waitUntil: 'networkidle' })
 results.narrowDocsOverflow = await narrowPage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
+await narrowPage.goto(`${baseUrl}/app/revenue`, { waitUntil: 'networkidle' })
+await narrowPage.getByRole('heading', { name: 'Revenue Engine.' }).waitFor({ timeout: 60_000 })
+results.narrowRevenueOverflow = await narrowPage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
 await narrowPage.goto(`${baseUrl}/app/muppet/1`, { waitUntil: 'domcontentloaded' })
 await narrowPage.getByRole('heading', { name: 'range fox' }).waitFor({ timeout: 60_000 })
 results.narrowPerformanceOverflow = await narrowPage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
@@ -1015,14 +1062,27 @@ const failed =
   || !results.portfolioHonestCopy
   || !results.portfolioConnectState
   || !results.portfolioChainNumberRemoved
+  || results.revenueTitle !== 'Revenue Engine | LIQUIDMUPPETS'
+  || !results.revenuePending
+  || results.revenueFeeDestinations !== 5
+  || results.revenueRouterSplits !== 4
+  || results.revenueActivationChecks !== 5
+  || !results.revenuePonsObserved
+  || !results.revenueBuybackOff
+  || !results.revenueNoReceipt
+  || !results.revenueNoInventedHistory
+  || !results.revenueEndpoint
+  || results.revenueOverflow
   || results.docsTitle !== 'Docs | LIQUIDMUPPETS'
-  || results.docsSections !== 21
+  || results.docsSections !== 22
   || !results.docsTokenGate
   || !results.docsCreatorSlotFormula
   || !results.docsSimpleCreator
   || !results.docsOptionalKeyMarket
   || !results.docsSevenPets
   || !results.docsFeeReserve
+  || !results.docsRevenue
+  || !results.docsRevenueBoundary
   || !results.docsPerformance
   || !results.docsPerformanceMarketplace
   || !results.docsCreatorProfiles
@@ -1052,6 +1112,7 @@ const failed =
   || results.mobileJobColumns !== 1
   || results.mobileLaunchOverflow
   || results.mobileDocsOverflow
+  || results.mobileRevenueOverflow
   || results.mobilePerformanceOverflow
   || !results.mobilePerformanceKeyVisible
   || results.mobileCreatorOverflow
@@ -1060,7 +1121,7 @@ const failed =
   || results.mobileProofColumns !== 1
   || results.mobileMonitorOverflow
   || !results.mobileRadarScrollsInside
-  || results.mobileNavItems !== 6
+  || results.mobileNavItems !== 7
   || !results.mobileNavSingleRow
   || !results.mobileNavVisible
   || results.mobileCommandCenterOverflow
@@ -1069,6 +1130,7 @@ const failed =
   || !results.narrowCompareButtonVisible
   || results.narrowComparisonColumns !== 1
   || results.narrowDocsOverflow
+  || results.narrowRevenueOverflow
   || results.narrowPerformanceOverflow
   || results.narrowProofOverflow
   || results.narrowProofColumns !== 1

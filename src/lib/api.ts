@@ -14,6 +14,8 @@ export interface ProtocolConfig {
   keyMarketplace: `0x${string}` | null
   legacyKeyMarketplace: `0x${string}` | null
   feeRwaReserve: `0x${string}` | null
+  revenueRouter: `0x${string}` | null
+  agentBond: `0x${string}` | null
   testUSDG: `0x${string}` | null
   testWETH: `0x${string}` | null
   stablePool: `0x${string}` | null
@@ -75,6 +77,10 @@ export interface TokenAccess {
   decimals: number | null
   balance: string | null
   balanceRaw: string | null
+  walletBalance: string | null
+  walletBalanceRaw: string | null
+  bondedBalance: string | null
+  bondedBalanceRaw: string | null
   minimumRaw: string | null
   slotSize: string
   slotSizeRaw: string | null
@@ -563,6 +569,110 @@ export async function fetchRwaReserve(): Promise<RwaReserveState> {
     }
   }
   throw lastError
+}
+
+export interface RevenueContractState {
+  deployed: boolean
+  address: `0x${string}` | null
+  paused?: boolean
+  block_number?: number
+  total_pons_revenue?: string
+  total_marketplace_revenue?: string
+  total_funding_received?: string
+  total_revenue_routed?: string
+  total_bond_rewards_delivered?: string
+  total_stock_reserve_routed?: string
+  total_operations_routed?: string
+  pending_bond_rewards_native?: string
+  last_route_at?: string
+  total_reward_units?: string
+  total_bonded_muppets?: string
+  total_rewards_notified?: string
+  total_rewards_claimed?: string
+  error?: string
+}
+
+export interface RevenueState {
+  generated_at: string
+  status: 'live' | 'activation_pending'
+  status_detail: string
+  network: { chain_id: number; chain_name: string; explorer_url: string }
+  contracts: {
+    muppets: `0x${string}` | null
+    weth: `0x${string}`
+    revenue_router: `0x${string}` | null
+    agent_bond: `0x${string}` | null
+    stock_reserve: `0x${string}` | null
+    pons_fee_policy: `0x${string}` | null
+    pons_fee_escrow: `0x${string}` | null
+    pons_curve: `0x${string}` | null
+    pons_pool_id: `0x${string}` | null
+  }
+  reward_unit: {
+    muppets: string
+    bound_agent_keys: string
+    lock_days: number
+    formula: string
+    creator_slots: string
+  }
+  target_fee_route: Array<{ id: string; label: string; percent: string }>
+  router_split: {
+    input: string
+    agent_bonds: string
+    stock_reserve: string
+    operations: string
+    cadence: string
+    zero_revenue_rule: string
+  }
+  pons: {
+    available: boolean
+    fee_policy: `0x${string}` | null
+    pool_id: `0x${string}` | null
+    registered?: boolean
+    token?: `0x${string}`
+    creator?: `0x${string}`
+    creator_fee_recipient?: `0x${string}`
+    protocol_fee_recipient?: `0x${string}`
+    creator_tax_bps?: number
+    hook_fee_bps?: number
+    protocol_fee_share_bps?: number
+    buyback_share_bps?: number
+    buyback_enabled?: boolean
+    current_protocol_fee?: string
+    current_buyback_fee?: string
+    current_creator_revenue?: string
+    block_number?: number
+    observed_at?: string
+    error?: string
+  }
+  router: RevenueContractState
+  bond: RevenueContractState
+  activation_checks: Array<{ label: string; complete: boolean }>
+  tracking_started_at: string | null
+  receipt_status: string
+  receipts: Array<{
+    action: string
+    contract: `0x${string}`
+    tx_hash: `0x${string}`
+    block_number: number
+    timestamp: string
+    url: string
+  }>
+  wallet: {
+    address: `0x${string}`
+    available: boolean
+    bonded_muppets_raw?: string
+    reward_units?: string
+    pending_weth_raw?: string
+    block_number?: number
+    error?: string
+  } | null
+  boundaries: string[]
+}
+
+export function fetchRevenue(wallet?: string): Promise<RevenueState> {
+  const query = wallet ? `?wallet=${encodeURIComponent(wallet)}` : ''
+  return request(`/revenue${query}`, { cache: 'no-store' })
 }
 
 export interface KeeperResult {

@@ -71,6 +71,15 @@ const keyAbi = [
   { type: 'function', name: 'bind', stateMutability: 'nonpayable', inputs: [{ type: 'uint256' }], outputs: [] },
 ] as const
 
+const agentBondAbi = [
+  { type: 'function', name: 'unitsByKey', stateMutability: 'view', inputs: [{ type: 'address' }, { type: 'address' }], outputs: [{ type: 'uint256' }] },
+  { type: 'function', name: 'availableBoundKeys', stateMutability: 'view', inputs: [{ type: 'address' }, { type: 'address' }], outputs: [{ type: 'uint256' }] },
+  { type: 'function', name: 'lockedUntil', stateMutability: 'view', inputs: [{ type: 'address' }, { type: 'address' }], outputs: [{ type: 'uint40' }] },
+  { type: 'function', name: 'bond', stateMutability: 'nonpayable', inputs: [{ type: 'address' }, { type: 'uint256' }], outputs: [] },
+  { type: 'function', name: 'unbond', stateMutability: 'nonpayable', inputs: [{ type: 'address' }, { type: 'uint256' }], outputs: [] },
+  { type: 'function', name: 'claimReward', stateMutability: 'nonpayable', inputs: [], outputs: [{ type: 'uint256' }] },
+] as const
+
 const vaultAbi = [
   ...erc20Abi,
   { type: 'function', name: 'asset', stateMutability: 'view', inputs: [], outputs: [{ type: 'address' }] },
@@ -744,6 +753,70 @@ export async function bindKeys(config: ProtocolConfig, provider: WalletProvider,
   const client = createProtocolClient(config)
   return (await sendAndWait(provider, client, account, agent.key.address, encodeFunctionData({
     abi: keyAbi, functionName: 'bind', args: [BigInt(quantity)],
+  }))).transactionHash
+}
+
+export interface AgentBondKeyPosition {
+  committedUnits: bigint
+  availableBoundKeys: bigint
+  lockedUntil: number
+}
+
+export async function readAgentBondKeyPosition(
+  config: ProtocolConfig,
+  account: Address,
+  key: Address,
+): Promise<AgentBondKeyPosition> {
+  if (!config.agentBond) throw new Error('Agent Bond is not configured.')
+  const client = createProtocolClient(config, { fresh: true })
+  const [committedUnits, availableBoundKeys, lockedUntil] = await Promise.all([
+    client.readContract({ address: config.agentBond, abi: agentBondAbi, functionName: 'unitsByKey', args: [account, key] }),
+    client.readContract({ address: config.agentBond, abi: agentBondAbi, functionName: 'availableBoundKeys', args: [account, key] }),
+    client.readContract({ address: config.agentBond, abi: agentBondAbi, functionName: 'lockedUntil', args: [account, key] }),
+  ])
+  return { committedUnits, availableBoundKeys, lockedUntil: Number(lockedUntil) }
+}
+
+export async function bondAgentKeyUnit(
+  config: ProtocolConfig,
+  provider: WalletProvider,
+  account: Address,
+  key: Address,
+): Promise<Hash[]> {
+  if (!config.agentBond || !config.accessGate.tokenAddress) throw new Error('Agent Bond is not configured.')
+  const client = createProtocolClient(config)
+  const amount = parseUnits(config.accessGate.slotSize, 18)
+  const approval = await sendAndWait(provider, client, account, config.accessGate.tokenAddress, encodeFunctionData({
+    abi: erc20Abi, functionName: 'approve', args: [config.agentBond, amount],
+  }))
+  const bondReceipt = await sendAndWait(provider, client, account, config.agentBond, encodeFunctionData({
+    abi: agentBondAbi, functionName: 'bond', args: [key, 1n],
+  }))
+  return [approval.transactionHash, bondReceipt.transactionHash]
+}
+
+export async function unbondAgentKeyUnit(
+  config: ProtocolConfig,
+  provider: WalletProvider,
+  account: Address,
+  key: Address,
+): Promise<Hash> {
+  if (!config.agentBond) throw new Error('Agent Bond is not configured.')
+  const client = createProtocolClient(config)
+  return (await sendAndWait(provider, client, account, config.agentBond, encodeFunctionData({
+    abi: agentBondAbi, functionName: 'unbond', args: [key, 1n],
+  }))).transactionHash
+}
+
+export async function claimAgentBondReward(
+  config: ProtocolConfig,
+  provider: WalletProvider,
+  account: Address,
+): Promise<Hash> {
+  if (!config.agentBond) throw new Error('Agent Bond is not configured.')
+  const client = createProtocolClient(config)
+  return (await sendAndWait(provider, client, account, config.agentBond, encodeFunctionData({
+    abi: agentBondAbi, functionName: 'claimReward', args: [],
   }))).transactionHash
 }
 
