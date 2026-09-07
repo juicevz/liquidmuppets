@@ -2,6 +2,7 @@ import type { View } from '../types'
 
 export const pathForView: Record<Exclude<View, 'performance' | 'creator' | 'proof'>, string> = {
   landing: '/',
+  about: '/about',
   marketplace: '/app',
   portfolio: '/app/portfolio',
   create: '/app/create',
@@ -24,6 +25,7 @@ export function viewFromPath(pathname: string): View {
   if (path === '/app/portfolio') return 'portfolio'
   if (path === '/app') return 'marketplace'
   if (path === '/docs') return 'docs'
+  if (path === '/about') return 'about'
   return 'landing'
 }
 

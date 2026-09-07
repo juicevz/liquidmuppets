@@ -110,8 +110,8 @@ const ultra = await ultraBrowser.newContext({ viewport: { width: 1920, height: 1
 const ultraPage = await ultra.newPage()
 watch(ultraPage, '4k')
 await ultraPage.goto(baseUrl, { waitUntil: 'networkidle' })
-await ultraPage.waitForSelector('.hero-world-art img')
-results.hero4kSelected = await ultraPage.locator('.hero-world-art img').evaluate((node) => node.currentSrc.includes('4k'))
+await ultraPage.waitForSelector('.simple-home-art img')
+results.hero4kSelected = await ultraPage.locator('.simple-home-art img').evaluate((node) => node.currentSrc.includes('4k'))
 await ultra.close()
 await ultraBrowser.close()
 
@@ -178,16 +178,16 @@ const devCapacityProof = await page.evaluate(async ({ wallet }) => {
 }, { wallet: expectedDevWallet })
 results.devWalletCapacity = devCapacityProof
 results.landingTitle = await page.title()
-results.heroHeading = (await page.locator('.hero h1').innerText()).replace(/\s+/g, ' ').trim()
+results.homeHeading = (await page.locator('.simple-home h1').innerText()).replace(/\s+/g, ' ').trim()
 results.heroAgentCount = await page.locator('.pixel-agent').count()
-results.storyLeaves = await page.locator('.folio-index li').count()
-results.strategyCards = await page.locator('.strategy-roles .type-grid article').count()
-results.petPreviewCards = await page.locator('.landing-pet-card').count()
-results.roadmapPhases = await page.locator('#roadmap .roadmap-card').count()
-results.roadmapShipped = await page.locator('#roadmap .roadmap-card-shipped').count()
-results.roadmapRepository = await page.getByRole('link', { name: /Public repository/i }).getAttribute('href')
-results.roadmapBoundary = await page.getByText(/Shipped means live or published/i).count() === 1
-results.explicitMainnetBoundary = await page.getByText(/unaudited contracts/i).count() > 0
+results.homeObjectCount = await page.locator('.simple-home-objects article').count()
+results.homeMuppetsBoundary = await page.getByText(/Unlocks creator slots. No claim on vault assets or yield/i).count() === 1
+results.homeVaultBoundary = await page.getByText(/Represent the assets deposited into one Muppet vault/i).count() === 1
+results.homeKeyBoundary = await page.getByText(/A separate speculative market. No claim on vault assets or yield/i).count() === 1
+results.homeCreatorSlot = await page.getByText(/Hold 15,000 \$MUPPETS to unlock one creator slot/i).count() === 1
+results.homeSeeWorkingHref = await page.getByRole('link', { name: 'See one working' }).getAttribute('href')
+results.homeContractAddress = await page.locator('.simple-home-ca code').innerText()
+results.homeOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
 const soundDock = page.getByRole('button', { name: /Open soundtrack controls/i })
 results.soundDockVisible = await soundDock.isVisible()
 results.soundDockPosition = await page.locator('.landing-sound-control').evaluate((node) => getComputedStyle(node).position)
@@ -241,7 +241,20 @@ await page.waitForFunction(
   { timeout: 3_000 },
 )
 results.normalMotionChanged = true
+await page.screenshot({ path: new URL('home-clarity-first.png', screenshotDir).pathname, fullPage: false })
 
+await page.goto(`${baseUrl}/about`, { waitUntil: 'networkidle' })
+await page.waitForSelector('.hero h1')
+results.aboutTitle = await page.title()
+results.heroHeading = (await page.locator('.hero h1').innerText()).replace(/\s+/g, ' ').trim()
+results.storyLeaves = await page.locator('.folio-index li').count()
+results.strategyCards = await page.locator('.strategy-roles .type-grid article').count()
+results.petPreviewCards = await page.locator('.landing-pet-card').count()
+results.roadmapPhases = await page.locator('#roadmap .roadmap-card').count()
+results.roadmapShipped = await page.locator('#roadmap .roadmap-card-shipped').count()
+results.roadmapRepository = await page.getByRole('link', { name: /Public repository/i }).getAttribute('href')
+results.roadmapBoundary = await page.getByText(/Shipped means live or published/i).count() === 1
+results.explicitMainnetBoundary = await page.getByText(/unaudited contracts/i).count() > 0
 await page.evaluate(() => {
   document.documentElement.style.scrollBehavior = 'auto'
   const heroScroll = document.querySelector('.hero-scroll')
@@ -259,7 +272,7 @@ const landingReveal = await revealLanding(page)
 results.landingRevealCount = landingReveal.count
 results.landingHiddenReveals = landingReveal.hidden
 await page.evaluate(() => window.scrollTo({ top: 0 }))
-await page.screenshot({ path: new URL('landing-functional.png', screenshotDir).pathname, fullPage: false })
+await page.screenshot({ path: new URL('about-functional.png', screenshotDir).pathname, fullPage: false })
 
 await page.close()
 page = await desktop.newPage()
@@ -267,54 +280,44 @@ watch(page, 'create')
 await page.goto(`${baseUrl}/app/create`, { waitUntil: 'networkidle' })
 results.networkPillRemoved = await page.locator('.network-pill').count() === 0
 results.createChainNumberRemoved = !((await page.locator('.create-page').innerText()).includes('4663'))
-results.petPickerCount = await page.locator('.pet-picker button').count()
-results.builderProgressSteps = await page.locator('.compact-builder-progress button').count()
+results.petPickerCount = await page.locator('.guided-pet-grid button').count()
+results.builderProgressSteps = await page.locator('.guided-builder-steps > button').count()
 results.descriptionInputs = await page.locator('textarea, input[name="description"]').count()
 results.creatorSlotsOnLaunch = await page.getByRole('heading', { name: 'Creator Slots' }).count() === 1
 results.creatorSlotMetricsOnLaunch = await page.locator('.creator-slots-grid > span').count()
-results.appearanceCopy = await page.getByText(/Appearance changes no permissions/i).count() === 1
-await page.getByRole('button', { name: /Continue/ }).click()
-await page.getByText('What should this pet do?').waitFor()
-results.taskPickerCount = await page.locator('.task-picker button').count()
-results.taskMoneyPath = await page.locator('.task-money-path').count() === 1
-results.taskDetails = await page.locator('.task-detail-grid > div').count() === 3
-await page.getByRole('button', { name: /NVDA range/i }).click()
-results.nvdaCandidateVisible = await page.getByRole('button', { name: /NVDA range/i }).getAttribute('aria-pressed') === 'true'
-await page.getByRole('button', { name: /Continue/ }).click()
-await page.getByText('Choose where this pet can work.').waitFor()
-results.candidateMarketReviewOptions = await page.locator('.strategy-market-grid .market-review').count()
-results.candidateCannotContinue = await page.getByRole('button', { name: /Continue/ }).isDisabled()
-await page.locator('.compact-builder-progress button').filter({ hasText: 'Task' }).click()
-await page.getByRole('button', { name: /ETH range/i }).click()
-results.ethRangeSelectable = await page.getByRole('button', { name: /ETH range/i }).getAttribute('aria-pressed') === 'true'
-results.ethRangeExplained = await page.getByText(/Converts WETH through the canonical/i).count() === 1
-await page.getByRole('button', { name: /Launch pool/i }).click()
-results.launchPoolSelectable = await page.getByRole('button', { name: /Launch pool/i }).getAttribute('aria-pressed') === 'true'
-results.launchPoolExplained = await page.getByText(/Keeps a small WETH position/i).count() === 1
-await page.getByRole('button', { name: /ETH range/i }).click()
-await page.getByRole('button', { name: /Continue/ }).click()
-await page.getByText('Choose where this pet can work.').waitFor()
-results.marketUniverseOptions = await page.locator('.strategy-market-grid button').count()
-results.marketReviewOptions = await page.locator('.strategy-market-grid .market-review').count()
-results.liveMarketDefault = await page.getByRole('button', { name: /ETH market/i }).getAttribute('aria-pressed') === 'true'
-results.marketPairs = await page.locator('.strategy-market-pair').allTextContents()
-results.marketChecks = await page.locator('.strategy-market-detail li').count()
-results.liveRouteAllowsContinue = !(await page.getByRole('button', { name: /Continue/ }).isDisabled())
-await page.screenshot({ path: new URL('create-market-universe.png', screenshotDir).pathname, fullPage: false })
-await page.getByRole('button', { name: /Continue/ }).click()
-await page.getByText('Name it and open the floor.').waitFor()
-results.floorField = await page.locator('label').filter({ hasText: 'base floor' }).locator('input').count() === 1
-results.keySupplyField = await page.locator('label').filter({ hasText: 'Key supply' }).locator('input').count() === 1
-results.firstAskCopy = await page.getByText(/This becomes a real ask/i).count() === 1
-await page.screenshot({ path: new URL('create-seven-pets.png', screenshotDir).pathname, fullPage: false })
-await page.locator('label').filter({ hasText: 'muppet name' }).locator('input').fill('browser gate')
-await page.locator('label').filter({ hasText: 'Key ticker' }).locator('input').fill('GATE')
-await page.getByRole('button', { name: /Continue/ }).click()
+results.appearanceCopy = await page.getByText(/does not change the vault, permissions or risk/i).count() === 1
+results.nameRequired = await page.getByRole('button', { name: /Choose one job/i }).isDisabled()
+await page.locator('.guided-name-field input').fill('browser gate')
+await page.screenshot({ path: new URL('create-pet-and-name.png', screenshotDir).pathname, fullPage: false })
+await page.getByRole('button', { name: /Choose one job/i }).click()
+await page.getByText('What should its vault do?').waitFor()
+results.taskPickerCount = await page.locator('.guided-job-grid > button').count()
+results.candidateRoutesHidden = await page.getByText(/NVDA range|AAPL range|SPY range/i).count() === 0
+results.stableJobVisible = await page.getByRole('button', { name: /Earn on stablecoins/i }).count() === 1
+results.ethRangeSelectable = await page.getByRole('button', { name: /Run an ETH range/i }).count() === 1
+results.launchReserveSelectable = await page.getByRole('button', { name: /Keep a launch reserve/i }).count() === 1
+await page.getByRole('button', { name: /Run an ETH range/i }).click()
+results.ethRangeSelected = await page.getByRole('button', { name: /Run an ETH range/i }).getAttribute('aria-pressed') === 'true'
+results.jobAllocationVisible = await page.getByText(/up to 85% deployed/i).count() === 1
+await page.getByText('Advanced details', { exact: true }).click()
+results.advancedMarket = await page.getByText(/WETH · WETH \/ USDG/i).count() === 1
+results.marketChecks = await page.locator('.guided-advanced-grid li').count()
+results.noPromisedApy = await page.getByText(/no APY is promised/i).count() === 0
+results.keyBoundaryBeforeLaunch = await page.getByText(/Keys do not own vault assets or receive vault yield/i).count() === 1
+await page.screenshot({ path: new URL('create-live-jobs.png', screenshotDir).pathname, fullPage: false })
+await page.getByRole('button', { name: /Review launch \+ funding/i }).click()
+await page.getByText('Review the money path.').waitFor()
+results.plannedFundField = await page.locator('.guided-fund-plan input').count() === 1
+results.launchOneConfirmation = await page.getByText(/one wallet confirmation/i).count() === 1
+results.fundingTwoConfirmations = await page.getByText(/asset approval \+ deposit/i).count() === 1
+results.keyFieldsRemoved = await page.locator('.guided-launch-stage input').count() === 1
+results.keyMarketClosedCopy = await page.getByText(/No Keys are approved or listed during launch/i).count() === 1
 results.launchTokenGate = await page.getByText('15,000 $MUPPETS unlocks your next Creator Slot.', { exact: true }).count() === 1
 results.launchGateConnect = await page.getByRole('button', { name: 'Connect wallet' }).count() === 1
 const muppetsContractLink = page.getByRole('link', { name: `MUPPETS contract ${expectedMuppetsToken}` })
 results.launchTokenAddressLink = await muppetsContractLink.count() === 1
   && (await muppetsContractLink.getAttribute('href')) === `https://robinhoodchain.blockscout.com/address/${expectedMuppetsToken}`
+await page.screenshot({ path: new URL('create-launch-and-fund.png', screenshotDir).pathname, fullPage: false })
 
 await page.close()
 const commandCenter = await browser.newContext({ viewport: { width: 1440, height: 980 } })
@@ -322,9 +325,10 @@ await useLaunchCommandFixture(commandCenter, launchCommandFixture)
 const commandPage = await commandCenter.newPage()
 watch(commandPage, 'command-center')
 await commandPage.goto(`${baseUrl}/app/create`, { waitUntil: 'domcontentloaded' })
-await commandPage.getByRole('heading', { name: 'Muppet live. Put it to work.' }).waitFor({ timeout: 60_000 })
-results.commandCenterHeading = await commandPage.getByRole('heading', { name: 'Muppet live. Put it to work.' }).count() === 1
-results.commandReceiptStages = await commandPage.locator('.launch-stage').count()
+await commandPage.getByRole('heading', { name: 'Muppet live. Put the vault to work.' }).waitFor({ timeout: 60_000 })
+results.commandCenterHeading = await commandPage.getByRole('heading', { name: 'Muppet live. Put the vault to work.' }).count() === 1
+results.commandLaunchReceiptStages = await commandPage.locator('.single-launch-stage .launch-stage').count()
+results.commandKeyReceiptStages = await commandPage.locator('.key-stage-list .launch-stage').count()
 results.commandConfirmedStages = await commandPage.locator('.launch-stage.confirmed').count()
 await commandPage.locator('.command-fund-preview strong').first().waitFor({ timeout: 60_000 })
 await commandPage.waitForFunction(() => {
@@ -336,7 +340,9 @@ results.commandSharePreview = !((await commandPage.locator('.command-fund-previe
 results.commandKeeperTiming = await commandPage.getByText('next automatic check', { exact: true }).count() === 1
 results.commandPerformanceHref = await commandPage.getByRole('link', { name: /Open performance/i }).getAttribute('href')
 results.commandShareHref = await commandPage.getByRole('link', { name: /Share on X/i }).getAttribute('href')
-results.commandRecoveryDisclosure = await commandPage.getByText(/public transaction metadata only/i).count() === 1
+results.commandRecoveryDisclosure = await commandPage.getByText(/Public receipt metadata was saved in this browser/i).count() === 1
+results.commandKeyMarketSeparate = await commandPage.getByText(/Agent Keys are speculative collectibles/i).count() === 1
+results.commandKeyMarketOpen = await commandPage.getByText('market open', { exact: true }).count() === 1
 results.commandCenterOverflow = await commandPage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
 await commandPage.screenshot({ path: new URL('post-launch-command-center.png', screenshotDir).pathname, fullPage: true })
 await commandCenter.close()
@@ -355,7 +361,7 @@ await recoveryPage.getByRole('button', { name: /Resume launch/i }).waitFor({ tim
 results.launchRecoveryAction = await recoveryPage.getByRole('button', { name: /Resume launch/i }).count() === 1
 results.launchRecoverySubmitted = await recoveryPage.locator('.launch-stage.submitted').count()
 results.launchRecoveryWaiting = await recoveryPage.locator('.launch-stage.waiting').count()
-results.launchRecoveryCopy = await recoveryPage.getByText(/continues at the first unfinished confirmation/i).count() === 1
+results.launchRecoveryCopy = await recoveryPage.getByText(/saved the submitted receipt/i).count() === 1
 await recoveryPage.screenshot({ path: new URL('launch-recovery.png', screenshotDir).pathname, fullPage: false })
 await recovery.close()
 
@@ -635,6 +641,8 @@ results.docsTitle = await page.title()
 results.docsSections = await page.locator('.docs-layout article > section').count()
 results.docsTokenGate = await page.getByRole('heading', { name: '$MUPPETS Creator Slots' }).count() === 1
 results.docsCreatorSlotFormula = await page.getByText(/floor\(wallet balance \/ 15,000\)/i).count() === 1
+results.docsSimpleCreator = await page.getByText(/Creation now has three stages/i).count() === 1
+results.docsOptionalKeyMarket = await page.getByText(/Opening an Agent Key market is optional and separate after launch/i).count() === 1
 results.docsSevenPets = await page.getByRole('heading', { name: 'Seven pets, three live tasks' }).count() === 1
 results.docsFeeReserve = await page.getByRole('heading', { name: 'Marketplace fee reserve' }).count() === 1
 results.docsPerformance = await page.getByRole('heading', { name: 'Public Muppet performance' }).count() === 1
@@ -675,9 +683,10 @@ await degraded.route('**/api/v1/rpc', (route) => route.fulfill({
 }))
 const degradedPage = await degraded.newPage()
 await degradedPage.goto(`${baseUrl}/app/create`, { waitUntil: 'networkidle' })
-await degradedPage.getByRole('button', { name: /Continue/ }).click()
-await degradedPage.getByText('What should this pet do?').waitFor()
-results.degradedTaskPickerCount = await degradedPage.locator('.task-picker button').count()
+await degradedPage.locator('.guided-name-field input').fill('degraded test')
+await degradedPage.getByRole('button', { name: /Choose one job/i }).click()
+await degradedPage.getByText('What should its vault do?').waitFor()
+results.degradedTaskPickerCount = await degradedPage.locator('.guided-job-grid > button').count()
 results.degradedTaskWarning = await degradedPage.getByRole('alert')
   .getByText(/task selection and wallet transactions still work/i).count() === 1
 await degraded.close()
@@ -724,13 +733,15 @@ await mobilePage.goto(`${baseUrl}/app/create`, { waitUntil: 'networkidle' })
 results.mobileNavVisible = await mobilePage.locator('.mobile-app-nav').isVisible()
 results.mobileCreateOverflow = await mobilePage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
 await mobilePage.screenshot({ path: new URL('create-mobile.png', screenshotDir).pathname, fullPage: false })
-await mobilePage.getByRole('button', { name: /Continue/ }).click()
-await mobilePage.getByRole('button', { name: /ETH range/i }).click()
-await mobilePage.getByRole('button', { name: /Continue/ }).click()
-await mobilePage.getByText('Choose where this pet can work.').waitFor()
-results.mobileMarketOverflow = await mobilePage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
-results.mobileMarketColumns = await mobilePage.locator('.strategy-market-grid').evaluate((node) => getComputedStyle(node).gridTemplateColumns.split(' ').length)
-await mobilePage.screenshot({ path: new URL('market-mobile.png', screenshotDir).pathname, fullPage: false })
+await mobilePage.locator('.guided-name-field input').fill('mobile fox')
+await mobilePage.getByRole('button', { name: /Choose one job/i }).click()
+await mobilePage.getByRole('button', { name: /Run an ETH range/i }).click()
+results.mobileJobOverflow = await mobilePage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
+results.mobileJobColumns = await mobilePage.locator('.guided-job-grid').evaluate((node) => getComputedStyle(node).gridTemplateColumns.split(' ').length)
+await mobilePage.getByRole('button', { name: /Review launch \+ funding/i }).click()
+await mobilePage.getByText('Review the money path.').waitFor()
+results.mobileLaunchOverflow = await mobilePage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
+await mobilePage.screenshot({ path: new URL('launch-mobile.png', screenshotDir).pathname, fullPage: false })
 await mobilePage.goto(`${baseUrl}/docs`, { waitUntil: 'networkidle' })
 results.mobileDocsOverflow = await mobilePage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
 await mobilePage.goto(`${baseUrl}/app/muppet/1`, { waitUntil: 'domcontentloaded' })
@@ -763,7 +774,7 @@ await useLaunchCommandFixture(mobileCommand, launchCommandFixture)
 const mobileCommandPage = await mobileCommand.newPage()
 watch(mobileCommandPage, 'command-center-320px')
 await mobileCommandPage.goto(`${baseUrl}/app/create`, { waitUntil: 'domcontentloaded' })
-await mobileCommandPage.getByRole('heading', { name: 'Muppet live. Put it to work.' }).waitFor({ timeout: 60_000 })
+await mobileCommandPage.getByRole('heading', { name: 'Muppet live. Put the vault to work.' }).waitFor({ timeout: 60_000 })
 await mobileCommandPage.locator('.command-fund-preview').waitFor({ timeout: 60_000 })
 results.mobileCommandCenterOverflow = await mobileCommandPage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
 results.mobileCommandColumns = await mobileCommandPage.locator('.command-center-grid').evaluate((node) => getComputedStyle(node).gridTemplateColumns.split(' ').length)
@@ -843,6 +854,16 @@ const marketStateValid = results.marketRows > 0
 
 const failed =
   results.landingTitle !== 'LIQUIDMUPPETS | onchain liquidity agents'
+  || results.homeHeading !== 'A Muppet is an onchain vault with one job.'
+  || results.homeObjectCount !== 3
+  || !results.homeMuppetsBoundary
+  || !results.homeVaultBoundary
+  || !results.homeKeyBoundary
+  || !results.homeCreatorSlot
+  || results.homeSeeWorkingHref !== '/app/muppet/0'
+  || results.homeContractAddress.toLowerCase() !== expectedMuppetsToken.toLowerCase()
+  || results.homeOverflow
+  || results.aboutTitle !== 'How LIQUIDMUPPETS works'
   || results.heroHeading !== 'Muppets work. You set the limits.'
   || results.heroAgentCount !== 3
   || results.storyLeaves !== 4
@@ -884,35 +905,34 @@ const failed =
   || !results.networkPillRemoved
   || !results.createChainNumberRemoved
   || results.petPickerCount !== 7
-  || results.builderProgressSteps !== 5
+  || results.builderProgressSteps !== 3
   || results.descriptionInputs !== 0
   || !results.creatorSlotsOnLaunch
   || results.creatorSlotMetricsOnLaunch !== 5
   || !results.appearanceCopy
-  || results.taskPickerCount !== 7
-  || !results.taskMoneyPath
-  || !results.taskDetails
-  || !results.nvdaCandidateVisible
-  || results.candidateMarketReviewOptions !== 1
-  || !results.candidateCannotContinue
+  || !results.nameRequired
+  || results.taskPickerCount !== 3
+  || !results.candidateRoutesHidden
+  || !results.stableJobVisible
   || !results.ethRangeSelectable
-  || !results.ethRangeExplained
-  || !results.launchPoolSelectable
-  || !results.launchPoolExplained
-  || results.marketUniverseOptions !== 1
-  || results.marketReviewOptions !== 0
-  || !results.liveMarketDefault
-  || JSON.stringify(results.marketPairs) !== JSON.stringify(['WETH / USDG'])
+  || !results.launchReserveSelectable
+  || !results.ethRangeSelected
+  || !results.jobAllocationVisible
+  || !results.advancedMarket
   || results.marketChecks !== 3
-  || !results.liveRouteAllowsContinue
-  || !results.floorField
-  || !results.keySupplyField
-  || !results.firstAskCopy
+  || !results.noPromisedApy
+  || !results.keyBoundaryBeforeLaunch
+  || !results.plannedFundField
+  || !results.launchOneConfirmation
+  || !results.fundingTwoConfirmations
+  || !results.keyFieldsRemoved
+  || !results.keyMarketClosedCopy
   || !results.launchTokenGate
   || !results.launchGateConnect
   || !results.launchTokenAddressLink
   || !results.commandCenterHeading
-  || results.commandReceiptStages !== 3
+  || results.commandLaunchReceiptStages !== 1
+  || results.commandKeyReceiptStages !== 2
   || results.commandConfirmedStages !== 3
   || !results.commandFundAction
   || !results.commandSharePreview
@@ -920,10 +940,12 @@ const failed =
   || results.commandPerformanceHref !== '/app/muppet/0'
   || !results.commandShareHref?.startsWith('https://x.com/intent/post?')
   || !results.commandRecoveryDisclosure
+  || !results.commandKeyMarketSeparate
+  || !results.commandKeyMarketOpen
   || results.commandCenterOverflow
   || !results.launchRecoveryAction
   || results.launchRecoverySubmitted !== 1
-  || results.launchRecoveryWaiting !== 2
+  || results.launchRecoveryWaiting !== 0
   || !results.launchRecoveryCopy
   || results.marketHeading !== 'Pet marketplace.'
   || !results.marketChainNumberRemoved
@@ -997,6 +1019,8 @@ const failed =
   || results.docsSections !== 21
   || !results.docsTokenGate
   || !results.docsCreatorSlotFormula
+  || !results.docsSimpleCreator
+  || !results.docsOptionalKeyMarket
   || !results.docsSevenPets
   || !results.docsFeeReserve
   || !results.docsPerformance
@@ -1024,8 +1048,9 @@ const failed =
   || !results.mobileXPickerVisible
   || !results.mobileXPickerInViewport
   || results.mobileCreateOverflow
-  || results.mobileMarketOverflow
-  || results.mobileMarketColumns !== 1
+  || results.mobileJobOverflow
+  || results.mobileJobColumns !== 1
+  || results.mobileLaunchOverflow
   || results.mobileDocsOverflow
   || results.mobilePerformanceOverflow
   || !results.mobilePerformanceKeyVisible

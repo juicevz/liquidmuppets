@@ -1,11 +1,25 @@
 import { useEffect, useMemo, useState } from 'react'
 import { parseUnits, type Address, type Hash } from 'viem'
-import { Icon } from '../components/Icon'
 import { CreatorSlots } from '../components/CreatorSlots'
+import { Icon } from '../components/Icon'
 import { pets } from '../data/pets'
-import { defaultMarketForTask, marketsForTask } from '../data/strategyMarkets'
+import { defaultMarketForTask } from '../data/strategyMarkets'
 import { useProtocol } from '../hooks/useProtocol'
-import { fetchMuppetPerformance, fetchTokenAccess, type MuppetPerformance, type ProtocolConfig, type TokenAccess } from '../lib/api'
+import {
+  fetchMuppetPerformance,
+  fetchTokenAccess,
+  type MuppetPerformance,
+  type ProtocolConfig,
+  type TokenAccess,
+} from '../lib/api'
+import { actionErrorMessage } from '../lib/errors'
+import {
+  DEFAULT_AGENT_KEY_LISTING_QUANTITY,
+  DEFAULT_AGENT_KEY_REFERENCE_PRICE_ETH,
+  DEFAULT_AGENT_KEY_SUPPLY,
+  defaultFundingAmount,
+  deriveAgentKeySymbol,
+} from '../lib/launchDefaults'
 import {
   clearLaunchSession,
   createLaunchSession,
@@ -23,6 +37,7 @@ import {
   getInjectedProvider,
   launchAgent,
   loadVaultFundingTarget,
+  openAgentKeyMarket,
   previewVaultDeposit,
   type ChainAgent,
   type LaunchCheckpoint,
@@ -30,7 +45,6 @@ import {
   type LaunchResult,
   type VaultFundingTarget,
 } from '../lib/protocol'
-import { actionErrorMessage } from '../lib/errors'
 import type { StrategyTaskId } from '../types'
 
 interface CreateAgentPageProps {
@@ -39,43 +53,43 @@ interface CreateAgentPageProps {
   onConnect: () => void
 }
 
-const steps = ['Pet', 'Task', 'Market', 'Key', 'Launch'] as const
+const steps = ['Pet + name', 'Choose job', 'Launch + fund'] as const
 
-const taskDetails: Record<StrategyTaskId, { summary: string; movement: string; guardrail: string }> = {
+const jobDetails: Record<0 | 1 | 2, {
+  title: string
+  summary: string
+  movement: string
+  guardrail: string
+  deployed: string
+  idle: string
+  risk: string
+}> = {
   0: {
-    summary: 'Routes idle USDG into one fixed Morpho Blue market while the vault keeps a cash reserve.',
-    movement: 'A cycle can allocate up to the 90% target after the market, utilization, oracle, and vault-cap checks pass.',
-    guardrail: 'Depositors keep ERC-4626 vault shares. Yield is variable and withdrawals depend on available market liquidity.',
+    title: 'Earn on stablecoins',
+    summary: 'Deposit USDG. The vault can supply part of it to one fixed Morpho Blue market.',
+    movement: 'The keeper checks the market, utilization, oracle and vault cap before allocating.',
+    guardrail: 'Withdrawals depend on available market liquidity. Interest is variable and no APY is promised.',
+    deployed: 'up to 90%',
+    idle: 'at least 10%',
+    risk: 'lower',
   },
   1: {
-    summary: 'Converts WETH through the canonical WETH and USDG pool, then opens a separately-accounted EZManager range.',
-    movement: 'The first cycle deploys 85%. After the daily movement limit resets, the creator can atomically close and recenter it.',
-    guardrail: '15% stays idle, each vault is capped at 1 WETH, and EZManager currently charges a 0.4% entry fee.',
+    title: 'Run an ETH range',
+    summary: 'Deposit WETH. The vault can open a bounded WETH / USDG liquidity range.',
+    movement: 'The keeper can open or recenter the range when policy and cooldown checks pass.',
+    guardrail: 'Price movement and range position affect results. EZManager currently charges a 0.4% entry fee.',
+    deployed: 'up to 85%',
+    idle: 'at least 15%',
+    risk: 'higher',
   },
   2: {
-    summary: 'Keeps a small WETH position inside the vault\'s isolated launch-reserve adapter.',
-    movement: 'A cycle can stage 10% in the reserve. The position stays in WETH and remains recallable.',
-    guardrail: '90% stays idle, each vault is capped at 0.25 WETH, and staged WETH remains recallable at any time.',
-  },
-  3: {
-    summary: 'Prepares a USDG-accounted AAPL range through the reviewed FactoryV2 adapter interface.',
-    movement: 'The route stays disabled until the exact pool is approved by EZManager and its full exit passes a mainnet-fork test.',
-    guardrail: 'A freshness-bounded stock oracle, fixed pool identity, vault cap, and selected risk preset are required.',
-  },
-  4: {
-    summary: 'Prepares a separately-accounted NVDA range whose vault accepts USDG and returns USDG on exit.',
-    movement: 'The pool is venue-allowlisted and its full exit passed fork review. Launch remains disabled until the verified FactoryV2 migration.',
-    guardrail: 'The adapter checks venue status and oracle freshness before opening or adding to a position.',
-  },
-  5: {
-    summary: 'Prepares a defensive SPY range with USDG vault accounting and its own immutable adapter.',
-    movement: 'The route stays disabled until venue approval and the complete withdrawal path are verified on a fork.',
-    guardrail: 'The route needs an exact pool, a fresh stock oracle, a vault cap, and a FactoryV2 risk preset.',
-  },
-  6: {
-    summary: 'Reserves a reviewed template slot for one meme and WETH market. No token or pool is selected.',
-    movement: 'Governance can activate a route only after the pool, adapter and exit path are fixed onchain.',
-    guardrail: 'At least $250k liquidity, 30 days of pool age, $50k daily volume, and independent oracle evidence are required.',
+    title: 'Keep a launch reserve',
+    summary: 'Deposit WETH. The vault can stage a small amount in its isolated launch reserve.',
+    movement: 'The keeper can stage or recall the reserve inside the vault policy.',
+    guardrail: 'The staged WETH remains recallable. This route does not earn external pool fees.',
+    deployed: 'up to 10%',
+    idle: 'at least 90%',
+    risk: 'limited route',
   },
 }
 
@@ -84,13 +98,9 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
   const [step, setStep] = useState(0)
   const [petId, setPetId] = useState(0)
   const [taskId, setTaskId] = useState<StrategyTaskId>(0)
-  const [marketId, setMarketId] = useState(defaultMarketForTask(0).id)
   const [presetId, setPresetId] = useState<0 | 1 | 2>(1)
   const [name, setName] = useState('')
-  const [keySymbol, setKeySymbol] = useState('')
-  const [keySupply, setKeySupply] = useState('100')
-  const [listingQuantity, setListingQuantity] = useState('20')
-  const [floorPrice, setFloorPrice] = useState('0.01')
+  const [fundAmount, setFundAmount] = useState(defaultFundingAmount(0))
   const [progress, setProgress] = useState('')
   const [launchError, setLaunchError] = useState('')
   const [launching, setLaunching] = useState(false)
@@ -99,41 +109,28 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
   const [accessLoading, setAccessLoading] = useState(false)
 
   const pet = pets[petId]
-  const task = tasks.find((item) => item.id === taskId)
-  const marketOptions = marketsForTask(taskId)
-  const market = marketOptions.find((item) => item.id === marketId) ?? defaultMarketForTask(taskId)
-  const supply = Number(keySupply)
-  const listed = Number(listingQuantity)
-  const floor = Number(floorPrice)
-  const requiredMuppets = Number(access?.requiredForNextLaunch ?? config?.accessGate.slotSize ?? 15_000).toLocaleString('en-US')
-  const keyValid = /^[A-Za-z0-9]{2,10}$/.test(keySymbol)
-  const formReady = Boolean(
-    name.trim().length >= 2 && name.trim().length <= 32 && keyValid
-      && Number.isInteger(supply) && supply >= 10 && supply <= 100_000
-      && Number.isInteger(listed) && listed >= 1 && listed <= supply
-      && Number.isFinite(floor) && floor > 0,
-  )
-  const routeCanLaunch = Boolean(
-    config?.factory && config.keyMarketplace && formReady && Boolean(task?.live) && market,
-  )
-  const recoveryReady = Boolean(config?.factory && config.keyMarketplace && formReady)
+  const liveTasks = tasks.filter((item) => item.live && item.id <= 2)
+  const task = liveTasks.find((item) => item.id === taskId)
+  const market = defaultMarketForTask(taskId)
+  const detail = taskId <= 2 ? jobDetails[taskId as 0 | 1 | 2] : jobDetails[0]
+  const route = task ? (config?.mode === 'testnet' ? task.testnet_route : task.production_route) : ''
+  const selectedPreset = task?.risk_presets[presetId]
+  const keySymbol = deriveAgentKeySymbol(name, petId)
+  const nameReady = name.trim().length >= 2 && name.trim().length <= 32
+  const fundAmountValid = Number.isFinite(Number(fundAmount)) && Number(fundAmount) > 0
+  const formReady = nameReady && fundAmountValid
+  const routeCanLaunch = Boolean(config?.factory && formReady && task?.live && market.status === 'live')
+  const recoveryReady = Boolean(config?.factory && formReady)
   const canLaunch = routeCanLaunch && (!walletAddress || access?.eligible === true)
   const checkpoint = session?.checkpoint ?? {}
   const result = launchResultFromCheckpoint(checkpoint)
   const launchStarted = launchHasStarted(checkpoint)
   const commandAgent = result ? snapshot?.agents.find((agent) => agent.id === result.agentId) : undefined
+  const requiredMuppets = Number(access?.requiredForNextLaunch ?? config?.accessGate.slotSize ?? 15_000).toLocaleString('en-US')
   const canContinue = useMemo(
-    () => step === 0
-      || (step === 1 && Boolean(task))
-      || (step === 2 && market?.status === 'live')
-      || (step === 3 && formReady),
-    [formReady, market?.id, step, task],
+    () => step === 0 ? nameReady : step === 1 ? Boolean(task?.live) : false,
+    [nameReady, step, task?.live],
   )
-  const detail = task ? taskDetails[task.id] : null
-  const route = task
-    ? config?.mode === 'testnet' ? task.testnet_route : task.production_route
-    : ''
-  const selectedPreset = task?.risk_presets[presetId]
 
   useEffect(() => {
     if (!walletAddress) {
@@ -144,15 +141,9 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
     let active = true
     setAccessLoading(true)
     fetchTokenAccess(walletAddress)
-      .then((next) => {
-        if (active) setAccess(next)
-      })
-      .catch(() => {
-        if (active) setAccess(null)
-      })
-      .finally(() => {
-        if (active) setAccessLoading(false)
-      })
+      .then((next) => { if (active) setAccess(next) })
+      .catch(() => { if (active) setAccess(null) })
+      .finally(() => { if (active) setAccessLoading(false) })
     return () => { active = false }
   }, [walletAddress])
 
@@ -166,17 +157,13 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
     if (!stored) return
     setPetId(stored.input.petId)
     setTaskId(stored.input.taskId)
-    setMarketId(defaultMarketForTask(stored.input.taskId).id)
     setPresetId(stored.input.presetId ?? 1)
     setName(stored.input.name)
-    setKeySymbol(stored.input.keySymbol)
-    setKeySupply(String(stored.input.keySupply))
-    setListingQuantity(String(stored.input.listingQuantity))
-    setFloorPrice(stored.input.floorPriceEth)
-    setStep(4)
+    setFundAmount(stored.input.fundAmount ?? defaultFundingAmount(stored.input.taskId))
+    setStep(2)
     setProgress(launchResultFromCheckpoint(stored.checkpoint)
-      ? 'Muppet launched. Vault, Key, and first ask are live.'
-      : 'Recovered an unfinished launch. Continue from the first unconfirmed transaction.')
+      ? 'Muppet launched. Fund the vault when ready. The Agent Key market is a separate optional step.'
+      : 'Recovered an unfinished launch. Continue from the saved creation receipt.')
   }, [config?.chainId, config?.factory, walletAddress])
 
   useEffect(() => {
@@ -186,7 +173,12 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
 
   const selectTask = (nextTaskId: StrategyTaskId) => {
     setTaskId(nextTaskId)
-    setMarketId(defaultMarketForTask(nextTaskId).id)
+    setFundAmount(defaultFundingAmount(nextTaskId))
+  }
+
+  const persistSession = (next: LaunchSession) => {
+    saveLaunchSession(window.localStorage, next)
+    setSession(next)
   }
 
   const deploy = async () => {
@@ -206,10 +198,11 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
       petId,
       taskId,
       name: name.trim(),
-      keySymbol: keySymbol.trim(),
-      keySupply: supply,
-      listingQuantity: listed,
-      floorPriceEth: floorPrice,
+      keySymbol,
+      keySupply: DEFAULT_AGENT_KEY_SUPPLY,
+      listingQuantity: DEFAULT_AGENT_KEY_LISTING_QUANTITY,
+      floorPriceEth: DEFAULT_AGENT_KEY_REFERENCE_PRICE_ETH,
+      fundAmount,
       presetId: config.factoryVersion >= 2 && task?.risk_presets.length ? presetId : undefined,
     }
     let activeSession = session ?? createLaunchSession(
@@ -220,7 +213,7 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
     )
     try {
       if (!launchHasStarted(activeSession.checkpoint)) {
-        setProgress('Checking $MUPPETS access…')
+        setProgress('Checking your Creator Slot…')
         const latestAccess = await fetchTokenAccess(walletAddress)
         setAccess(latestAccess)
         if (!latestAccess.eligible) {
@@ -237,16 +230,15 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
         onProgress: setProgress,
         onCheckpoint: (nextCheckpoint) => {
           activeSession = withLaunchCheckpoint(activeSession, nextCheckpoint)
-          saveLaunchSession(window.localStorage, activeSession)
-          setSession(activeSession)
+          persistSession(activeSession)
         },
       })
-      setProgress('Muppet launched. Vault, Key, and first ask are live.')
+      setProgress('Muppet launched. Fund the vault when ready. The Agent Key market is still closed.')
       refresh()
     } catch (reason) {
       setLaunchError(actionErrorMessage(reason, 'The launch failed.'))
       setProgress(launchHasStarted(activeSession.checkpoint)
-        ? 'Launch paused. The submitted receipts are saved in this browser.'
+        ? 'Launch paused. The submitted creation receipt is saved in this browser.'
         : '')
     } finally {
       setLaunching(false)
@@ -261,287 +253,261 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
     setStep(0)
     setPetId(0)
     setTaskId(0)
-    setMarketId(defaultMarketForTask(0).id)
     setPresetId(1)
     setName('')
-    setKeySymbol('')
-    setKeySupply('100')
-    setListingQuantity('20')
-    setFloorPrice('0.01')
+    setFundAmount(defaultFundingAmount(0))
     setProgress('')
     setLaunchError('')
   }
 
   return (
-    <div className="app-page create-page live-builder-page">
-      <section className="app-page-heading create-heading">
+    <div className="app-page create-page guided-create-page">
+      <section className="app-page-heading guided-create-heading">
         <div>
-          <h1>{result ? 'Launch complete.' : 'Pick the pet. Pick the work.'}</h1>
+          <span className="guided-create-kicker"><i /> three clear steps</span>
+          <h1>{result ? 'Your Muppet is live.' : 'Create a Muppet.'}</h1>
           <p>{result
-            ? 'The Muppet is live. Fund its vault, watch the keeper, and share the public record.'
-            : 'The appearance is cosmetic. The task fixes the vault and its deployed money route.'}</p>
+            ? 'Fund its vault, watch the keeper and share its public record. The Agent Key market stays separate.'
+            : 'Pick a pet, give its vault one job, then launch and fund it. The pet is cosmetic.'}</p>
         </div>
       </section>
 
-      <CreatorSlots
-        access={access}
-        connected={Boolean(walletAddress)}
-        loading={accessLoading}
-        slotSize={config?.accessGate.slotSize}
-        explorerUrl={config?.explorerUrl}
-        tokenAddress={config?.accessGate.tokenAddress}
-      />
+      <div className="creator-capacity-strip">
+        <CreatorSlots
+          access={access}
+          connected={Boolean(walletAddress)}
+          loading={accessLoading}
+          slotSize={config?.accessGate.slotSize}
+          explorerUrl={config?.explorerUrl}
+          tokenAddress={config?.accessGate.tokenAddress}
+        />
+      </div>
 
       {(error || launchError) && <div className="protocol-error" role="alert"><Icon name="alert" />{launchError || error}</div>}
 
-      <section className="builder-shell live-builder-shell">
-        <aside className="builder-sidebar">
-          <div className="builder-progress compact-builder-progress">
+      {result && config && session ? (
+        <LaunchCommandCenter
+          agent={commandAgent}
+          chainLoading={loading}
+          config={config}
+          session={session}
+          result={result}
+          wallet={walletAddress as Address}
+          onRefresh={refresh}
+          onReset={resetLaunch}
+          onSessionChange={persistSession}
+        />
+      ) : (
+        <section className="guided-builder-shell">
+          <aside className="guided-builder-steps" aria-label="Muppet creation steps">
+            <span className="guided-steps-label">create flow</span>
             {steps.map((label, index) => (
-              <button type="button" key={label} disabled={launchStarted} className={`${step === index ? 'active' : ''}${step > index || (Boolean(result) && index === 4) ? ' complete' : ''}`} onClick={() => setStep(index)}>
-                <span>{step > index || (result && index === 4) ? <Icon name="check" /> : index + 1}</span><strong>{label}</strong>
+              <button
+                type="button"
+                key={label}
+                disabled={launchStarted}
+                className={`${step === index ? 'active' : ''}${step > index ? ' complete' : ''}`}
+                onClick={() => setStep(index)}
+              >
+                <span>{step > index ? <Icon name="check" /> : index + 1}</span>
+                <strong>{label}</strong>
               </button>
             ))}
-          </div>
-          <div className="builder-safety-note">
-            <Icon name="shield" />
-            <strong>Your wallet deploys it.</strong>
-            <p>Three confirmations create the agent, approve the initial Keys, and open the first ask.</p>
-          </div>
-        </aside>
-
-        <div className="builder-content">
-          {step === 0 && (
-            <div className="builder-step">
-              <span className="builder-step-number">01 / APPEARANCE</span>
-              <h2>Choose one of seven pets.</h2>
-              <div className="pet-picker" role="group" aria-label="Choose pet appearance">
-                {pets.map((item) => (
-                  <button type="button" className={petId === item.id ? 'active' : ''} onClick={() => setPetId(item.id)} key={item.id}>
-                    <img src={item.portrait} alt={`${item.name} pet`} /><span>{item.name}</span><i />
-                  </button>
-                ))}
-              </div>
-              <div className="cosmetic-note"><Icon name="check" /> Appearance changes no permissions, yield, Key supply, or vault ownership.</div>
+            <div className="guided-wallet-note">
+              <Icon name="shield" />
+              <span><strong>One launch confirmation.</strong><small>Funding and an optional Key listing happen separately.</small></span>
             </div>
-          )}
+          </aside>
 
-          {step === 1 && (
-            <div className="builder-step">
-              <span className="builder-step-number">02 / TYPE OF TASK</span>
-              <h2>What should this pet do?</h2>
-              <div className="task-picker" role="group" aria-label="Choose type of task">
-                {tasks.map((item) => (
-                  <button type="button" aria-pressed={taskId === item.id} className={taskId === item.id ? 'active' : ''} onClick={() => selectTask(item.id)} key={item.id}>
-                    <span className={`task-availability ${item.live ? 'live' : ''}`}>{item.live ? 'live' : 'route review'}</span>
-                    <strong>{item.label}</strong><span className="task-assets">{item.deposit_asset} → {item.share_prefix}</span><i />
-                  </button>
-                ))}
-              </div>
-              {task && (
-                <div className="task-explainer" aria-live="polite">
-                  <div className="task-money-path">
-                    <span><small>deposit</small><strong>{task.deposit_asset}</strong></span>
-                    <Icon name="arrow" />
-                    <span><small>vault receipt</small><strong>{task.share_prefix}-KEY</strong></span>
-                    <Icon name="arrow" />
-                    <span><small>route</small><strong>{route}</strong></span>
-                  </div>
-                  {detail && (
-                    <div className="task-detail-grid">
-                      <div><small>what it does</small><p>{detail.summary}</p></div>
-                      <div><small>when it moves</small><p>{detail.movement}</p></div>
-                      <div><small>limits</small><p>{detail.guardrail}</p></div>
-                    </div>
-                  )}
-                  <p className={`task-execution-note task-${task.execution_mode}`}>{task.execution_note}</p>
+          <div className="guided-builder-content">
+            {step === 0 && (
+              <div className="guided-builder-stage">
+                <span className="builder-step-number">01 / PET + NAME</span>
+                <h2>Make it yours.</h2>
+                <p className="guided-stage-intro">The pet is the public identity. It does not change the vault, permissions or risk.</p>
+                <label className="guided-name-field">
+                  <span>Muppet name</span>
+                  <input value={name} onChange={(event) => setName(event.target.value)} maxLength={32} placeholder="quiet fox" autoFocus />
+                  <small>{name.trim().length}/32 characters</small>
+                </label>
+                <div className="guided-pet-grid" role="group" aria-label="Choose pet appearance">
+                  {pets.map((item) => (
+                    <button type="button" className={petId === item.id ? 'active' : ''} onClick={() => setPetId(item.id)} key={item.id}>
+                      <img src={item.portrait} alt={`${item.name} pet`} />
+                      <span>{item.name}</span>
+                      <i aria-hidden="true" />
+                    </button>
+                  ))}
                 </div>
-              )}
-            </div>
-          )}
-
-          {step === 2 && (
-            <div className="builder-step market-universe-step">
-              <span className="builder-step-number">03 / MARKET</span>
-              <h2>Choose where this pet can work.</h2>
-              <div className="market-status-legend"><span><i className="live" />live route</span><span><i />review only</span></div>
-              <div className="strategy-market-grid" role="group" aria-label="Choose market route">
-                {marketOptions.map((item) => (
-                  <button
-                    type="button"
-                    className={`${market?.id === item.id ? 'active ' : ''}market-${item.status}`}
-                    aria-pressed={market?.id === item.id}
-                    onClick={() => setMarketId(item.id)}
-                    key={item.id}
-                  >
-                    <span className="strategy-market-topline"><small>{item.groupLabel}</small><b>{item.status}</b></span>
-                    <strong>{item.title}</strong>
-                    <span className="strategy-market-pair">{item.market}</span>
-                    <p>{item.description}</p>
-                    <i aria-hidden="true" />
-                  </button>
-                ))}
               </div>
-              {market && (
-                <div className={`strategy-market-detail market-detail-${market.status}`} aria-live="polite">
-                  <div>
-                    <span><small>selected market</small><strong>{market.market}</strong></span>
-                    <b>{market.status === 'live' ? 'enabled' : 'not launchable'}</b>
-                  </div>
-                  <ul>{market.checks.map((check) => <li key={check}><Icon name={market.status === 'live' ? 'check' : 'alert'} />{check}</li>)}</ul>
-                  {market.status === 'review' && (
-                    <p className="market-review-boundary"><Icon name="shield" /><span><strong>Candidate only.</strong> Code support is present, but no user capital can enter this route until its contract registry entry is enabled.</span></p>
-                  )}
-                  {task && task.risk_presets.length > 0 && (
-                    <div className="risk-preset-picker" role="group" aria-label="FactoryV2 range risk preset">
-                      {task.risk_presets.map((preset, index) => (
-                        <button
-                          type="button"
-                          className={presetId === index ? 'active' : ''}
-                          disabled={(config?.factoryVersion ?? 1) < 2}
-                          onClick={() => setPresetId(index as 0 | 1 | 2)}
-                          key={preset.id}
-                        >
-                          <strong>{preset.id}</strong>
-                          <small>{preset.max_allocation_bps / 100}% max · {preset.cooldown_seconds / 3600}h cooldown</small>
-                        </button>
-                      ))}
-                      {(config?.factoryVersion ?? 1) < 2 && <p>Preset selection activates only after the FactoryV2 multisig migration.</p>}
-                    </div>
-                  )}
+            )}
+
+            {step === 1 && (
+              <div className="guided-builder-stage">
+                <span className="builder-step-number">02 / CHOOSE ONE JOB</span>
+                <h2>What should its vault do?</h2>
+                <p className="guided-stage-intro">These are the three routes live today. Every job fixes the deposit asset, maximum deployment and idle reserve.</p>
+                <div className="guided-job-grid" role="group" aria-label="Choose a live vault job">
+                  {liveTasks.map((item) => {
+                    const itemDetail = jobDetails[item.id as 0 | 1 | 2]
+                    return (
+                      <button type="button" aria-pressed={taskId === item.id} className={taskId === item.id ? 'active' : ''} onClick={() => selectTask(item.id)} key={item.id}>
+                        <span className="guided-job-top"><b><i /> live</b><small>{itemDetail.risk}</small></span>
+                        <Icon name={item.id === 0 ? 'layers' : item.id === 1 ? 'spark' : 'shield'} />
+                        <strong>{itemDetail.title}</strong>
+                        <p>{itemDetail.summary}</p>
+                        <span className="guided-job-split"><small>{itemDetail.deployed} deployed</small><small>{itemDetail.idle} idle</small></span>
+                      </button>
+                    )
+                  })}
                 </div>
-              )}
-            </div>
-          )}
 
-          {step === 3 && (
-            <div className="builder-step">
-              <span className="builder-step-number">04 / KEY MARKET</span>
-              <h2>Name it and open the floor.</h2>
-              <div className="form-grid key-launch-form">
-                <label><span>muppet name</span><input value={name} onChange={(event) => setName(event.target.value)} maxLength={32} placeholder="quiet fox" /></label>
-                <label><span>creator</span><input value={creatorHandle} readOnly /></label>
-                <label><span>Key ticker</span><input value={keySymbol} onChange={(event) => setKeySymbol(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10))} placeholder="QFOX" /></label>
-                <label><span>Key supply</span><input value={keySupply} onChange={(event) => setKeySupply(event.target.value)} inputMode="numeric" /></label>
-                <label><span>initial Keys listed</span><input value={listingQuantity} onChange={(event) => setListingQuantity(event.target.value)} inputMode="numeric" /></label>
-                <label><span>base floor</span><div className="unit-input"><input value={floorPrice} onChange={(event) => setFloorPrice(event.target.value)} inputMode="decimal" /><b>ETH</b></div></label>
+                {task && (
+                  <details className="guided-advanced">
+                    <summary>Advanced details <Icon name="chevron" /></summary>
+                    <div className="guided-advanced-grid">
+                      <div><small>exact route</small><strong>{route}</strong><p>{detail.movement}</p></div>
+                      <div><small>asset + market</small><strong>{task.deposit_asset} · {market.market}</strong><p>{detail.guardrail}</p></div>
+                      <div><small>checks</small><ul>{market.checks.map((check) => <li key={check}><Icon name="check" />{check}</li>)}</ul></div>
+                    </div>
+                    {task.risk_presets.length > 0 && (
+                      <div className="guided-preset-picker" role="group" aria-label="FactoryV2 risk preset">
+                        {task.risk_presets.map((preset, index) => (
+                          <button
+                            type="button"
+                            className={presetId === index ? 'active' : ''}
+                            disabled={(config?.factoryVersion ?? 1) < 2}
+                            onClick={() => setPresetId(index as 0 | 1 | 2)}
+                            key={preset.id}
+                          >
+                            <strong>{preset.id}</strong>
+                            <small>{preset.max_allocation_bps / 100}% max · {preset.cooldown_seconds / 3600}h cooldown</small>
+                          </button>
+                        ))}
+                        {(config?.factoryVersion ?? 1) < 2 && <p>Preset selection activates after the FactoryV2 migration.</p>}
+                      </div>
+                    )}
+                  </details>
+                )}
+
+                <div className="guided-key-boundary"><Icon name="key" /><span><strong>Agent Keys are separate.</strong><small>A Key market is optional after launch. Keys do not own vault assets or receive vault yield.</small></span></div>
               </div>
-              <div className="floor-explainer"><Icon name="key" /><span><strong>This becomes a real ask.</strong> The floor is the cheapest active listing, so it can move when listings sell or someone lists lower.</span></div>
-            </div>
-          )}
+            )}
 
-          {step === 4 && (
-            <div className="builder-step review-step">
-              <span className="builder-step-number">05 / LAUNCH</span>
-              {result && config ? (
-                <LaunchCommandCenter
-                  agent={commandAgent}
-                  chainLoading={loading}
-                  config={config}
-                  input={session!.input}
-                  result={result}
-                  sessionUpdatedAt={session!.updatedAt}
-                  wallet={walletAddress as Address}
-                  onRefresh={refresh}
-                  onReset={resetLaunch}
-                />
-              ) : (
-                <>
-                  <h2>{launchStarted ? 'Finish this launch.' : 'Three confirmations, one Muppet.'}</h2>
-                  <div className="live-launch-review">
-                    <div className="review-pet"><img src={pet.portrait} alt="" /><span><small>appearance</small><strong>{pet.name}</strong></span></div>
-                    <div><small>task</small><strong>{task?.label ?? 'loading'}</strong></div>
-                    <div className="review-market"><small>market</small><strong>{market?.market ?? 'loading'}</strong></div>
-                    {selectedPreset && config?.factoryVersion && config.factoryVersion >= 2 && <div><small>risk preset</small><strong>{selectedPreset.id}</strong></div>}
-                    <div><small>vault share</small><strong>{task?.share_prefix}-{keySymbol || 'KEY'}</strong></div>
-                    <div><small>Agent Key</small><strong>{supply || 0} ${keySymbol || 'KEY'}</strong></div>
-                    <div><small>first ask</small><strong>{listed || 0} at {floorPrice || '0'} ETH</strong></div>
-                    <div><small>market fee</small><strong>3% per fill</strong></div>
-                  </div>
-                  <div className="deployment-sequence">
-                    <span><b>1</b> deploy vault + Key</span><span><b>2</b> approve listed Keys</span><span><b>3</b> open first ask</span>
-                  </div>
-                  <div className={`launch-token-gate ${access?.eligible || launchStarted ? 'unlocked' : 'locked'}`}>
-                    <Icon name={access?.eligible || launchStarted ? 'check' : 'lock'} />
-                    <span>
-                      <strong>{launchStarted ? 'Launch recovery ready.' : `${requiredMuppets} $MUPPETS unlocks your next Creator Slot.`}</strong>
-                      <small>{launchStarted
-                        ? 'This browser saved each submitted receipt. Resume continues at the first unfinished confirmation.'
-                        : !walletAddress
-                          ? 'Connect a wallet to check its Robinhood Chain balance.'
-                          : accessLoading
-                            ? 'Checking the connected wallet.'
-                            : access?.eligible
-                              ? `${access.balance} $MUPPETS verified. ${access.slotsAvailable} launch slot${access.slotsAvailable === 1 ? '' : 's'} available.`
-                              : access?.reason === 'below_minimum' || access?.reason === 'capacity_full'
-                                ? `Wallet balance: ${access.balance ?? '0'} $MUPPETS. Existing Muppets remain available.`
-                                : 'Creator Slot verification is unavailable. No transaction will be sent.'}</small>
-                    </span>
-                  </div>
-                  <button type="button" className="builder-primary" disabled={launching || (launchStarted ? !recoveryReady : !canLaunch)} onClick={deploy}>
-                    <Icon name={launchStarted ? 'receipt' : task?.live && !walletAddress ? 'wallet' : access?.eligible ? 'receipt' : 'lock'} /> {launching
-                      ? 'Waiting for wallet'
-                      : launchStarted
-                        ? 'Resume launch'
-                        : task && !task.live
-                          ? 'Route unavailable'
-                          : !walletAddress
-                            ? 'Connect wallet'
-                            : accessLoading
-                              ? 'Checking $MUPPETS'
-                              : access?.eligible
-                              ? 'Launch Muppet'
-                                : access?.reason === 'below_minimum' || access?.reason === 'capacity_full'
-                                  ? `Unlock at ${requiredMuppets} $MUPPETS`
-                                  : 'Slot check unavailable'}
-                  </button>
-                  {progress && <div className="transaction-progress" role="status"><Icon name="spark" />{progress}</div>}
-                  {session && config && <LaunchReceiptTracker checkpoint={session.checkpoint} explorerUrl={config.explorerUrl} />}
-                </>
+            {step === 2 && (
+              <div className="guided-builder-stage guided-launch-stage">
+                <span className="builder-step-number">03 / LAUNCH + FUND</span>
+                <h2>{launchStarted ? 'Finish this launch.' : 'Review the money path.'}</h2>
+                <div className="guided-launch-review">
+                  <div className="guided-review-identity"><img src={pet.portrait} alt="" /><span><small>Muppet</small><strong>{name || pet.name}</strong><em>{creatorHandle}</em></span></div>
+                  <div><small>job</small><strong>{detail.title}</strong></div>
+                  <div><small>deposit</small><strong>{task?.deposit_asset ?? 'loading'}</strong></div>
+                  <div><small>deployed</small><strong>{detail.deployed}</strong></div>
+                  <div><small>idle</small><strong>{detail.idle}</strong></div>
+                  <div className="guided-review-market"><small>market</small><strong>{market.market}</strong></div>
+                  {selectedPreset && config?.factoryVersion && config.factoryVersion >= 2 && <div><small>risk preset</small><strong>{selectedPreset.id}</strong></div>}
+                </div>
+
+                <label className="guided-fund-plan">
+                  <span><strong>Planned first deposit</strong><small>This is remembered for the funding screen. It is not sent during launch.</small></span>
+                  <div className="unit-input"><input value={fundAmount} onChange={(event) => setFundAmount(event.target.value)} inputMode="decimal" /><b>{task?.deposit_asset ?? ''}</b></div>
+                </label>
+
+                <div className="guided-confirmation-path">
+                  <span><b>1</b><strong>Launch Muppet</strong><small>one wallet confirmation</small></span>
+                  <Icon name="arrow" />
+                  <span><b>2</b><strong>Fund vault</strong><small>asset approval + deposit</small></span>
+                  <Icon name="arrow" />
+                  <span><b>3</b><strong>Keeper checks</strong><small>acts only when policy passes</small></span>
+                </div>
+
+                <div className="guided-factory-key-note">
+                  <Icon name="key" />
+                  <span><strong>The current factory also creates ${keySymbol} with the Muppet.</strong><small>No Keys are approved or listed during launch. Its speculative market stays closed unless you open one later.</small></span>
+                </div>
+
+                <div className={`launch-token-gate ${access?.eligible || launchStarted ? 'unlocked' : 'locked'}`}>
+                  <Icon name={access?.eligible || launchStarted ? 'check' : 'lock'} />
+                  <span>
+                    <strong>{launchStarted ? 'Launch recovery ready.' : `${requiredMuppets} $MUPPETS unlocks your next Creator Slot.`}</strong>
+                    <small>{launchStarted
+                      ? 'This browser saved the submitted receipt. Resume checks it before doing anything else.'
+                      : !walletAddress
+                        ? 'Connect a wallet to check its Robinhood Chain balance.'
+                        : accessLoading
+                          ? 'Checking the connected wallet.'
+                          : access?.eligible
+                            ? `${access.balance} $MUPPETS verified. ${access.slotsAvailable} launch slot${access.slotsAvailable === 1 ? '' : 's'} available.`
+                            : access?.reason === 'below_minimum' || access?.reason === 'capacity_full'
+                              ? `Wallet balance: ${access.balance ?? '0'} $MUPPETS. Existing Muppets remain available.`
+                              : 'Creator Slot verification is unavailable. No transaction will be sent.'}</small>
+                  </span>
+                </div>
+
+                <button type="button" className="builder-primary guided-launch-button" disabled={launching || (launchStarted ? !recoveryReady : !canLaunch)} onClick={deploy}>
+                  <Icon name={launchStarted ? 'receipt' : task?.live && !walletAddress ? 'wallet' : access?.eligible ? 'receipt' : 'lock'} /> {launching
+                    ? 'Waiting for wallet'
+                    : launchStarted
+                      ? 'Resume launch'
+                      : !walletAddress
+                        ? 'Connect wallet'
+                        : accessLoading
+                          ? 'Checking $MUPPETS'
+                          : access?.eligible
+                            ? 'Launch Muppet'
+                            : access?.reason === 'below_minimum' || access?.reason === 'capacity_full'
+                              ? `Unlock at ${requiredMuppets} $MUPPETS`
+                              : 'Slot check unavailable'}
+                </button>
+                {progress && <div className="transaction-progress" role="status"><Icon name="spark" />{progress}</div>}
+                {session && config && <LaunchReceiptTracker checkpoint={session.checkpoint} explorerUrl={config.explorerUrl} />}
+              </div>
+            )}
+
+            <div className="guided-builder-footer">
+              <button type="button" className="builder-back" onClick={() => setStep(Math.max(0, step - 1))} disabled={step === 0 || launchStarted}>Back</button>
+              {step < steps.length - 1 && (
+                <button type="button" className="builder-next" disabled={!canContinue} onClick={() => setStep(step + 1)}>
+                  {step === 0 ? 'Choose one job' : 'Review launch + funding'} <Icon name="arrow" />
+                </button>
               )}
             </div>
-          )}
-
-          <div className="builder-footer">
-            <button type="button" className="builder-back" onClick={() => setStep(Math.max(0, step - 1))} disabled={step === 0 || launchStarted}>Back</button>
-            {step < steps.length - 1 && <button type="button" className="builder-next" disabled={!canContinue} onClick={() => setStep(step + 1)}>Continue <Icon name="arrow" /></button>}
           </div>
-        </div>
 
-        <aside className="builder-preview live-pet-preview">
-          <span className="preview-label">YOUR MUPPET</span>
-          <div className="preview-card">
-            <div className="preview-portrait"><img src={pet.portrait} alt="" /></div>
-            <h3>{name || pet.name}</h3>
-            <p>{creatorHandle}</p>
-            <span className="preview-category">{market?.title ?? task?.label ?? 'choose market'}</span>
-            <div className="preview-line" />
-            <div className="preview-stats"><span><small>Key floor</small><strong>{floorPrice || '0'} ETH</strong></span><span><small>vault</small><strong>{task?.share_prefix ?? 'mAsset'}</strong></span></div>
-          </div>
-        </aside>
-      </section>
+          <aside className="guided-builder-preview">
+            <span className="preview-label">YOUR MUPPET</span>
+            <div className="guided-preview-pet"><img src={pet.portrait} alt="" /></div>
+            <h3>{name || 'unnamed Muppet'}</h3>
+            <p>{detail.title}</p>
+            <div className="guided-preview-stats">
+              <span><small>deposit asset</small><strong>{task?.deposit_asset ?? 'USDG'}</strong></span>
+              <span><small>deployment</small><strong>{detail.deployed}</strong></span>
+              <span><small>idle reserve</small><strong>{detail.idle}</strong></span>
+            </div>
+            <div className="guided-money-path">
+              <small>money path</small>
+              <span><b>wallet</b><Icon name="arrow" /><b>vault</b><Icon name="arrow" /><b>one job</b></span>
+            </div>
+            <p className="guided-preview-boundary">Vault shares represent deposited assets. $MUPPETS unlocks creator capacity. Agent Keys stay separate.</p>
+          </aside>
+        </section>
+      )}
     </div>
   )
 }
 
 function LaunchReceiptTracker({ checkpoint, explorerUrl }: { checkpoint: LaunchCheckpoint; explorerUrl: string }) {
-  const stages = [
-    { label: 'vault + Key', hash: checkpoint.createTx, confirmed: checkpoint.createConfirmed },
-    { label: 'Key approval', hash: checkpoint.approveTx, confirmed: checkpoint.approveConfirmed },
-    { label: 'first ask', hash: checkpoint.listingTx, confirmed: checkpoint.listingConfirmed },
-  ]
+  const stage = { label: 'Muppet + vault', hash: checkpoint.createTx, confirmed: checkpoint.createConfirmed }
   return (
-    <div className="launch-stage-list" aria-label="Launch transaction receipts">
-      {stages.map((stage, index) => (
-        <div className={`launch-stage ${stage.confirmed ? 'confirmed' : stage.hash ? 'submitted' : 'waiting'}`} key={stage.label}>
-          <span><b>{stage.confirmed ? <Icon name="check" /> : index + 1}</b><strong>{stage.label}</strong></span>
-          {stage.hash ? (
-            <a href={`${explorerUrl}/tx/${stage.hash}`} target="_blank" rel="noreferrer" title={stage.hash}>
-              {stage.confirmed ? 'confirmed' : 'submitted'} · {shortHash(stage.hash)} <Icon name="arrow" />
-            </a>
-          ) : <small>waiting</small>}
-        </div>
-      ))}
+    <div className="launch-stage-list single-launch-stage" aria-label="Launch transaction receipt">
+      <div className={`launch-stage ${stage.confirmed ? 'confirmed' : stage.hash ? 'submitted' : 'waiting'}`}>
+        <span><b>{stage.confirmed ? <Icon name="check" /> : 1}</b><strong>{stage.label}</strong></span>
+        {stage.hash ? (
+          <a href={`${explorerUrl}/tx/${stage.hash}`} target="_blank" rel="noreferrer" title={stage.hash}>
+            {stage.confirmed ? 'confirmed' : 'submitted'} · {shortHash(stage.hash)} <Icon name="arrow" />
+          </a>
+        ) : <small>waiting</small>}
+      </div>
     </div>
   )
 }
@@ -550,26 +516,27 @@ interface LaunchCommandCenterProps {
   agent?: ChainAgent
   chainLoading: boolean
   config: ProtocolConfig
-  input: LaunchInput
+  session: LaunchSession
   result: LaunchResult
-  sessionUpdatedAt: string
   wallet: Address
   onRefresh: () => void
   onReset: () => void
+  onSessionChange: (session: LaunchSession) => void
 }
 
 function LaunchCommandCenter({
   agent,
   chainLoading,
   config,
-  input,
+  session,
   result,
-  sessionUpdatedAt,
   wallet,
   onRefresh,
   onReset,
+  onSessionChange,
 }: LaunchCommandCenterProps) {
-  const [fundAmount, setFundAmount] = useState(input.taskId === 0 ? '100' : '0.1')
+  const input = session.input
+  const [fundAmount, setFundAmount] = useState(input.fundAmount ?? defaultFundingAmount(input.taskId))
   const [previewShares, setPreviewShares] = useState<bigint | null>(null)
   const [previewError, setPreviewError] = useState('')
   const [fundProgress, setFundProgress] = useState('')
@@ -580,15 +547,31 @@ function LaunchCommandCenter({
   const [targetLoading, setTargetLoading] = useState(false)
   const [performance, setPerformance] = useState<MuppetPerformance | null>(null)
   const [now, setNow] = useState(Date.now())
+  const [keyQuantity, setKeyQuantity] = useState(String(input.listingQuantity))
+  const [keyPrice, setKeyPrice] = useState(input.floorPriceEth)
+  const [keyProgress, setKeyProgress] = useState('')
+  const [keyError, setKeyError] = useState('')
+  const [openingKeyMarket, setOpeningKeyMarket] = useState(false)
 
   const performanceHref = performancePath(result.agentId)
   const performanceUrl = typeof window === 'undefined'
     ? `https://liquidmuppets.io${performanceHref}`
     : new URL(performanceHref, window.location.origin).href
-  const taskLabel = input.taskId === 0 ? 'stable yield' : input.taskId === 1 ? 'ETH range' : 'launch reserve'
-  const shareText = `${input.name} is live on @liquidmuppets.\n\n${taskLabel}, an onchain vault, and public performance from the first recorded checkpoint.`
+  const taskLabel = input.taskId === 0 ? 'stablecoin lending' : input.taskId === 1 ? 'an ETH range' : 'a launch reserve'
+  const shareText = `${input.name} is live on @liquidmuppets.\n\nOne policy-bound vault running ${taskLabel}, with public performance from its first recorded checkpoint.`
   const shareHref = `https://x.com/intent/post?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(performanceUrl)}`
   const fundingTarget: VaultFundingTarget | null = agent ?? directTarget
+  const keyMarketOpen = Boolean(session.checkpoint.listingConfirmed && session.checkpoint.listingTx)
+  const keyMarketStarted = Boolean(session.checkpoint.approveTx || session.checkpoint.listingTx)
+  const parsedKeyQuantity = Number(keyQuantity)
+  const keyFormReady = Boolean(
+    config.keyMarketplace
+    && Number.isInteger(parsedKeyQuantity)
+    && parsedKeyQuantity >= 1
+    && parsedKeyQuantity <= input.keySupply
+    && Number.isFinite(Number(keyPrice))
+    && Number(keyPrice) > 0,
+  )
   const amountRaw = useMemo(() => {
     if (!fundingTarget) return null
     try {
@@ -680,33 +663,60 @@ function LaunchCommandCenter({
     }
   }
 
+  const openKeyMarket = async () => {
+    if (!keyFormReady || keyMarketOpen) return
+    const provider = getInjectedProvider()
+    if (!provider) {
+      setKeyError('No injected wallet was found.')
+      return
+    }
+    setOpeningKeyMarket(true)
+    setKeyError('')
+    let activeSession: LaunchSession = {
+      ...session,
+      input: {
+        ...session.input,
+        listingQuantity: parsedKeyQuantity,
+        floorPriceEth: keyPrice,
+      },
+      updatedAt: new Date().toISOString(),
+    }
+    onSessionChange(activeSession)
+    try {
+      await openAgentKeyMarket(config, provider, wallet, result.key, parsedKeyQuantity, keyPrice, {
+        checkpoint: activeSession.checkpoint,
+        onProgress: setKeyProgress,
+        onCheckpoint: (nextCheckpoint) => {
+          activeSession = withLaunchCheckpoint(activeSession, nextCheckpoint)
+          onSessionChange(activeSession)
+        },
+      })
+      setKeyProgress('Agent Key market open. The listing receipts are saved below.')
+      onRefresh()
+    } catch (reason) {
+      setKeyError(actionErrorMessage(reason, 'The Agent Key listing failed.'))
+    } finally {
+      setOpeningKeyMarket(false)
+    }
+  }
+
   return (
-    <div className="launch-command-center">
+    <div className="launch-command-center simplified-command-center">
       <div className="command-center-heading">
         <div>
           <span>LAUNCH COMPLETE · MUPPET #{result.agentId.toString()}</span>
-          <h2>Muppet live. Put it to work.</h2>
-          <p>Fund the vault, watch the keeper, open the public record, or share it from here.</p>
+          <h2>Muppet live. Put the vault to work.</h2>
+          <p>The launch is complete. Funding, keeper decisions and the optional Agent Key market remain distinct.</p>
         </div>
         <span className="command-center-live"><i /> live</span>
       </div>
 
-      <LaunchReceiptTracker checkpoint={{
-        createTx: result.createTx,
-        createConfirmed: true,
-        agentId: result.agentId,
-        vault: result.vault,
-        key: result.key,
-        approveTx: result.approveTx,
-        approveConfirmed: true,
-        listingTx: result.listingTx,
-        listingConfirmed: true,
-      }} explorerUrl={config.explorerUrl} />
+      <LaunchReceiptTracker checkpoint={session.checkpoint} explorerUrl={config.explorerUrl} />
 
       <div className="command-center-grid">
         <section className="command-card funding-card">
           <div className="command-card-head"><Icon name="wallet" /><span><small>01</small><h3>Fund vault</h3></span></div>
-          <p>Previewed by the deployed ERC-4626 vault before your wallet signs.</p>
+          <p>Two wallet confirmations: approve the deposit asset, then deposit it into the ERC-4626 vault.</p>
           {fundingTarget ? (
             <>
               <label className="command-fund-input">
@@ -734,22 +744,16 @@ function LaunchCommandCenter({
           {fundReceipts.length > 0 && (
             <div className="launch-receipts">
               <a href={`${config.explorerUrl}/tx/${fundReceipts[0]}`} target="_blank" rel="noreferrer">asset approval <Icon name="arrow" /></a>
-              <a href={`${config.explorerUrl}/tx/${fundReceipts[1]}`} target="_blank" rel="noreferrer">vault deposit <Icon name="arrow" /></a>
+              {fundReceipts[1] && <a href={`${config.explorerUrl}/tx/${fundReceipts[1]}`} target="_blank" rel="noreferrer">vault deposit <Icon name="arrow" /></a>}
             </div>
           )}
         </section>
 
         <section className="command-card keeper-card">
-          <div className="command-card-head"><Icon name="clock" /><span><small>02</small><h3>Next keeper check</h3></span></div>
-          <div className="keeper-next-time">
-            <small>next automatic check</small>
-            <strong>{keeperTiming(performance, now)}</strong>
-          </div>
+          <div className="command-card-head"><Icon name="clock" /><span><small>02</small><h3>Keeper checks</h3></span></div>
+          <div className="keeper-next-time"><small>next automatic check</small><strong>{keeperTiming(performance, now)}</strong></div>
           {performance?.keeper ? (
-            <div className="keeper-last-decision">
-              <span><small>last decision</small><strong>{performance.keeper.action}</strong></span>
-              <p>{performance.keeper.reason}</p>
-            </div>
+            <div className="keeper-last-decision"><span><small>last decision</small><strong>{performance.keeper.action}</strong></span><p>{performance.keeper.reason}</p></div>
           ) : <p className="keeper-awaiting">Waiting for the first recorded decision.</p>}
           <p className="command-boundary">The five minute schedule is automatic. Policy still decides whether the keeper acts or holds.</p>
         </section>
@@ -768,10 +772,46 @@ function LaunchCommandCenter({
         </section>
       </div>
 
+      <section className={`optional-key-market ${keyMarketOpen ? 'open' : 'closed'}`}>
+        <div className="optional-key-heading">
+          <Icon name="key" />
+          <div><span>OPTIONAL · SEPARATE MARKET</span><h3>{keyMarketOpen ? 'Agent Key market open.' : `Open a market for $${input.keySymbol}`}</h3><p>Agent Keys are speculative collectibles. They do not own vault assets, receive vault yield or control the keeper.</p></div>
+          <b><i /> {keyMarketOpen ? 'market open' : 'market closed'}</b>
+        </div>
+        {!keyMarketOpen && (
+          <div className="optional-key-form">
+            <label><span>Keys to list</span><input value={keyQuantity} disabled={keyMarketStarted} onChange={(event) => setKeyQuantity(event.target.value)} inputMode="numeric" /></label>
+            <label><span>price per Key</span><div className="unit-input"><input value={keyPrice} disabled={Boolean(session.checkpoint.listingTx)} onChange={(event) => setKeyPrice(event.target.value)} inputMode="decimal" /><b>ETH</b></div></label>
+            <button type="button" className="command-secondary" disabled={!keyFormReady || openingKeyMarket} onClick={openKeyMarket}><Icon name="key" />{openingKeyMarket ? 'Waiting for wallet' : keyMarketStarted ? 'Resume Key market' : 'Approve + open listing'}</button>
+          </div>
+        )}
+        <p className="optional-key-confirmations">Opening the market uses two confirmations: approve only the selected Keys, then create the listing.</p>
+        {keyProgress && <div className="transaction-notice" role="status"><Icon name="check" />{keyProgress}</div>}
+        {keyError && <div className="transaction-notice error" role="alert"><Icon name="alert" />{keyError}</div>}
+        {(session.checkpoint.approveTx || session.checkpoint.listingTx) && <KeyMarketReceiptTracker checkpoint={session.checkpoint} explorerUrl={config.explorerUrl} />}
+      </section>
+
       <div className="command-center-footer">
-        <span><Icon name="shield" /> Launch record saved in this browser at {formatSavedTime(sessionUpdatedAt)}. It contains public transaction metadata only.</span>
+        <span><Icon name="shield" /> Public receipt metadata was saved in this browser at {formatSavedTime(session.updatedAt)}.</span>
         <button type="button" onClick={onReset}>Start another Muppet</button>
       </div>
+    </div>
+  )
+}
+
+function KeyMarketReceiptTracker({ checkpoint, explorerUrl }: { checkpoint: LaunchCheckpoint; explorerUrl: string }) {
+  const stages = [
+    { label: 'Key approval', hash: checkpoint.approveTx, confirmed: checkpoint.approveConfirmed },
+    { label: 'Key listing', hash: checkpoint.listingTx, confirmed: checkpoint.listingConfirmed },
+  ]
+  return (
+    <div className="launch-stage-list key-stage-list" aria-label="Agent Key market receipts">
+      {stages.map((stage, index) => (
+        <div className={`launch-stage ${stage.confirmed ? 'confirmed' : stage.hash ? 'submitted' : 'waiting'}`} key={stage.label}>
+          <span><b>{stage.confirmed ? <Icon name="check" /> : index + 1}</b><strong>{stage.label}</strong></span>
+          {stage.hash ? <a href={`${explorerUrl}/tx/${stage.hash}`} target="_blank" rel="noreferrer">{stage.confirmed ? 'confirmed' : 'submitted'} · {shortHash(stage.hash)} <Icon name="arrow" /></a> : <small>waiting</small>}
+        </div>
+      ))}
     </div>
   )
 }

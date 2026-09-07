@@ -7,7 +7,7 @@ LiquidMuppets combines two separate products on Robinhood Chain mainnet:
 
 A third token has platform access utility. Public browsing remains open. Every `15,000 $MUPPETS` held unlocks one active Creator Slot, and an available slot permits one new Muppet plus one featured placement on the creator profile. The token remains transferable in the wallet and is not spent, locked or burned.
 
-A qualifying creator chooses one of seven cosmetic pets, assigns one of three enabled tasks, chooses that task's live market, sets the Key supply and initial ask, and signs the factory transaction. Four FactoryV2 candidates are visible for review but cannot be selected for a live launch. The selected task fixes the deposit asset, adapter, allocation cap, cooldown, and vault cap. Pet appearance never changes the financial behavior.
+A qualifying creator uses three stages: choose one of seven cosmetic pets and a name, assign one of three enabled jobs, then review the money path and launch. The beginner flow shows only live routes. Four FactoryV2 candidates remain visible in Market Radar and documentation for review, but do not appear as launch choices. The selected job fixes the deposit asset, adapter, allocation cap, cooldown, and vault cap. Pet appearance never changes the financial behavior.
 
 ## $MUPPETS Creator Slots
 
@@ -232,24 +232,24 @@ The Market Radar beta is read-only. `GET /api/v1/market-radar` groups the latest
 1. Browse agents, markets, public creator profiles, System Pulse, Proof Cards, watchlists, Market Radar and documentation without connecting a wallet or holding `$MUPPETS`.
 2. Connect an EVM wallet on Robinhood Chain mainnet.
 3. Hold `15,000 $MUPPETS` per Muppet you want to operate. The first launch threshold is 15,000, the second is 30,000, and each later threshold adds 15,000.
-4. Pick any of the seven pet appearances.
-5. Select stable yield, ETH range, or launch reserve.
-6. Confirm the deployed market for that task.
-7. Set the Agent Key name, symbol, fixed whole-Key supply, and first ask.
-8. Confirm vault and Key creation, Key approval, and the first ask. The browser records each submitted receipt so an interrupted launch can resume at the first unfinished step.
-9. Use the post-launch command center to preview the exact ERC-4626 shares, approve the task asset, and fund the vault. The wallet receives transferable vault shares.
+4. Pick any of the seven pet appearances and give the Muppet a name.
+5. Select stable yield, ETH range, or launch reserve. Open Advanced details only when you need the exact market, checks, or available FactoryV2 preset.
+6. Review the deposit asset, deployed maximum, idle minimum, exact market and planned first deposit.
+7. Confirm one factory transaction. It creates the Muppet, vault and fixed-supply Agent Key. The browser records the submitted creation receipt so an interrupted launch can resume without creating a duplicate Muppet.
+8. Use the post-launch command center to preview the exact ERC-4626 shares, approve the task asset, and fund the vault. The wallet receives transferable vault shares.
+9. Optionally open the separate Agent Key market with two confirmations: approve only the chosen Key quantity, then create the listing. A Key has no claim on vault assets or yield.
 10. The creator or private keeper requests the task cycle. PolicyExecutor enforces the route and limits before the vault can call its immutable adapter.
 11. Depositors can redeem their shares. Full redemption recalls the complete adapter position and pays the assets actually realized.
-12. Key holders can buy, list, bid, sell, or permanently bind whole Keys through the native marketplace.
+12. Key holders can buy, list, bid, sell, or permanently bind whole Keys through the native marketplace after a market exists.
 13. Every filled Key trade sends its 3% fee to the Stock Token reserve. The private keeper executes a purchase after the threshold and cooldown checks pass.
 
 The browser signs and submits user transactions through the injected wallet. The FastAPI service reads public state and metadata. It does not custody funds or hold the deployer key. Launch recovery stores only public inputs, addresses, statuses and transaction hashes in the current browser, scoped to the connected wallet, chain and factory.
 
 ### Post-launch command center
 
-Once the three launch receipts confirm, `/app/create` immediately exposes the new vault's funding controls, its `previewDeposit` result, the connected wallet's task-asset balance, an estimate for the next five minute keeper check, the public performance link and an X share action. The preview comes from the deployed ERC-4626 contract and can change with vault state before execution. Keeper timing is an estimate from the latest recorded decision; each check can still act or hold under policy.
+Once the single creation receipt confirms, `/app/create` immediately exposes the new vault's funding controls, its `previewDeposit` result, the connected wallet's task-asset balance, an estimate for the next five minute keeper check, the public performance link and an X share action. The preview comes from the deployed ERC-4626 contract and can change with vault state before execution. Keeper timing is an estimate from the latest recorded decision; each check can still act or hold under policy.
 
-If creation, approval or listing is interrupted, `Resume launch` first checks any saved submitted transaction. It sends only the first missing or reverted stage. Browser storage is a convenience rather than a cross-device ledger, so clearing site data removes that local recovery record while the onchain receipts remain authoritative.
+If creation is interrupted, `Resume launch` first checks the saved factory transaction and only retries after a confirmed revert. The optional Key market has its own saved approval and listing checkpoints, so it can recover without becoming part of launch. Browser storage is a convenience rather than a cross-device ledger, so clearing site data removes that local recovery record while the onchain receipts remain authoritative.
 
 ## Policy and contract boundaries
 

@@ -13,6 +13,7 @@ import {
 describe('viewFromPath', () => {
   it('maps every public concept route', () => {
     expect(viewFromPath('/')).toBe('landing')
+    expect(viewFromPath('/about')).toBe('about')
     expect(viewFromPath('/app')).toBe('marketplace')
     expect(viewFromPath('/app/')).toBe('marketplace')
     expect(viewFromPath('/app/portfolio')).toBe('portfolio')

@@ -1,10 +1,12 @@
 # LIQUIDMUPPETS
 
-LIQUIDMUPPETS is a Robinhood Chain mainnet marketplace for policy-bounded onchain agents. Public browsing remains open. Every `15,000 $MUPPETS` held unlocks one active Creator Slot. One available slot permits one new Muppet and one featured Muppet on the creator profile.
+LIQUIDMUPPETS is a Robinhood Chain mainnet marketplace for policy-bounded onchain agents. A Muppet is an onchain vault with one job: pick a cosmetic pet, choose one live vault route, then launch and fund it. Public browsing remains open. Every `15,000 $MUPPETS` held unlocks one active Creator Slot. One available slot permits one new Muppet and one featured Muppet on the creator profile.
 
 Creator Slots equal `floor(wallet balance / 15,000)`. The `$MUPPETS` balance remains transferable in the wallet and is not spent, locked or burned. If the balance falls, existing vaults, withdrawals and Agent Key markets remain available; only additional launches and over-capacity featured placement pause. The canonical Robinhood Chain token is `0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189`. FactoryV2 now implements this capacity rule onchain, but the current mainnet factory remains V1 until the published multisig migration is executed.
 
 Public interface: [https://liquidmuppets.io](https://liquidmuppets.io)
+
+Full product explainer: [https://liquidmuppets.io/about](https://liquidmuppets.io/about)
 
 X: [@AMBF](https://x.com/AMBF)
 
@@ -14,8 +16,9 @@ Current status: controlled mainnet beta. Existing Muppets can be funded, allocat
 
 - Robinhood Chain ID `4663`
 - seven cosmetic pet appearances, independent from task permissions
-- three selectable live task configurations and four visible FactoryV2 review candidates
-- one deployed money route for each task, with no unavailable route cards in the app
+- a three-stage beginner creator for pet and name, one of three live jobs, then launch and funding
+- four FactoryV2 review candidates kept in Market Radar and documentation instead of the launch picker
+- one deployed money route for each job, with no unavailable route cards in the beginner launch flow
 - native Agent Key asks, bids, partial fills, buys, sells and permanent binding
 - 3% marketplace fee routed into an onchain Stock Token reserve
 - 26 oracle-bounded Stock Token purchase routes
@@ -28,8 +31,8 @@ Current status: controlled mainnet beta. Existing Muppets can be funded, allocat
 - automatic Proof Cards with durable public URLs for meaningful protocol records
 - browser-local Muppet watchlists with an in-app evidence alert inbox
 - Muppet Market Radar, a read-only view of approved route health, capacity, source gaps and exact status reasons
-- a post-launch command center with vault funding, an onchain share preview, keeper timing, performance link and X sharing
-- browser-local recovery for the three launch transactions, keyed to the connected wallet, chain and factory
+- a post-launch command center with vault funding, an optional separate Agent Key listing, an onchain share preview, keeper timing, performance link and X sharing
+- browser-local recovery for the single creation receipt and optional Key listing receipts, keyed to the connected wallet, chain and factory
 - optional app handles claimed with a wallet signature and no gas
 - app and API capacity gate requiring one available slot per new launch through the current V1 interface
 - FactoryV2 code with one onchain creator slot per 15,000 `$MUPPETS`, reviewed task registry, risk presets, multisig-only ownership and a post-verification launch switch
@@ -113,8 +116,10 @@ task asset
   -> the task's immutable adapter executes
   -> vault accounting reads idle assets plus adapter position value
 
-creator receives a fixed Agent Key supply
-  -> creator opens the first ask
+current factory creates a fixed Agent Key supply with the Muppet
+  -> no Key is approved or listed during launch
+  -> creator can optionally approve a chosen quantity after launch
+  -> creator can then open the first ask
   -> lowest active ask becomes the floor
   -> users buy, list, bid, sell, or permanently bind whole Keys
   -> 3% fee applies only when value changes hands
@@ -218,17 +223,18 @@ Radar reports exact pool or market identifiers, native route liquidity, oracle e
 
 ## Launch recovery and command center
 
-The launch flow records each submitted transaction hash before waiting for confirmation: vault and Key creation, Key approval, then the first ask. If the wallet rejects a later step, a transaction reverts, confirmation reading times out, or the page reloads, `/app/create` restores the matching browser-local record and offers `Resume launch`. Resume checks any existing receipt before it sends the first missing transaction, so it does not blindly create another Muppet or repeat a pending listing.
+The creator is intentionally split into three stages: pet and name, one live job, then launch and fund. Launch submits one factory transaction that creates the Muppet, vault and the fixed-supply Agent Key required by the current factory. It does not approve or list Keys. The app records the creation hash before waiting for confirmation. If confirmation reading times out or the page reloads, `/app/create` restores the matching browser-local record and offers `Resume launch`. Resume checks the existing receipt before it can send anything, so it does not blindly create another Muppet.
 
 This recovery record is scoped to the chain ID, factory address and connected wallet. It contains the public launch inputs, contract addresses and transaction hashes only. It contains no signature, private key or token approval secret, and it does not move automatically to another browser or device.
 
-After all three receipts confirm, the same page becomes the post-launch command center. It:
+After the creation receipt confirms, the same page becomes the post-launch command center. It:
 
 - reads `previewDeposit` from the deployed ERC-4626 vault and shows the exact expected shares before funding
 - shows the connected wallet's live task-asset balance, then submits the asset approval and vault deposit through that wallet
 - estimates the next five minute keeper check from the latest recorded decision, while stating that policy can still act or hold
 - links directly to the Muppet's public performance page, vault, Agent Key and launch receipts
 - opens a prepared X share intent for the public performance URL
+- keeps the speculative Agent Key market closed unless the creator separately approves a chosen Key quantity and creates a listing; those two receipts are resumable and displayed apart from the launch receipt
 
 The share preview is a current onchain conversion, not a promised return. The public performance page still begins at its first recorded checkpoint and does not invent earlier APY.
 
@@ -272,6 +278,12 @@ Run the frontend from the repository root:
 
 ```bash
 npm run dev
+```
+
+To test the local frontend against the public read-only API without sending wallet transactions:
+
+```bash
+LIQUIDMUPPETS_API_PROXY=https://liquidmuppets.io npm run dev
 ```
 
 The app opens at `http://127.0.0.1:4317`. OpenAPI is available at `http://127.0.0.1:8000/api/docs`.

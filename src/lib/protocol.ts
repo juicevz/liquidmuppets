@@ -407,6 +407,7 @@ export interface LaunchInput {
   keySupply: number
   listingQuantity: number
   floorPriceEth: string
+  fundAmount?: string
   presetId?: 0 | 1 | 2
 }
 
@@ -415,8 +416,8 @@ export interface LaunchResult {
   vault: Address
   key: Address
   createTx: Hash
-  approveTx: Hash
-  listingTx: Hash
+  approveTx?: Hash
+  listingTx?: Hash
 }
 
 export interface LaunchCheckpoint {
@@ -444,7 +445,7 @@ export async function launchAgent(
   input: LaunchInput,
   options: LaunchExecutionOptions = {},
 ): Promise<LaunchResult> {
-  if (!config.factory || !config.keyMarketplace) throw new Error('Mainnet contract addresses are required.')
+  if (!config.factory) throw new Error('The mainnet factory address is required.')
   const client = createProtocolClient(config)
   let checkpoint: LaunchCheckpoint = { ...options.checkpoint }
   const updateCheckpoint = (patch: Partial<LaunchCheckpoint>) => {
@@ -506,48 +507,72 @@ export async function launchAgent(
     updateCheckpoint({ ...created, createTx: createReceipt.transactionHash, createConfirmed: true })
   }
 
-  const floorWei = parseEther(input.floorPriceEth)
-  if (checkpoint.approveTx && !checkpoint.approveConfirmed) {
-    options.onProgress?.('Recovering the Key approval transaction…')
-    const receipt = await waitForSubmittedTransaction(client, checkpoint.approveTx)
-    if (receipt.status === 'success') updateCheckpoint({ approveConfirmed: true })
-    else updateCheckpoint({ approveTx: undefined, approveConfirmed: false, listingTx: undefined, listingConfirmed: false })
-  }
-  if (!checkpoint.approveConfirmed) {
-    options.onProgress?.('Approving the initial Key listing…')
-    const approveReceipt = await sendAndWait(provider, client, account, created.key, encodeFunctionData({
-      abi: erc20Abi,
-      functionName: 'approve',
-      args: [config.keyMarketplace, BigInt(input.listingQuantity)],
-    }), undefined, (hash) => updateCheckpoint({ approveTx: hash, approveConfirmed: false }))
-    updateCheckpoint({ approveTx: approveReceipt.transactionHash, approveConfirmed: true })
-  }
-
-  if (checkpoint.listingTx && !checkpoint.listingConfirmed) {
-    options.onProgress?.('Recovering the first ask transaction…')
-    const receipt = await waitForSubmittedTransaction(client, checkpoint.listingTx)
-    if (receipt.status === 'success') updateCheckpoint({ listingConfirmed: true })
-    else updateCheckpoint({ listingTx: undefined, listingConfirmed: false })
-  }
-  if (!checkpoint.listingConfirmed) {
-    options.onProgress?.('Opening the first ask at your base price…')
-    const listingReceipt = await sendAndWait(provider, client, account, config.keyMarketplace, encodeFunctionData({
-      abi: marketAbi,
-      functionName: 'createListing',
-      args: [created.key, BigInt(input.listingQuantity), floorWei],
-    }), undefined, (hash) => updateCheckpoint({ listingTx: hash, listingConfirmed: false }))
-    updateCheckpoint({ listingTx: listingReceipt.transactionHash, listingConfirmed: true })
-  }
-
-  if (!checkpoint.createTx || !checkpoint.approveTx || !checkpoint.listingTx) {
-    throw new Error('The launch completed without a complete transaction record. Refresh and resume to recover it.')
-  }
+  if (!checkpoint.createTx) throw new Error('The launch completed without a creation receipt. Refresh and resume to recover it.')
   return {
     ...created,
     createTx: checkpoint.createTx,
     approveTx: checkpoint.approveTx,
     listingTx: checkpoint.listingTx,
   }
+}
+
+export async function openAgentKeyMarket(
+  config: ProtocolConfig,
+  provider: WalletProvider,
+  account: Address,
+  key: Address,
+  quantity: number,
+  priceEth: string,
+  options: LaunchExecutionOptions = {},
+): Promise<{ approveTx: Hash; listingTx: Hash }> {
+  if (!config.keyMarketplace) throw new Error('The Agent Key marketplace address is required.')
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100_000) throw new Error('Enter a whole Key quantity between 1 and 100,000.')
+  const price = parseEther(priceEth)
+  if (price <= 0n) throw new Error('Enter a Key price greater than zero.')
+
+  const client = createProtocolClient(config)
+  let checkpoint: LaunchCheckpoint = { ...options.checkpoint }
+  const updateCheckpoint = (patch: Partial<LaunchCheckpoint>) => {
+    checkpoint = { ...checkpoint, ...patch }
+    options.onCheckpoint?.({ ...checkpoint })
+  }
+
+  if (checkpoint.approveTx && !checkpoint.approveConfirmed) {
+    options.onProgress?.('Checking the submitted Key approval…')
+    const receipt = await waitForSubmittedTransaction(client, checkpoint.approveTx)
+    if (receipt.status === 'success') updateCheckpoint({ approveConfirmed: true })
+    else updateCheckpoint({ approveTx: undefined, approveConfirmed: false, listingTx: undefined, listingConfirmed: false })
+  }
+  if (!checkpoint.approveConfirmed) {
+    options.onProgress?.('Approving only the Keys you chose to list…')
+    const approveReceipt = await sendAndWait(provider, client, account, key, encodeFunctionData({
+      abi: erc20Abi,
+      functionName: 'approve',
+      args: [config.keyMarketplace, BigInt(quantity)],
+    }), undefined, (hash) => updateCheckpoint({ approveTx: hash, approveConfirmed: false }))
+    updateCheckpoint({ approveTx: approveReceipt.transactionHash, approveConfirmed: true })
+  }
+
+  if (checkpoint.listingTx && !checkpoint.listingConfirmed) {
+    options.onProgress?.('Checking the submitted first ask…')
+    const receipt = await waitForSubmittedTransaction(client, checkpoint.listingTx)
+    if (receipt.status === 'success') updateCheckpoint({ listingConfirmed: true })
+    else updateCheckpoint({ listingTx: undefined, listingConfirmed: false })
+  }
+  if (!checkpoint.listingConfirmed) {
+    options.onProgress?.('Opening the optional Agent Key market…')
+    const listingReceipt = await sendAndWait(provider, client, account, config.keyMarketplace, encodeFunctionData({
+      abi: marketAbi,
+      functionName: 'createListing',
+      args: [key, BigInt(quantity), price],
+    }), undefined, (hash) => updateCheckpoint({ listingTx: hash, listingConfirmed: false }))
+    updateCheckpoint({ listingTx: listingReceipt.transactionHash, listingConfirmed: true })
+  }
+
+  if (!checkpoint.approveTx || !checkpoint.listingTx) {
+    throw new Error('The Agent Key market opened without a complete receipt record. Refresh to recover it.')
+  }
+  return { approveTx: checkpoint.approveTx, listingTx: checkpoint.listingTx }
 }
 
 export async function loadVaultFundingTarget(

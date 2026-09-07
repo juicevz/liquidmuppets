@@ -34,8 +34,8 @@ const docsSections: DocsSection[] = [
   {
     number: '01',
     title: 'The product loop',
-    body: 'LIQUIDMUPPETS is a Robinhood mainnet marketplace for policy-bounded onchain agents. Every 15,000 $MUPPETS held unlocks one active Creator Slot. An available slot lets its wallet choose a cosmetic pet, assign a live task, deploy a single-asset vault and fungible Agent Key, then open the first Key ask. Review candidates stay visible but cannot launch.',
-    details: ['pet appearance has no financial effect', 'the task fixes the asset, adapter and risk caps', 'vault shares and Agent Keys remain separate'],
+    body: 'A Muppet is an onchain vault with one job. The first screen now explains that loop directly, while /about keeps the full product story. Every 15,000 $MUPPETS held unlocks one active Creator Slot. A creator picks a cosmetic pet and name, chooses one of three live vault jobs, then launches and funds it.',
+    details: ['pet appearance has no financial effect', 'the task fixes the asset, adapter and risk caps', 'vault shares and Agent Keys remain separate', 'the optional Agent Key market opens only after launch'],
     visual: 'loop',
   },
   {
@@ -54,7 +54,7 @@ const docsSections: DocsSection[] = [
   {
     number: '03',
     title: 'Seven pets, three live tasks',
-    body: 'Blue, sage, stone, fox, plum, frog and gold are appearance choices. Any pet can use stable yield, ETH range, or launch reserve. AAPL, NVDA, SPY and screened meme routes are visible as FactoryV2 review candidates. The pet never changes the money path or permissions.',
+    body: 'Blue, sage, stone, fox, plum, frog and gold are appearance choices. Any pet can use stable yield, ETH range, or launch reserve. The beginner launch flow shows only those three live jobs. AAPL, NVDA, SPY and screened meme candidates remain documented in Market Radar and FactoryV2 review material. The pet never changes the money path or permissions.',
     visual: 'pets',
   },
   {
@@ -98,7 +98,7 @@ const docsSections: DocsSection[] = [
   {
     number: '09',
     title: 'Agent Keys and their market',
-    body: 'Each Muppet has a fixed-supply, zero-decimal ERC-20 Agent Key. The creator receives the supply and chooses the first ask. The actual floor is always the cheapest active ask. The native marketplace supports partial asks, bids, buys and sells. Its 3% fill fee goes to the Stock Token reserve.',
+    body: 'The current factory creates a fixed-supply, zero-decimal ERC-20 Agent Key with each Muppet. No Key is approved or listed in the launch transaction. After launch, the creator can optionally approve a chosen quantity and open the first ask in a clearly separate flow. The actual floor is always the cheapest active ask. The native marketplace supports partial asks, bids, buys and sells. Its 3% fill fee goes to the Stock Token reserve.',
     details: ['Key ownership is not vault ownership', 'Key price does not change vault share price', 'current utility is trading and permanent onchain binding'],
     visual: 'keys',
   },
@@ -110,9 +110,10 @@ const docsSections: DocsSection[] = [
   {
     number: '11',
     title: 'How to use the live loop',
-    body: 'Connect an EVM wallet on Robinhood Chain mainnet. The launch page shows live Creator Slot capacity. A first Muppet needs 15,000 $MUPPETS, a second needs 30,000, and each later Muppet adds another 15,000 threshold. Confirm vault and Key creation, Key approval, and the first ask. The post-launch command center then previews vault shares, funds the vault, shows keeper timing, and links to the public record and X sharing.',
+    body: 'Connect an EVM wallet on Robinhood Chain mainnet. The launch page shows live Creator Slot capacity. A first Muppet needs 15,000 $MUPPETS, a second needs 30,000, and each later Muppet adds another 15,000 threshold. Creation now has three stages: pet and name, one live job, then launch and fund. Launch uses one wallet confirmation. Funding remains a separate asset approval and vault deposit. Opening an Agent Key market is optional and separate after launch.',
     details: [
-      'each submitted launch receipt is saved in this browser so Resume launch can continue at the first unfinished stage',
+      'the submitted creation receipt is saved in this browser so Resume launch can recover it without creating a duplicate Muppet',
+      'optional Key approval and listing receipts are saved independently in the same browser-local record',
       'recovery is scoped to this wallet, chain and factory and stores public transaction metadata only',
       'expected shares come from the deployed ERC-4626 previewDeposit call before funding',
       'the next keeper time is an estimate; policy can still act or hold',
@@ -377,8 +378,8 @@ function KeyMarketVisual() {
 
 function LiveStepsVisual() {
   const steps = [
-    ['01', 'confirm', 'three saved receipts'],
-    ['02', 'fund', 'onchain share preview'],
+    ['01', 'launch', 'one saved receipt'],
+    ['02', 'fund', 'approval + deposit'],
     ['03', 'keeper', 'policy acts or holds'],
     ['04', 'share', 'public performance'],
   ]

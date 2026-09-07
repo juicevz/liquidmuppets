@@ -128,11 +128,7 @@ export function launchResultFromCheckpoint(checkpoint: LaunchCheckpoint): Launch
     || checkpoint.agentId === undefined
     || !checkpoint.vault
     || !checkpoint.key
-    || !checkpoint.createTx
-    || !checkpoint.approveConfirmed
-    || !checkpoint.approveTx
-    || !checkpoint.listingConfirmed
-    || !checkpoint.listingTx) return null
+    || !checkpoint.createTx) return null
   return {
     agentId: checkpoint.agentId,
     vault: checkpoint.vault,
@@ -165,6 +161,11 @@ function isLaunchInput(value: unknown): value is LaunchInput {
     && typeof input.floorPriceEth === 'string'
     && Number.isFinite(Number(input.floorPriceEth))
     && Number(input.floorPriceEth) > 0
+    && (input.fundAmount === undefined || (
+      typeof input.fundAmount === 'string'
+      && Number.isFinite(Number(input.fundAmount))
+      && Number(input.fundAmount) > 0
+    ))
 }
 
 function isStoredCheckpoint(value: unknown): value is StoredLaunchSession['checkpoint'] {

@@ -3,6 +3,7 @@ import type { View } from './types'
 import { creatorAddressFromPath, pathForView, performanceAgentIdFromPath, proofIdFromPath, viewFromPath } from './lib/navigation'
 import { AppShell } from './components/AppShell'
 import { LandingPage } from './pages/LandingPage'
+import { HomePage } from './pages/HomePage'
 
 export function App() {
   const [view, setView] = useState<View>(() => viewFromPath(window.location.pathname))
@@ -14,9 +15,11 @@ export function App() {
   }, [])
 
   useEffect(() => {
-    document.body.dataset.surface = view === 'landing' ? 'landing' : 'app'
+    document.body.dataset.surface = view === 'landing' || view === 'about' ? 'landing' : 'app'
     document.title = view === 'landing'
       ? 'LIQUIDMUPPETS | onchain liquidity agents'
+      : view === 'about'
+        ? 'How LIQUIDMUPPETS works'
       : `${view === 'marketplace' ? 'Pet Marketplace' : view === 'performance' ? 'Muppet Performance' : view === 'creator' ? 'Creator Profile' : view === 'pulse' ? 'System Pulse' : view === 'proofs' ? 'Proof Cards' : view === 'proof' ? 'Public Proof' : view === 'monitor' ? 'Watchlist and Market Radar' : view[0].toUpperCase() + view.slice(1)} | LIQUIDMUPPETS`
     window.scrollTo({ top: 0 })
   }, [view])
@@ -28,7 +31,8 @@ export function App() {
     setView(next)
   }
 
-  if (view === 'landing') return <LandingPage onNavigate={navigate} />
+  if (view === 'landing') return <HomePage onNavigate={navigate} />
+  if (view === 'about') return <LandingPage onNavigate={navigate} />
   return (
     <AppShell
       view={view}

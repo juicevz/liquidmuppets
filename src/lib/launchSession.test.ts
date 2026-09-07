@@ -24,6 +24,7 @@ const input = {
   keySupply: 100,
   listingQuantity: 20,
   floorPriceEth: '0.01',
+  fundAmount: '0.1',
 }
 
 describe('launch session recovery', () => {
@@ -42,7 +43,27 @@ describe('launch session recovery', () => {
     const restored = parseLaunchSession(serializeLaunchSession(session), { chainId: 4663, factory, wallet })
 
     expect(restored?.checkpoint.agentId).toBe(17n)
+    expect(restored?.input.fundAmount).toBe('0.1')
     expect(launchResultFromCheckpoint(restored!.checkpoint)).toEqual({ agentId: 17n, vault, key, createTx, approveTx, listingTx })
+  })
+
+  it('treats the Muppet as launched before any optional Key listing', () => {
+    const session = withLaunchCheckpoint(createLaunchSession(4663, factory, wallet, input), {
+      createTx,
+      createConfirmed: true,
+      agentId: 17n,
+      vault,
+      key,
+    })
+
+    expect(launchResultFromCheckpoint(session.checkpoint)).toEqual({
+      agentId: 17n,
+      vault,
+      key,
+      createTx,
+      approveTx: undefined,
+      listingTx: undefined,
+    })
   })
 
   it('keeps a submitted transaction resumable before confirmation', () => {

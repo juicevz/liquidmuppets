@@ -1,0 +1,25 @@
+LIQUIDMUPPETS
+
+liquidmuppets is simpler now.
+
+one screen explains the product. creating a Muppet is 3 steps: pick a pet + name, choose one live vault job, then launch + fund.
+
+Agent Key markets are optional after launch and stay separate from vault assets.
+
+https://liquidmuppets.io
+
+
+FOUNDER
+
+got fair feedback that liquidmuppets took too much reading to click.
+
+fixed it. the homepage explains the product in one screen and creating a Muppet is 3 steps: pet + name, one vault job, launch + fund.
+
+the Key market is optional after launch.
+
+https://liquidmuppets.io
+
+
+REPOSITORY
+
+https://github.com/juicevz/liquidmuppets
