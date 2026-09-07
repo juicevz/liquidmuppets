@@ -16969,6 +16969,15 @@ button.header-social-link {
     flex-direction: column;
   }
 
+  .creator-title,
+  .creator-title > div,
+  .creator-title h1,
+  .creator-title > a {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
   .creator-asset-grid,
   .creator-key-grid {
     grid-template-columns: 1fr;
