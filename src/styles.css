@@ -11141,6 +11141,17 @@ select:focus-visible {
 
 /* Public roadmap: one evidence ledger, with shipped work kept distinct from conditional work. */
 
+.docs-section-link {
+  display: inline-flex;
+  margin-top: 15px;
+  color: #c5d6ce;
+  font-size: 12px;
+  font-weight: 620;
+  overflow-wrap: anywhere;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
 .landing-v2.landing-v3 .roadmap-section {
   padding-block: 164px 148px;
 }

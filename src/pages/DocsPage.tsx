@@ -26,6 +26,7 @@ interface DocsSection {
   title: string
   body: string
   details?: string[]
+  link?: { label: string; href: string }
   visual?: DocsVisualKind
 }
 
@@ -197,7 +198,8 @@ const docsSections: DocsSection[] = [
   {
     number: '19',
     title: 'Public roadmap',
-    body: `${roadmapBoundary} The public repository is ${roadmapRepository}.`,
+    body: `${roadmapBoundary} The current implementation and full operating notes stay available in the public repository.`,
+    link: { label: 'Open the public repository', href: roadmapRepository },
     details: [
       ...publicRoadmap.map((phase) => `phase ${phase.number} · ${phase.status} · ${phase.title}: ${phase.items.join('; ')}`),
       roadmapSequenceNote,
@@ -416,6 +418,7 @@ export function DocsPage() {
               <div className="docs-section-copy">
                 <h2>{section.title}</h2>
                 <p>{section.body}</p>
+                {section.link && <a className="docs-section-link" href={section.link.href} target="_blank" rel="noreferrer">{section.link.label}</a>}
                 {section.details && <ul>{section.details.map((detail) => <li key={detail}>{detail}</li>)}</ul>}
                 {section.visual && <DocsVisual kind={section.visual} />}
               </div>
