@@ -679,7 +679,7 @@ await page.goto(`${baseUrl}/docs`, { waitUntil: 'networkidle' })
 results.docsTitle = await page.title()
 results.docsSections = await page.locator('.docs-layout article > section').count()
 results.docsTokenGate = await page.getByRole('heading', { name: '$MUPPETS Creator Slots' }).count() === 1
-results.docsCreatorSlotFormula = await page.getByText(/floor\(wallet balance \/ 15,000\)/i).count() === 1
+results.docsCreatorSlotFormula = await page.getByText(/floor\(\(liquid balance \+ Agent-Bonded balance\) \/ 15,000\)/i).count() === 1
 results.docsSimpleCreator = await page.getByText(/Creation now has three stages/i).count() === 1
 results.docsOptionalKeyMarket = await page.getByText(/Opening an Agent Key market is optional and separate after launch/i).count() === 1
 results.docsSevenPets = await page.getByRole('heading', { name: 'Seven pets, three live tasks' }).count() === 1
@@ -1093,7 +1093,7 @@ const failed =
   || !results.docsRoadmap
   || !results.docsBoundary
   || !results.docsLiveContracts
-  || results.docsVisuals !== 8
+  || results.docsVisuals !== 9
   || results.docsPetCards !== 7
   || results.docsPetNames.join(',') !== 'blue,sage,stone,fox,plum,frog,gold'
   || !results.docsPetNamesUnclipped
@@ -1137,7 +1137,7 @@ const failed =
   || results.narrowCreatorOverflow
   || results.narrowCreatorSlotColumns !== 1
   || !results.narrowHeaderVisible
-  || results.degradedTaskPickerCount !== 7
+  || results.degradedTaskPickerCount !== 3
   || !results.degradedTaskWarning
   || consoleErrors.length > 0
 
