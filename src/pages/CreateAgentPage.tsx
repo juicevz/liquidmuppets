@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { parseUnits, type Address, type Hash } from 'viem'
 import { Icon } from '../components/Icon'
+import { CreatorSlots } from '../components/CreatorSlots'
 import { pets } from '../data/pets'
 import { defaultMarketForTask, marketsForTask } from '../data/strategyMarkets'
 import { useProtocol } from '../hooks/useProtocol'
@@ -104,7 +105,7 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
   const supply = Number(keySupply)
   const listed = Number(listingQuantity)
   const floor = Number(floorPrice)
-  const requiredMuppets = Number(access?.minimum ?? config?.accessGate.minimum ?? 15_000).toLocaleString('en-US')
+  const requiredMuppets = Number(access?.requiredForNextLaunch ?? config?.accessGate.slotSize ?? 15_000).toLocaleString('en-US')
   const keyValid = /^[A-Za-z0-9]{2,10}$/.test(keySymbol)
   const formReady = Boolean(
     name.trim().length >= 2 && name.trim().length <= 32 && keyValid
@@ -223,10 +224,12 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
         const latestAccess = await fetchTokenAccess(walletAddress)
         setAccess(latestAccess)
         if (!latestAccess.eligible) {
-          const required = Number(latestAccess.minimum).toLocaleString('en-US')
+          const required = Number(latestAccess.requiredForNextLaunch ?? latestAccess.minimum).toLocaleString('en-US')
           throw new Error(latestAccess.reason === 'token_not_configured'
-            ? 'The canonical $MUPPETS contract address is required to launch.'
-            : `Hold at least ${required} $MUPPETS to launch a Muppet.`)
+            ? 'The canonical $MUPPETS contract address is required to calculate Creator Slots.'
+            : latestAccess.reason === 'access_check_unavailable'
+              ? 'Creator Slot verification is temporarily unavailable. No transaction was sent.'
+              : `Hold ${required} $MUPPETS to unlock your next Creator Slot.`)
         }
       }
       await launchAgent(config, provider, walletAddress as Address, input, {
@@ -279,6 +282,15 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
             : 'The appearance is cosmetic. The task fixes the vault and its deployed money route.'}</p>
         </div>
       </section>
+
+      <CreatorSlots
+        access={access}
+        connected={Boolean(walletAddress)}
+        loading={accessLoading}
+        slotSize={config?.accessGate.slotSize}
+        explorerUrl={config?.explorerUrl}
+        tokenAddress={config?.accessGate.tokenAddress}
+      />
 
       {(error || launchError) && <div className="protocol-error" role="alert"><Icon name="alert" />{launchError || error}</div>}
 
@@ -452,7 +464,7 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
                   <div className={`launch-token-gate ${access?.eligible || launchStarted ? 'unlocked' : 'locked'}`}>
                     <Icon name={access?.eligible || launchStarted ? 'check' : 'lock'} />
                     <span>
-                      <strong>{launchStarted ? 'Launch recovery ready.' : `${requiredMuppets} $MUPPETS required to launch.`}</strong>
+                      <strong>{launchStarted ? 'Launch recovery ready.' : `${requiredMuppets} $MUPPETS unlocks your next Creator Slot.`}</strong>
                       <small>{launchStarted
                         ? 'This browser saved each submitted receipt. Resume continues at the first unfinished confirmation.'
                         : !walletAddress
@@ -460,19 +472,10 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
                           : accessLoading
                             ? 'Checking the connected wallet.'
                             : access?.eligible
-                              ? `${access.balance} $MUPPETS verified. Launch is unlocked.`
-                              : access?.reason === 'below_minimum'
-                                ? `Wallet balance: ${access.balance ?? '0'} $MUPPETS. Tokens remain in the wallet.`
-                                : 'Add the canonical $MUPPETS contract address to enable launch.'}</small>
-                      {config?.accessGate.tokenAddress && (
-                        <a
-                          className="launch-token-address"
-                          href={`${config.explorerUrl}/address/${config.accessGate.tokenAddress}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          aria-label={`MUPPETS contract ${config.accessGate.tokenAddress}`}
-                        >CA {config.accessGate.tokenAddress}</a>
-                      )}
+                              ? `${access.balance} $MUPPETS verified. ${access.slotsAvailable} launch slot${access.slotsAvailable === 1 ? '' : 's'} available.`
+                              : access?.reason === 'below_minimum' || access?.reason === 'capacity_full'
+                                ? `Wallet balance: ${access.balance ?? '0'} $MUPPETS. Existing Muppets remain available.`
+                                : 'Creator Slot verification is unavailable. No transaction will be sent.'}</small>
                     </span>
                   </div>
                   <button type="button" className="builder-primary" disabled={launching || (launchStarted ? !recoveryReady : !canLaunch)} onClick={deploy}>
@@ -487,10 +490,10 @@ export function CreateAgentPage({ creatorHandle, walletAddress, onConnect }: Cre
                             : accessLoading
                               ? 'Checking $MUPPETS'
                               : access?.eligible
-                                ? 'Launch Muppet'
-                                : access?.reason === 'below_minimum'
-                                  ? `Hold ${requiredMuppets} $MUPPETS`
-                                  : '$MUPPETS address required'}
+                              ? 'Launch Muppet'
+                                : access?.reason === 'below_minimum' || access?.reason === 'capacity_full'
+                                  ? `Unlock at ${requiredMuppets} $MUPPETS`
+                                  : 'Slot check unavailable'}
                   </button>
                   {progress && <div className="transaction-progress" role="status"><Icon name="spark" />{progress}</div>}
                   {session && config && <LaunchReceiptTracker checkpoint={session.checkpoint} explorerUrl={config.explorerUrl} />}

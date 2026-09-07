@@ -17,6 +17,7 @@ export const publicRoadmap: RoadmapPhase[] = [
     title: 'Market core',
     items: [
       'Public performance pages and creator profiles',
+      '$MUPPETS Creator Slots in the app, API and public profiles',
       'System Pulse with restart-safe incremental indexing',
       'Watchlists, alerts and Market Radar',
       'Three live task routes and a 26-route Stock Token reserve',
@@ -42,7 +43,7 @@ export const publicRoadmap: RoadmapPhase[] = [
     track: 'FactoryV2',
     items: [
       'Simulate and broadcast migration after Safe approval',
-      'Enforce the 15,000 $MUPPETS balance onchain while tokens remain in the wallet',
+      'Enforce one creator slot per 15,000 $MUPPETS onchain while tokens remain in the wallet',
       'Preserve V1 vaults, withdrawals, policies and Key markets',
       'Enable new launches through a separate Safe transaction',
     ],

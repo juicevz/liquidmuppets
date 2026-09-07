@@ -23,6 +23,16 @@ ERC20_ACCESS_ABI = [
     },
 ]
 
+FACTORY_CREATOR_ABI = [
+    {
+        "type": "function",
+        "name": "getCreatorAgentIds",
+        "stateMutability": "view",
+        "inputs": [{"name": "creator", "type": "address"}],
+        "outputs": [{"name": "ids", "type": "uint256[]"}],
+    }
+]
+
 
 def format_token_amount(value: int, decimals: int) -> str:
     if decimals == 0:
@@ -51,10 +61,22 @@ class TokenGateService:
             "tokenAddress": self.settings.muppets_token_address.strip() or None,
             "tokenSymbol": self.settings.muppets_token_symbol,
             "minimum": str(self.settings.muppets_token_minimum),
+            "enforcement": "onchain" if self.settings.factory_version >= 2 else "app_and_api",
             "decimals": None,
             "balance": None,
             "balanceRaw": None,
             "minimumRaw": None,
+            "slotSize": str(self.settings.muppets_token_minimum),
+            "slotSizeRaw": None,
+            "slotCount": None,
+            "slotsUsed": None,
+            "slotsAvailable": None,
+            "featuredSlots": None,
+            "overCapacity": None,
+            "nextSlotThreshold": None,
+            "nextSlotThresholdRaw": None,
+            "requiredForNextLaunch": None,
+            "requiredForNextLaunchRaw": None,
             "reason": "token_not_configured",
             "source": "Robinhood Chain RPC",
         }
@@ -72,17 +94,31 @@ class TokenGateService:
             wallet_address = Web3.to_checksum_address(wallet)
             if len(self.web3.eth.get_code(token_address)) == 0:
                 raise ValueError("configured token address has no runtime code")
+            if not Web3.is_address(self.settings.factory_address):
+                raise ValueError("factory address is not configured")
+            factory_address = Web3.to_checksum_address(self.settings.factory_address)
+            if len(self.web3.eth.get_code(factory_address)) == 0:
+                raise ValueError("configured factory address has no runtime code")
             token = self.web3.eth.contract(address=token_address, abi=ERC20_ACCESS_ABI)
+            factory = self.web3.eth.contract(address=factory_address, abi=FACTORY_CREATOR_ABI)
             decimals = int(token.functions.decimals().call())
             if decimals < 0 or decimals > 36:
                 raise ValueError("token decimals are outside the supported range")
             balance = int(token.functions.balanceOf(wallet_address).call())
+            slots_used = len(factory.functions.getCreatorAgentIds(wallet_address).call())
         except Exception:
             result["reason"] = "access_check_unavailable"
             return result
 
         minimum_raw = self.settings.muppets_token_minimum * 10**decimals
-        eligible = balance >= minimum_raw
+        slot_count = balance // minimum_raw
+        slots_available = max(slot_count - slots_used, 0)
+        featured_slots = min(slot_count, slots_used)
+        over_capacity = max(slots_used - slot_count, 0)
+        next_threshold_raw = (slot_count + 1) * minimum_raw
+        required_for_next_launch_raw = (slots_used + 1) * minimum_raw
+        eligible = slots_available > 0
+        reason = "eligible" if eligible else "below_minimum" if slot_count == 0 else "capacity_full"
         result.update(
             {
                 "eligible": eligible,
@@ -90,7 +126,17 @@ class TokenGateService:
                 "balance": format_token_amount(balance, decimals),
                 "balanceRaw": str(balance),
                 "minimumRaw": str(minimum_raw),
-                "reason": "eligible" if eligible else "below_minimum",
+                "slotSizeRaw": str(minimum_raw),
+                "slotCount": slot_count,
+                "slotsUsed": slots_used,
+                "slotsAvailable": slots_available,
+                "featuredSlots": featured_slots,
+                "overCapacity": over_capacity,
+                "nextSlotThreshold": format_token_amount(next_threshold_raw, decimals),
+                "nextSlotThresholdRaw": str(next_threshold_raw),
+                "requiredForNextLaunch": format_token_amount(required_for_next_launch_raw, decimals),
+                "requiredForNextLaunchRaw": str(required_for_next_launch_raw),
+                "reason": reason,
             }
         )
         return result

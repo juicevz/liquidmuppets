@@ -85,7 +85,7 @@ contract LiquidMuppetsFactoryV2Test is Test {
         factoryV2.setLaunchesEnabled(true);
     }
 
-    function testGateRejectsBelowThresholdAndLeavesTheBalanceReusable() public {
+    function testCreatorSlotsScaleWithEachLaunchAndLeaveTheBalanceReusable() public {
         accessToken.mint(creator, 14_999 ether);
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -99,9 +99,70 @@ contract LiquidMuppetsFactoryV2Test is Test {
         vm.prank(creator);
         factoryV2.createAgent(1, 3, "apple fox", "APPLE", 100, 0.01 ether);
 
-        assertEq(accessToken.balanceOf(creator), 15_000 ether);
-        assertEq(factoryV2.agentCount(), 2);
-        assertEq(factoryV2.newAgentCount(), 1);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                LiquidMuppetsFactoryV2.InsufficientAccessBalance.selector, 15_000 ether, 30_000 ether
+            )
+        );
+        vm.prank(creator);
+        factoryV2.createAgent(2, 3, "second fox", "FOX2", 100, 0.01 ether);
+
+        accessToken.mint(creator, 15_000 ether);
+        vm.prank(creator);
+        factoryV2.createAgent(2, 3, "second fox", "FOX2", 100, 0.01 ether);
+
+        (uint256 balance, uint256 slots, uint256 used, uint256 available, uint256 nextRequired) =
+            factoryV2.creatorSlotState(creator);
+        assertEq(balance, 30_000 ether);
+        assertEq(slots, 2);
+        assertEq(used, 2);
+        assertEq(available, 0);
+        assertEq(nextRequired, 45_000 ether);
+        assertEq(accessToken.balanceOf(creator), 30_000 ether);
+        assertEq(factoryV2.agentCount(), 3);
+        assertEq(factoryV2.newAgentCount(), 2);
+    }
+
+    function testLegacyMuppetConsumesOneCreatorSlot() public {
+        accessToken.mint(legacyCreator, 15_000 ether);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                LiquidMuppetsFactoryV2.InsufficientAccessBalance.selector, 15_000 ether, 30_000 ether
+            )
+        );
+        vm.prank(legacyCreator);
+        factoryV2.createAgent(1, 3, "second legacy", "LEG2", 100, 0.01 ether);
+
+        (uint256 balance, uint256 slots, uint256 used, uint256 available, uint256 nextRequired) =
+            factoryV2.creatorSlotState(legacyCreator);
+        assertEq(balance, 15_000 ether);
+        assertEq(slots, 1);
+        assertEq(used, 1);
+        assertEq(available, 0);
+        assertEq(nextRequired, 30_000 ether);
+    }
+
+    function testBalanceDropDoesNotTouchExistingVaultOrAgentKeyMarket() public {
+        accessToken.mint(creator, 15_000 ether);
+        vm.prank(creator);
+        (, address vaultAddress, address key) =
+            factoryV2.createAgent(1, 3, "independent fox", "IFX", 100, 0.01 ether);
+
+        vm.prank(creator);
+        accessToken.transfer(makeAddr("receiver"), 15_000 ether);
+
+        StrategyVault vault = StrategyVault(vaultAddress);
+        asset.mint(creator, 100e6);
+        vm.startPrank(creator);
+        asset.approve(address(vault), 100e6);
+        uint256 shares = vault.deposit(100e6, creator);
+        uint256 redeemed = vault.redeem(shares, creator, creator);
+        vm.stopPrank();
+
+        assertEq(accessToken.balanceOf(creator), 0);
+        assertEq(redeemed, 100e6);
+        assertEq(IERC20(key).balanceOf(creator), 100);
+        assertTrue(marketV2.approvedKeys(key));
     }
 
     function testLegacyRecordsAndCreatorIdsRemainReadable() public view {

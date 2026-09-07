@@ -64,9 +64,12 @@ def test_contract_config_uses_same_origin_read_proxy(tmp_path: Path) -> None:
     assert response.json()["rpcUrl"] == "/api/v1/rpc"
     assert response.json()["accessGate"] == {
         "feature": "agent_launch",
+        "model": "creator_slots",
         "tokenAddress": None,
         "tokenSymbol": "MUPPETS",
         "minimum": "15000",
+        "slotSize": "15000",
+        "formula": "floor(balance / slotSize)",
         "configured": False,
         "enforcement": "app_and_api",
     }
@@ -240,12 +243,16 @@ def test_token_gate_unlocks_at_exact_threshold() -> None:
     settings = Settings(
         muppets_token_address="0x2222222222222222222222222222222222222222",
         muppets_token_minimum=15_000,
+        factory_address="0x3333333333333333333333333333333333333333",
     )
     fake_web3 = MagicMock()
     fake_web3.eth.get_code.return_value = b"\x60"
-    fake_contract = fake_web3.eth.contract.return_value
-    fake_contract.functions.decimals.return_value.call.return_value = 18
-    fake_contract.functions.balanceOf.return_value.call.return_value = 15_000 * 10**18
+    fake_token = MagicMock()
+    fake_factory = MagicMock()
+    fake_web3.eth.contract.side_effect = [fake_token, fake_factory]
+    fake_token.functions.decimals.return_value.call.return_value = 18
+    fake_token.functions.balanceOf.return_value.call.return_value = 15_000 * 10**18
+    fake_factory.functions.getCreatorAgentIds.return_value.call.return_value = []
 
     result = TokenGateService(settings, fake_web3).check("0x1111111111111111111111111111111111111111")
 
@@ -253,7 +260,40 @@ def test_token_gate_unlocks_at_exact_threshold() -> None:
     assert result["eligible"] is True
     assert result["balance"] == "15000"
     assert result["minimumRaw"] == str(15_000 * 10**18)
+    assert result["slotCount"] == 1
+    assert result["slotsUsed"] == 0
+    assert result["slotsAvailable"] == 1
+    assert result["featuredSlots"] == 0
+    assert result["nextSlotThreshold"] == "30000"
+    assert result["requiredForNextLaunch"] == "15000"
     assert result["reason"] == "eligible"
+
+
+def test_token_gate_requires_one_slot_per_existing_muppet() -> None:
+    settings = Settings(
+        muppets_token_address="0x2222222222222222222222222222222222222222",
+        muppets_token_minimum=15_000,
+        factory_address="0x3333333333333333333333333333333333333333",
+    )
+    fake_web3 = MagicMock()
+    fake_web3.eth.get_code.return_value = b"\x60"
+    fake_token = MagicMock()
+    fake_factory = MagicMock()
+    fake_web3.eth.contract.side_effect = [fake_token, fake_factory]
+    fake_token.functions.decimals.return_value.call.return_value = 18
+    fake_token.functions.balanceOf.return_value.call.return_value = 30_000 * 10**18
+    fake_factory.functions.getCreatorAgentIds.return_value.call.return_value = [0, 1]
+
+    result = TokenGateService(settings, fake_web3).check("0x1111111111111111111111111111111111111111")
+
+    assert result["eligible"] is False
+    assert result["slotCount"] == 2
+    assert result["slotsUsed"] == 2
+    assert result["slotsAvailable"] == 0
+    assert result["featuredSlots"] == 2
+    assert result["overCapacity"] == 0
+    assert result["requiredForNextLaunch"] == "45000"
+    assert result["reason"] == "capacity_full"
 
 
 def test_token_amount_formatting_is_exact() -> None:

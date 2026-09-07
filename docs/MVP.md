@@ -5,21 +5,24 @@ LiquidMuppets combines two separate products on Robinhood Chain mainnet:
 1. a task-bound ERC-4626 vault where depositors own transferable shares
 2. a fixed-supply Agent Key market for trading and permanent binding
 
-A third token has platform access utility. Public browsing remains open, but a creator must hold at least `15,000 $MUPPETS` in the connected wallet to launch a new agent through the LiquidMuppets app. The token remains in the wallet and is not spent, locked or burned.
+A third token has platform access utility. Public browsing remains open. Every `15,000 $MUPPETS` held unlocks one active Creator Slot, and an available slot permits one new Muppet plus one featured placement on the creator profile. The token remains transferable in the wallet and is not spent, locked or burned.
 
 A qualifying creator chooses one of seven cosmetic pets, assigns one of three enabled tasks, chooses that task's live market, sets the Key supply and initial ask, and signs the factory transaction. Four FactoryV2 candidates are visible for review but cannot be selected for a live launch. The selected task fixes the deposit asset, adapter, allocation cap, cooldown, and vault cap. Pet appearance never changes the financial behavior.
 
-## $MUPPETS access gate
+## $MUPPETS Creator Slots
 
-- gated feature: launching a new Muppet through `/app/create`
-- minimum balance: `15,000 $MUPPETS`
+- capacity formula: `slots = floor(wallet balance / 15,000)`
+- one available slot permits one new Muppet through `/app/create`
+- one used slot funds one featured Muppet on the public creator profile
 - public without the token: landing, docs, marketplace, activity, Muppet performance, creator profiles, System Pulse, watchlists, Market Radar and portfolio reads
-- balance verification: FastAPI reads `balanceOf(wallet)` from Robinhood Chain; the browser checks again before sending the first transaction
+- capacity verification: FastAPI reads `balanceOf(wallet)` and `getCreatorAgentIds(wallet)` from Robinhood Chain; the browser checks both again before sending the first transaction
 - token address: `0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189`
 
-The gate fails closed. An empty address, invalid contract, RPC failure or balance below the threshold cannot launch through the app.
+The capacity check fails closed. An empty address, invalid contract, unavailable RPC read, or a wallet with no available slot cannot launch through the app. Launch and creator pages show balance, slots unlocked, slots used, slots available and the exact next-launch threshold. The newest Muppets fill currently funded featured placements; every Muppet remains in the complete public ledger.
 
-The current mainnet factory was deployed before this rule and does not check `$MUPPETS` itself. A technically capable user can call that factory directly. FactoryV2 implements the immutable token address and 15,000-token balance check onchain while leaving the balance in the creator wallet. Until the published FactoryV2 multisig migration is broadcast, verified and activated, the live V1 path remains an app and API access rule.
+If a wallet balance falls, existing vaults, deposits, withdrawals, allocations, redemptions and Agent Key markets remain available. The wallet only loses additional launches and featured placement above current capacity.
+
+The current mainnet factory was deployed before this rule and does not check `$MUPPETS` itself. A technically capable user can call that factory directly. FactoryV2 counts legacy and V2 Muppets and requires `(existing Muppets + 1) × 15,000 $MUPPETS` for the next launch while leaving the balance in the creator wallet. Until the published FactoryV2 multisig migration is broadcast, verified and activated, the live V1 path remains an app and API capacity rule.
 
 ## Current deployment
 
@@ -43,7 +46,7 @@ The repository now contains `LiquidMuppetsFactoryV2`, a guarded deployment scrip
 
 FactoryV2 adds:
 
-- an immutable 15,000 `$MUPPETS` balance check on every new launch
+- one immutable creator slot per 15,000 `$MUPPETS`, counting both legacy and V2 Muppets before every new launch
 - an owner-controlled registry binding each approved task to an exact asset, adapter, route ID, vault cap and allowed preset mask
 - defensive, balanced and active presets for eligible range tasks
 - global launch activation that defaults to off and can only be enabled after ownership moves to deployed governance code
@@ -57,9 +60,9 @@ The migration leaves new launches disabled. `scripts/verify-factory-v2.sh` submi
 
 The site exposes a four-phase roadmap backed by the current release and repository state:
 
-1. `shipped · market core`: public performance and creator pages, System Pulse, watchlists, alerts, Market Radar, three live task routes, and the 26-route Stock Token reserve
+1. `shipped · market core`: public performance and creator pages, `$MUPPETS` Creator Slots, System Pulse, watchlists, alerts, Market Radar, three live task routes, and the 26-route Stock Token reserve
 2. `next · resilience`: configure an independent production RPC fallback, complete source verification, move protocol ownership to a verified Safe, and commission an independent contract review
-3. `conditional · FactoryV2 permissioning`: simulate and broadcast after Safe approval, enforce the 15,000 `$MUPPETS` balance onchain while the tokens remain in the wallet, preserve V1 positions and markets, then enable launches through a separate Safe transaction
+3. `conditional · FactoryV2 permissioning`: simulate and broadcast after Safe approval, enforce one creator slot per 15,000 `$MUPPETS` onchain while the tokens remain in the wallet, preserve V1 positions and markets, then enable launches through a separate Safe transaction
 4. `conditional · route review`: activate NVDA/USDG only after verified FactoryV2 activation, leave AAPL/USDG and SPY/USDG disabled until venue approval, keep meme/WETH disabled until every liquidity, age, volume, oracle, and exit gate passes, and expose new market evidence only when adapters source it
 
 `Shipped` means live or published. Later work remains conditional on verification and venue evidence. The roadmap has no dates, completion percentages, projected returns, or invented historical APY. Its sequence can change when evidence changes.
@@ -188,6 +191,8 @@ A visitor can select up to two Muppets for a side-by-side comparison. Both colum
 
 Every creator wallet has a shareable route at `/app/creator/{wallet}` backed by `GET /api/v1/creators/{wallet}`. It lists every Muppet in the recorded marketplace summaries whose factory creator matches that wallet. Each row retains its native asset, checkpoint start, flow-adjusted change, deployed share, market health, checkpoint count and decoded transaction-receipt count.
 
+The same response includes `creator_capacity` and `featured_agent_ids`. Capacity comes from the live canonical `$MUPPETS` balance and factory creator IDs. Featured placement deterministically uses the newest recorded Muppets up to the number of funded slots. A balance drop removes only over-capacity placement; it never removes the full record or changes a vault or Agent Key contract.
+
 Capital is aggregated only inside an exact asset address, symbol and decimals group. Different assets are never converted or summed. Agent Key state is returned with each Muppet but rendered in a separate speculative-market section because Key prices do not enter vault accounting.
 
 A claimed app handle is displayed as a wallet-signed label. It does not verify an external social account. A wallet without a handle or launched Muppet still has a valid public address page with an honest empty state.
@@ -218,7 +223,7 @@ The Market Radar beta is read-only. `GET /api/v1/market-radar` groups the latest
 
 1. Browse agents, markets, public creator profiles, System Pulse, watchlists, Market Radar and documentation without connecting a wallet or holding `$MUPPETS`.
 2. Connect an EVM wallet on Robinhood Chain mainnet.
-3. Hold at least `15,000 $MUPPETS` to unlock agent launch through the app.
+3. Hold `15,000 $MUPPETS` per Muppet you want to operate. The first launch threshold is 15,000, the second is 30,000, and each later threshold adds 15,000.
 4. Pick any of the seven pet appearances.
 5. Select stable yield, ETH range, or launch reserve.
 6. Confirm the deployed market for that task.
@@ -287,7 +292,7 @@ The dev-funded liquidity activation also deposited 0.05 WETH into the range vaul
 
 The API reads deployment configuration from environment variables and validates chain connectivity on startup. Thin routes delegate to services that:
 
-- verify `$MUPPETS` launch eligibility against the canonical token contract
+- calculate `$MUPPETS` Creator Slots from the canonical token balance and the wallet's factory Muppet count
 - query factory, vault, Key, marketplace, and adapter state through RPC
 - return live fee-reserve totals, holdings, limits, and all 26 routes
 - decode public activity logs and enrich them with agent metadata
@@ -309,7 +314,7 @@ Launch recovery and the post-launch command state are frontend-only. They are no
 
 Failure handling is explicit: RPC or decode failures keep the last healthy timestamp visible, activity polling labels stale state after five minutes, contract transactions surface wallet errors, and policy or adapter checks revert the whole onchain action. A cache is never relabeled as a new chain read.
 
-`GET /api/v1/access/{wallet}` returns the token address, required amount, live balance and eligibility decision. Access verification fails closed when token configuration or RPC reads are unavailable.
+`GET /api/v1/access/{wallet}` returns the token address, live balance, slot size, slots unlocked, slots used, slots available, funded featured placements, over-capacity count, next balance-slot threshold, next-launch threshold and eligibility decision. Access verification fails closed when token, factory or RPC reads are unavailable.
 
 ## Verification
 
@@ -361,12 +366,12 @@ SAFE_MULTISIG=0x... forge script script/DeployFactoryV2.s.sol:DeployFactoryV2 \
 
 ## Launch readiness
 
-The controlled mainnet beta is operational: qualifying creator launches, deposits, bounded strategy cycles, withdrawals, Key asks, bids, partial fills, binding, public activity, scheduled keeper checks, and the Stock Token reserve are live. The app and API unlock creator launch when the connected wallet holds at least `15,000 $MUPPETS`.
+The controlled mainnet beta is operational: qualifying creator launches, deposits, bounded strategy cycles, withdrawals, Key asks, bids, partial fills, binding, public activity, scheduled keeper checks, and the Stock Token reserve are live. The app and API unlock a creator launch only when the connected wallet has an available Creator Slot.
 
 Before an unrestricted public launch:
 
 - the canonical `$MUPPETS` contract is configured in the app and API, with unavailable reads still failing closed
-- the deployed V1 factory does not enforce the token rule against direct contract calls; FactoryV2 implements it but its migration has not been broadcast
+- the deployed V1 factory does not enforce Creator Slots against direct contract calls; FactoryV2 implements them but its migration has not been broadcast
 - mainnet deposits use real assets and carry loss risk
 - contracts are tested but not independently audited
 - the current owner is a dedicated EOA rather than a multisig; it can pause `FeeRwaReserve` and rescue reserve assets while paused

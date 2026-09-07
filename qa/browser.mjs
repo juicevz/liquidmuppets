@@ -3,6 +3,7 @@ import { mkdir } from 'node:fs/promises'
 
 const baseUrl = process.env.LIQUIDMUPPETS_QA_URL ?? 'http://127.0.0.1:4317'
 const expectedMuppetsToken = '0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189'
+const expectedDevWallet = '0x30dF6f545FcD732c659626b8C8aFd63Ff8aE3d5f'
 const screenshotDir = new URL('./screenshots/', import.meta.url)
 await mkdir(screenshotDir, { recursive: true })
 
@@ -139,6 +140,12 @@ const accessGateProof = await page.evaluate(async ({ tokenAddress }) => {
         && access.configured === true
         && access.decimals === 18
         && access.minimumRaw === '15000000000000000000000'
+        && access.slotSize === '15000'
+        && access.slotCount === 0
+        && access.slotsUsed === 0
+        && access.slotsAvailable === 0
+        && access.requiredForNextLaunch === '15000'
+        && access.enforcement === 'app_and_api'
         && access.reason === 'below_minimum',
     }
   } catch {
@@ -149,6 +156,27 @@ results.muppetsGateConfigured = accessGateProof.configured
 results.muppetsAddressMatches = accessGateProof.addressMatches
 results.muppetsMinimumMatches = accessGateProof.minimumMatches
 results.muppetsLiveRead = accessGateProof.liveRead
+const devCapacityProof = await page.evaluate(async ({ wallet }) => {
+  const [accessResponse, profileResponse] = await Promise.all([
+    fetch(`/api/v1/access/${wallet}`, { cache: 'no-store' }),
+    fetch(`/api/v1/creators/${wallet}`, { cache: 'no-store' }),
+  ])
+  const access = await accessResponse.json()
+  const profile = await profileResponse.json()
+  return accessResponse.ok
+    && profileResponse.ok
+    && access.balance === '0'
+    && access.slotCount === 0
+    && access.slotsUsed === 3
+    && access.slotsAvailable === 0
+    && access.overCapacity === 3
+    && access.requiredForNextLaunch === '60000'
+    && access.reason === 'below_minimum'
+    && profile.creator_capacity?.overCapacity === 3
+    && profile.agents?.length === 3
+    && profile.featured_agent_ids?.length === 0
+}, { wallet: expectedDevWallet })
+results.devWalletCapacity = devCapacityProof
 results.landingTitle = await page.title()
 results.heroHeading = (await page.locator('.hero h1').innerText()).replace(/\s+/g, ' ').trim()
 results.heroAgentCount = await page.locator('.pixel-agent').count()
@@ -242,6 +270,8 @@ results.createChainNumberRemoved = !((await page.locator('.create-page').innerTe
 results.petPickerCount = await page.locator('.pet-picker button').count()
 results.builderProgressSteps = await page.locator('.compact-builder-progress button').count()
 results.descriptionInputs = await page.locator('textarea, input[name="description"]').count()
+results.creatorSlotsOnLaunch = await page.getByRole('heading', { name: 'Creator Slots' }).count() === 1
+results.creatorSlotMetricsOnLaunch = await page.locator('.creator-slots-grid > span').count()
 results.appearanceCopy = await page.getByText(/Appearance changes no permissions/i).count() === 1
 await page.getByRole('button', { name: /Continue/ }).click()
 await page.getByText('What should this pet do?').waitFor()
@@ -280,7 +310,7 @@ await page.screenshot({ path: new URL('create-seven-pets.png', screenshotDir).pa
 await page.locator('label').filter({ hasText: 'muppet name' }).locator('input').fill('browser gate')
 await page.locator('label').filter({ hasText: 'Key ticker' }).locator('input').fill('GATE')
 await page.getByRole('button', { name: /Continue/ }).click()
-results.launchTokenGate = await page.getByText('15,000 $MUPPETS required to launch.', { exact: true }).count() === 1
+results.launchTokenGate = await page.getByText('15,000 $MUPPETS unlocks your next Creator Slot.', { exact: true }).count() === 1
 results.launchGateConnect = await page.getByRole('button', { name: 'Connect wallet' }).count() === 1
 const muppetsContractLink = page.getByRole('link', { name: `MUPPETS contract ${expectedMuppetsToken}` })
 results.launchTokenAddressLink = await muppetsContractLink.count() === 1
@@ -426,6 +456,23 @@ await page.screenshot({ path: new URL('muppet-performance.png', screenshotDir).p
 
 await page.close()
 page = await desktop.newPage()
+watch(page, 'creator-slots')
+await page.goto(`${baseUrl}/app/creator/${expectedDevWallet}`, { waitUntil: 'domcontentloaded' })
+await page.getByRole('heading', { name: 'Creator Slots' }).waitFor({ timeout: 60_000 })
+results.creatorSlotsUsed = await page.locator('.creator-slots-grid > span').filter({ hasText: 'slots used' }).locator('strong').innerText()
+results.creatorSlotsAvailable = await page.locator('.creator-slots-grid > span').filter({ hasText: 'slots available' }).locator('strong').innerText()
+results.creatorNextLaunchThreshold = await page.locator('.creator-slots-grid > span').filter({ hasText: 'next launch threshold' }).locator('strong').innerText()
+results.creatorOverCapacity = await page.getByText('3 over capacity', { exact: true }).count() === 1
+results.creatorFeaturedHeading = await page.getByRole('heading', { name: 'Featured Muppets' }).count() === 1
+results.creatorFeaturedCards = await page.locator('.creator-featured-grid > article').count()
+results.creatorFeaturedBoundary = await page.getByText(/All 3 Muppets remain in the full record/i).count() === 1
+results.creatorLedgerRows = await page.locator('.creator-agent-row').count()
+results.creatorKeySeparate = await page.getByRole('heading', { name: 'Agent Key markets' }).count() === 1
+results.creatorProfileOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
+await page.screenshot({ path: new URL('creator-slots-dev-wallet.png', screenshotDir).pathname, fullPage: false })
+
+await page.close()
+page = await desktop.newPage()
 watch(page, 'monitor')
 await page.goto(`${baseUrl}/app/watchlist`, { waitUntil: 'domcontentloaded' })
 await page.getByRole('heading', { name: 'Watchlist.' }).waitFor({ timeout: 60_000 })
@@ -481,7 +528,8 @@ watch(page, 'docs')
 await page.goto(`${baseUrl}/docs`, { waitUntil: 'networkidle' })
 results.docsTitle = await page.title()
 results.docsSections = await page.locator('.docs-layout article > section').count()
-results.docsTokenGate = await page.getByRole('heading', { name: '$MUPPETS launch access' }).count() === 1
+results.docsTokenGate = await page.getByRole('heading', { name: '$MUPPETS Creator Slots' }).count() === 1
+results.docsCreatorSlotFormula = await page.getByText(/floor\(wallet balance \/ 15,000\)/i).count() === 1
 results.docsSevenPets = await page.getByRole('heading', { name: 'Seven pets, three live tasks' }).count() === 1
 results.docsFeeReserve = await page.getByRole('heading', { name: 'Marketplace fee reserve' }).count() === 1
 results.docsPerformance = await page.getByRole('heading', { name: 'Public Muppet performance' }).count() === 1
@@ -583,6 +631,10 @@ await mobilePage.goto(`${baseUrl}/app/muppet/1`, { waitUntil: 'domcontentloaded'
 await mobilePage.getByRole('heading', { name: 'range fox' }).waitFor({ timeout: 60_000 })
 results.mobilePerformanceOverflow = await mobilePage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
 results.mobilePerformanceKeyVisible = await mobilePage.getByRole('heading', { name: 'Agent Key market' }).count() === 1
+await mobilePage.goto(`${baseUrl}/app/creator/${expectedDevWallet}`, { waitUntil: 'domcontentloaded' })
+await mobilePage.getByRole('heading', { name: 'Creator Slots' }).waitFor({ timeout: 60_000 })
+results.mobileCreatorOverflow = await mobilePage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
+results.mobileCreatorSlotColumns = await mobilePage.locator('.creator-slots-grid').evaluate((node) => getComputedStyle(node).gridTemplateColumns.split(' ').length)
 await mobilePage.goto(`${baseUrl}/app/watchlist`, { waitUntil: 'domcontentloaded' })
 await mobilePage.getByRole('heading', { name: 'Watchlist.' }).waitFor({ timeout: 60_000 })
 await mobilePage.getByRole('button', { name: /Market Radar/ }).click()
@@ -627,6 +679,10 @@ results.narrowDocsOverflow = await narrowPage.evaluate(() => document.documentEl
 await narrowPage.goto(`${baseUrl}/app/muppet/1`, { waitUntil: 'domcontentloaded' })
 await narrowPage.getByRole('heading', { name: 'range fox' }).waitFor({ timeout: 60_000 })
 results.narrowPerformanceOverflow = await narrowPage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
+await narrowPage.goto(`${baseUrl}/app/creator/${expectedDevWallet}`, { waitUntil: 'domcontentloaded' })
+await narrowPage.getByRole('heading', { name: 'Creator Slots' }).waitFor({ timeout: 60_000 })
+results.narrowCreatorOverflow = await narrowPage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
+results.narrowCreatorSlotColumns = await narrowPage.locator('.creator-slots-grid').evaluate((node) => getComputedStyle(node).gridTemplateColumns.split(' ').length)
 await narrow.close()
 await narrowBrowser.close()
 
@@ -701,6 +757,7 @@ const failed =
   || !results.muppetsAddressMatches
   || !results.muppetsMinimumMatches
   || !results.muppetsLiveRead
+  || !results.devWalletCapacity
   || !results.xPickerVisible
   || results.xAccountHrefs.join(',') !== 'https://x.com/liquidmuppets,https://x.com/AMBF'
   || JSON.stringify(results.xAccountHandles) !== JSON.stringify(['@liquidmuppets', '@AMBF'])
@@ -715,6 +772,8 @@ const failed =
   || results.petPickerCount !== 7
   || results.builderProgressSteps !== 5
   || results.descriptionInputs !== 0
+  || !results.creatorSlotsOnLaunch
+  || results.creatorSlotMetricsOnLaunch !== 5
   || !results.appearanceCopy
   || results.taskPickerCount !== 7
   || !results.taskMoneyPath
@@ -768,6 +827,16 @@ const failed =
   || !results.performanceNoHistoricalApy
   || !results.performanceFollowControl
   || results.performanceOverflow
+  || results.creatorSlotsUsed !== '3'
+  || results.creatorSlotsAvailable !== '0'
+  || results.creatorNextLaunchThreshold !== '60,000 $MUPPETS'
+  || !results.creatorOverCapacity
+  || !results.creatorFeaturedHeading
+  || results.creatorFeaturedCards !== 0
+  || !results.creatorFeaturedBoundary
+  || results.creatorLedgerRows !== 3
+  || !results.creatorKeySeparate
+  || results.creatorProfileOverflow
   || results.monitorTitle !== 'Watchlist and Market Radar | LIQUIDMUPPETS'
   || results.monitorFollowedRows !== 1
   || !results.monitorBrowserLocal
@@ -791,6 +860,7 @@ const failed =
   || results.docsTitle !== 'Docs | LIQUIDMUPPETS'
   || results.docsSections !== 20
   || !results.docsTokenGate
+  || !results.docsCreatorSlotFormula
   || !results.docsSevenPets
   || !results.docsFeeReserve
   || !results.docsPerformance
@@ -822,6 +892,8 @@ const failed =
   || results.mobileDocsOverflow
   || results.mobilePerformanceOverflow
   || !results.mobilePerformanceKeyVisible
+  || results.mobileCreatorOverflow
+  || results.mobileCreatorSlotColumns !== 2
   || results.mobileMonitorOverflow
   || !results.mobileRadarScrollsInside
   || results.mobileNavItems !== 6
@@ -834,6 +906,8 @@ const failed =
   || results.narrowComparisonColumns !== 1
   || results.narrowDocsOverflow
   || results.narrowPerformanceOverflow
+  || results.narrowCreatorOverflow
+  || results.narrowCreatorSlotColumns !== 1
   || !results.narrowHeaderVisible
   || results.degradedTaskPickerCount !== 7
   || !results.degradedTaskWarning

@@ -31,6 +31,9 @@ const factoryAbi = [
     }],
   },
   {
+    type: 'function', name: 'getCreatorAgentIds', stateMutability: 'view', inputs: [{ name: 'creator', type: 'address' }], outputs: [{ name: 'ids', type: 'uint256[]' }],
+  },
+  {
     type: 'function', name: 'createAgent', stateMutability: 'nonpayable', inputs: [
       { name: 'petId', type: 'uint8' }, { name: 'taskId', type: 'uint8' }, { name: 'name', type: 'string' },
       { name: 'keySymbol', type: 'string' }, { name: 'keySupply', type: 'uint256' }, { name: 'baseFloorWei', type: 'uint128' },
@@ -479,13 +482,15 @@ export async function launchAgent(
     if (!gate.configured || !gate.tokenAddress) {
       throw new Error('The canonical $MUPPETS address is required for launch.')
     }
-    const [gateDecimals, gateBalance] = await Promise.all([
+    const [gateDecimals, gateBalance, creatorAgentIds] = await Promise.all([
       client.readContract({ address: gate.tokenAddress, abi: erc20Abi, functionName: 'decimals' }),
       client.readContract({ address: gate.tokenAddress, abi: erc20Abi, functionName: 'balanceOf', args: [account] }),
+      client.readContract({ address: config.factory, abi: factoryAbi, functionName: 'getCreatorAgentIds', args: [account] }),
     ])
     const gateMinimum = parseUnits(gate.minimum, gateDecimals)
-    if (gateBalance < gateMinimum) {
-      throw new Error(`Hold at least ${Number(gate.minimum).toLocaleString('en-US')} $${gate.tokenSymbol} to launch a Muppet.`)
+    const requiredBalance = gateMinimum * BigInt(creatorAgentIds.length + 1)
+    if (gateBalance < requiredBalance) {
+      throw new Error(`Hold ${Number(formatUnits(requiredBalance, gateDecimals)).toLocaleString('en-US')} $${gate.tokenSymbol} to unlock creator slot ${creatorAgentIds.length + 1}.`)
     }
     const floorWei = parseEther(input.floorPriceEth)
     options.onProgress?.('Creating the vault and Agent Key…')

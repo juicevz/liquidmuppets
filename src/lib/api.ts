@@ -29,9 +29,12 @@ export interface ProtocolConfig {
   ezWrapper: `0x${string}`
   accessGate: {
     feature: 'agent_launch'
+    model: 'creator_slots'
     tokenAddress: `0x${string}` | null
     tokenSymbol: string
     minimum: string
+    slotSize: string
+    formula: 'floor(balance / slotSize)'
     configured: boolean
     enforcement: 'app_and_api' | 'onchain'
   }
@@ -68,11 +71,23 @@ export interface TokenAccess {
   tokenAddress: `0x${string}` | null
   tokenSymbol: string
   minimum: string
+  enforcement: 'app_and_api' | 'onchain'
   decimals: number | null
   balance: string | null
   balanceRaw: string | null
   minimumRaw: string | null
-  reason: 'eligible' | 'below_minimum' | 'token_not_configured' | 'access_check_unavailable'
+  slotSize: string
+  slotSizeRaw: string | null
+  slotCount: number | null
+  slotsUsed: number | null
+  slotsAvailable: number | null
+  featuredSlots: number | null
+  overCapacity: number | null
+  nextSlotThreshold: string | null
+  nextSlotThresholdRaw: string | null
+  requiredForNextLaunch: string | null
+  requiredForNextLaunchRaw: string | null
+  reason: 'eligible' | 'below_minimum' | 'capacity_full' | 'token_not_configured' | 'access_check_unavailable'
   source: string
 }
 
@@ -358,6 +373,8 @@ export interface CreatorProfileResponse {
   captured_at: string | null
   activity_status: 'available' | 'cached' | 'stale' | 'unavailable'
   receipt_count: number | null
+  creator_capacity: TokenAccess
+  featured_agent_ids: number[]
   asset_totals: CreatorAssetTotal[]
   agents: CreatorAgentRecord[]
 }

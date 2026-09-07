@@ -10,6 +10,7 @@ from web3 import Web3
 from app.config import Settings
 from app.database import Database
 from app.services.activity import ActivityService
+from app.services.token_gate import TokenGateService
 
 _KEY_ACTIONS = {"listed", "bought", "bid", "sold", "bound"}
 _RANGE_ACTIONS = {"opened range", "closed range", "recentered range"}
@@ -18,10 +19,17 @@ _RANGE_ACTIONS = {"opened range", "closed range", "recentered range"}
 class PublicDataService:
     """Build public creator and protocol records from persisted and decoded evidence."""
 
-    def __init__(self, settings: Settings, database: Database, activity: ActivityService) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        database: Database,
+        activity: ActivityService,
+        token_gate: TokenGateService,
+    ) -> None:
         self.settings = settings
         self.database = database
         self.activity = activity
+        self.token_gate = token_gate
 
     def get_creator_profile(self, wallet: str) -> dict[str, object]:
         checksum_wallet = Web3.to_checksum_address(wallet)
@@ -81,6 +89,13 @@ class PublicDataService:
         profile = self.database.get_wallet_profile(checksum_wallet)
         tracking_values = [str(row.get("tracking_started_at")) for row in summaries if row.get("tracking_started_at")]
         captured_values = [str(row.get("captured_at")) for row in summaries if row.get("captured_at")]
+        creator_capacity = self.token_gate.check(checksum_wallet)
+        featured_count = creator_capacity.get("featuredSlots")
+        featured_limit = featured_count if isinstance(featured_count, int) else 0
+        featured_agent_ids = [
+            _agent_id(row)
+            for row in sorted(agent_records, key=_agent_id, reverse=True)[:featured_limit]
+        ]
         return {
             "generated_at": datetime.now(UTC).isoformat(),
             "explorer_url": self.settings.explorer_url,
@@ -95,6 +110,8 @@ class PublicDataService:
                 if activity_status != "unavailable"
                 else None
             ),
+            "creator_capacity": creator_capacity,
+            "featured_agent_ids": featured_agent_ids,
             "asset_totals": sorted(asset_totals.values(), key=lambda row: (str(row["symbol"]), str(row["address"]))),
             "agents": agent_records,
         }

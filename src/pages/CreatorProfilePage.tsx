@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { formatUnits } from 'viem'
 import { Icon } from '../components/Icon'
+import { CreatorSlots } from '../components/CreatorSlots'
 import { formatBasisPoints, formatDeployedPercent } from '../components/PerformanceMarketplace'
 import { SystemPulse, formatUtc, timeAgo } from '../components/SystemPulse'
 import { getPet } from '../data/pets'
@@ -68,6 +69,10 @@ export function CreatorProfilePage({ creatorAddress }: CreatorProfilePageProps) 
   }, [profile])
 
   const keyMarkets = useMemo(() => profile?.agents.filter((agent) => agent.key_market.status === 'available') ?? [], [profile])
+  const featuredAgents = useMemo(() => {
+    const agents = new Map(profile?.agents.map((agent) => [agent.agent.id, agent]) ?? [])
+    return profile?.featured_agent_ids.flatMap((id) => agents.get(id) ?? []) ?? []
+  }, [profile])
 
   if (loading && !profile) {
     return <div className="app-page creator-profile-page creator-profile-state"><Icon name="clock" /><p>Reading this wallet’s public Muppet record.</p></div>
@@ -112,7 +117,33 @@ export function CreatorProfilePage({ creatorAddress }: CreatorProfilePageProps) 
         <span><small>latest checkpoint</small><strong>{profile.captured_at ? timeAgo(profile.captured_at) : 'pending'}</strong></span>
       </section>
 
+      <CreatorSlots
+        access={profile.creator_capacity}
+        explorerUrl={profile.explorer_url}
+        tokenAddress={profile.creator_capacity.tokenAddress}
+      />
+
       {error && <div className="pulse-error" role="status"><Icon name="alert" />{error}</div>}
+
+      <section className="creator-featured" aria-labelledby="creator-featured-title">
+        <header>
+          <div><small>slot-backed placement</small><h2 id="creator-featured-title">Featured Muppets</h2></div>
+          <p>The newest Muppets fill the wallet’s currently funded placements. Every Muppet remains in the full record below.</p>
+        </header>
+        <div className="creator-featured-grid">
+          {featuredAgents.map((agent) => <FeaturedMuppetCard record={agent} key={agent.agent.id} />)}
+          {featuredAgents.length === 0 && (
+            <div className="creator-section-empty">
+              <Icon name="spark" />
+              <p>{profile.agents.length === 0
+                ? 'This wallet has no tracked Muppets to feature yet.'
+                : profile.creator_capacity.reason === 'access_check_unavailable'
+                  ? 'Featured placement is waiting for a fresh Creator Slot read.'
+                  : `This wallet currently funds no featured placements. All ${profile.agents.length} Muppets remain in the full record.`}</p>
+            </div>
+          )}
+        </div>
+      </section>
 
       <section className="creator-capital" aria-labelledby="creator-capital-title">
         <header><div><small>vault capital</small><h2 id="creator-capital-title">Grouped by asset</h2></div><p>Different assets are never added into one pretend total.</p></header>
@@ -159,6 +190,22 @@ export function CreatorProfilePage({ creatorAddress }: CreatorProfilePageProps) 
         </div>
       </section>
     </div>
+  )
+}
+
+function FeaturedMuppetCard({ record }: { record: CreatorAgentRecord }) {
+  const pet = getPet(record.agent.pet_id)
+  return (
+    <article>
+      <span className="creator-featured-badge"><i aria-hidden="true" />funded placement</span>
+      <img src={pet.portrait} alt="" />
+      <div>
+        <small>Muppet #{record.agent.id} · {record.agent.task_label}</small>
+        <h3>{record.agent.name}</h3>
+        <p>{record.asset.symbol} vault · <span className={`health-${record.market.health.status}`}>{record.market.health.status}</span></p>
+      </div>
+      <a href={performancePath(record.agent.id)}>open record <Icon name="arrow" /></a>
+    </article>
   )
 }
 

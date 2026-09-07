@@ -182,13 +182,26 @@ class TokenAccessResponse(BaseModel):
     tokenAddress: str | None
     tokenSymbol: str
     minimum: str
+    enforcement: Literal["app_and_api", "onchain"]
     decimals: int | None
     balance: str | None
     balanceRaw: str | None
     minimumRaw: str | None
+    slotSize: str
+    slotSizeRaw: str | None
+    slotCount: int | None
+    slotsUsed: int | None
+    slotsAvailable: int | None
+    featuredSlots: int | None
+    overCapacity: int | None
+    nextSlotThreshold: str | None
+    nextSlotThresholdRaw: str | None
+    requiredForNextLaunch: str | None
+    requiredForNextLaunchRaw: str | None
     reason: Literal[
         "eligible",
         "below_minimum",
+        "capacity_full",
         "token_not_configured",
         "access_check_unavailable",
     ]
@@ -301,5 +314,7 @@ class CreatorProfileResponse(BaseModel):
     captured_at: datetime | None
     activity_status: Literal["available", "cached", "stale", "unavailable"]
     receipt_count: int | None
+    creator_capacity: TokenAccessResponse
+    featured_agent_ids: list[int]
     asset_totals: list[CreatorAssetTotal]
     agents: list[dict[str, Any]]

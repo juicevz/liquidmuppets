@@ -1,14 +1,14 @@
 # LIQUIDMUPPETS
 
-LIQUIDMUPPETS is a Robinhood Chain mainnet marketplace for policy-bounded onchain agents. Public browsing remains open. Launching a new agent through the app requires at least `15,000 $MUPPETS` in the connected wallet.
+LIQUIDMUPPETS is a Robinhood Chain mainnet marketplace for policy-bounded onchain agents. Public browsing remains open. Every `15,000 $MUPPETS` held unlocks one active Creator Slot. One available slot permits one new Muppet and one featured Muppet on the creator profile.
 
-The `$MUPPETS` balance is reusable access utility. It remains in the wallet and is not spent, locked or burned. The canonical Robinhood Chain token is `0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189`. FactoryV2 now implements this rule onchain, but the current mainnet factory remains V1 until the published multisig migration is executed.
+Creator Slots equal `floor(wallet balance / 15,000)`. The `$MUPPETS` balance remains transferable in the wallet and is not spent, locked or burned. If the balance falls, existing vaults, withdrawals and Agent Key markets remain available; only additional launches and over-capacity featured placement pause. The canonical Robinhood Chain token is `0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189`. FactoryV2 now implements this capacity rule onchain, but the current mainnet factory remains V1 until the published multisig migration is executed.
 
 Public interface: [https://liquidmuppets.io](https://liquidmuppets.io)
 
 X: [@AMBF](https://x.com/AMBF)
 
-Current status: controlled mainnet beta. Existing Muppets can be funded, allocated, traded and redeemed. New creator launches are available through the app to connected wallets holding at least `15,000 $MUPPETS`. The live V1 launch path is app and API gated. FactoryV2, its migration script, its verification step, and the new reviewed-route adapter are implemented in this repository but have not been broadcast to mainnet.
+Current status: controlled mainnet beta. Existing Muppets can be funded, allocated, traded and redeemed. Creator Slots are live in the app and API. The live V1 launch path is app and API enforced. FactoryV2, its onchain Creator Slot rule, migration script, verification step, and reviewed-route adapter are implemented in this repository but have not been broadcast to mainnet.
 
 ## Live mainnet scope
 
@@ -23,14 +23,15 @@ Current status: controlled mainnet beta. Existing Muppets can be funded, allocat
 - a shareable public performance URL for every Muppet, backed by five minute checkpoints
 - a performance marketplace with health, tracked change, deployment, oracle and keeper evidence plus two-Muppet comparison
 - a shareable creator profile for every wallet, with Muppets, per-asset vault totals, performance evidence and receipts
+- live Creator Slot balance, used, available, next-threshold and featured-placement state on launch and creator pages
 - System Pulse, a unified public feed for decoded receipts and recorded keeper actions or holds
 - browser-local Muppet watchlists with an in-app evidence alert inbox
 - Muppet Market Radar, a read-only view of approved route health, capacity, source gaps and exact status reasons
 - a post-launch command center with vault funding, an onchain share preview, keeper timing, performance link and X sharing
 - browser-local recovery for the three launch transactions, keyed to the connected wallet, chain and factory
 - optional app handles claimed with a wallet signature and no gas
-- app and API balance gate requiring `15,000 $MUPPETS` to launch through the current V1 interface
-- FactoryV2 code with an onchain 15,000 `$MUPPETS` balance gate, reviewed task registry, risk presets, multisig-only ownership and a post-verification launch switch
+- app and API capacity gate requiring one available slot per new launch through the current V1 interface
+- FactoryV2 code with one onchain creator slot per 15,000 `$MUPPETS`, reviewed task registry, risk presets, multisig-only ownership and a post-verification launch switch
 - canonical `$MUPPETS` token configured at `0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189`
 - no deployer key in the browser, API, or VPS; the limited keeper key is accepted only through the host-encrypted vault and loaded only by the private service
 
@@ -61,9 +62,9 @@ The live site publishes the work in four evidence-based phases. `Shipped` means 
 
 | Phase | State | Work |
 | --- | --- | --- |
-| 01 · Market core | shipped | public performance and creator pages; System Pulse; watchlists, alerts and Market Radar; three live task routes and the 26-route Stock Token reserve |
+| 01 · Market core | shipped | public performance and creator pages; `$MUPPETS` Creator Slots; System Pulse; watchlists, alerts and Market Radar; three live task routes and the 26-route Stock Token reserve |
 | 02 · Resilience | next | independent production RPC fallback; source verification; verified Safe ownership; independent contract review |
-| 03 · Permissioning | conditional | simulate and broadcast FactoryV2 after Safe approval; enforce the 15,000 `$MUPPETS` rule onchain; preserve V1 positions and markets; enable launches through a separate Safe transaction |
+| 03 · Permissioning | conditional | simulate and broadcast FactoryV2 after Safe approval; enforce one creator slot per 15,000 `$MUPPETS` onchain; preserve V1 positions and markets; enable launches through a separate Safe transaction |
 | 04 · Asset expansion | conditional | activate NVDA/USDG only after verified FactoryV2 activation; retain AAPL/USDG and SPY/USDG as disabled venue candidates; keep meme/WETH disabled until every route gate passes; expose new market evidence only when adapters source it |
 
 The sequence can change when evidence changes. The website and this repository use the same roadmap boundaries.
@@ -84,7 +85,7 @@ The deployer and current owner are the dedicated address `0x30dF6f545FcD732c6596
 
 ### FactoryV2 migration package
 
-`LiquidMuppetsFactoryV2` preserves the V1 agent ID range, delegates legacy reads to V1, and deploys only new vaults and Keys. It checks the creator's live balance against an immutable 15,000 `$MUPPETS` threshold, keeps the tokens in the creator wallet, and exposes defensive, balanced and active policy presets. Each task points to an exact asset, immutable adapter, route ID, deposit cap and allowed preset mask.
+`LiquidMuppetsFactoryV2` preserves the V1 agent ID range, delegates legacy reads to V1, and deploys only new vaults and Keys. It counts legacy and V2 Muppets, then requires `(existing Muppets + 1) × 15,000 $MUPPETS` for the next launch. Tokens stay in the creator wallet. Its public `creatorSlotState` view returns balance, unlocked slots, used slots, available slots and the next-launch requirement. FactoryV2 also exposes defensive, balanced and active policy presets. Each task points to an exact asset, immutable adapter, route ID, deposit cap and allowed preset mask.
 
 The deployment script creates a separate V2 Key market, deploys the fork-tested NVDA/USDG adapter, switches only future policy registration to V2, and transfers the legacy factory, both Key markets, PolicyExecutor, FeeRwaReserve and FactoryV2 to a Safe with at least two owners and a threshold of at least two. Existing V1 vault deposits, allocations, redemptions and Key orders retain their original contracts. The frontend aggregates both Key markets after migration.
 
@@ -151,7 +152,7 @@ The first dev-funded cycle spent `0.01 ETH`, routed `24.587800 USDG`, and bought
 
 `POST /api/v1/profiles/challenge` and `POST /api/v1/profiles/claim` let a wallet claim an app handle with an EIP-191 signature. The signature proves control of that wallet. It does not verify an X account or any other external identity.
 
-`GET /api/v1/access/{wallet}` checks launch eligibility against the configured `$MUPPETS` token on Robinhood Chain. Missing configuration, unreadable contract state and insufficient balance all fail closed.
+`GET /api/v1/access/{wallet}` reads the configured `$MUPPETS` balance and factory creator IDs on Robinhood Chain. It returns slot size, slots unlocked, used and available, funded featured placements, over-capacity count, and both the next balance-slot and next-launch thresholds. Missing token or factory configuration and unreadable contract state fail closed.
 
 ## Public performance pages
 
@@ -177,7 +178,7 @@ The marketplace reads a lightweight recorded summary for every Muppet and shows 
 
 ## Public creator profiles and System Pulse
 
-Every wallet has a public creator route at `/app/creator/{wallet}`. The corresponding `GET /api/v1/creators/{wallet}` response lists every recorded Muppet launched by that address, its checkpoint count, performance summary, receipt count and separate Agent Key market. Vault totals are grouped by contract asset and decimals. USDG, WETH and any future assets are never summed into a fabricated portfolio value.
+Every wallet has a public creator route at `/app/creator/{wallet}`. The corresponding `GET /api/v1/creators/{wallet}` response lists every recorded Muppet launched by that address, its checkpoint count, performance summary, receipt count and separate Agent Key market. It also returns the wallet's live Creator Slot calculation and the IDs receiving funded featured placement. The newest Muppets fill those placements deterministically. Vault totals are grouped by contract asset and decimals. USDG, WETH and any future assets are never summed into a fabricated portfolio value.
 
 The profile shows a wallet-signed app handle when one exists. The handle proves control of that wallet only. A profile with no claimed handle remains address-native, and a wallet with no recorded Muppets returns an honest empty profile rather than a generated history.
 
@@ -341,10 +342,10 @@ Public keeper triggering is disabled. The production scheduler is active every f
 
 ## Risk boundary
 
-- `$MUPPETS` launch access is enforced by the app and API, not the currently deployed V1 factory contract
-- app launch fails closed if the canonical `$MUPPETS` contract or its Robinhood Chain balance read is unavailable
+- `$MUPPETS` Creator Slots are enforced by the app and API, not the currently deployed V1 factory contract
+- app launch fails closed if the canonical `$MUPPETS` balance or factory creator-count read is unavailable
 - interrupted launch recovery is stored only in the current browser; users should keep wallet receipts if they switch devices or clear site data
-- FactoryV2 implements an unbypassable 15,000 `$MUPPETS` balance rule, but it is not active until its multisig migration is broadcast, verified and enabled
+- FactoryV2 implements an unbypassable one-slot-per-15,000 `$MUPPETS` rule, but it is not active until its multisig migration is broadcast, verified and enabled
 - contracts are tested but not independently audited
 - stable APY is variable and can be zero
 - Morpho withdrawals depend on market liquidity

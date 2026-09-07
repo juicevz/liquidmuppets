@@ -240,7 +240,8 @@ contract LiquidMuppetsFactoryV2 is Ownable {
         if (!governanceReady()) revert ContractGovernanceRequired();
         if (!launchesEnabled) revert LaunchesDisabled();
         uint256 balance = accessToken.balanceOf(msg.sender);
-        if (balance < minimumAccessBalance) revert InsufficientAccessBalance(balance, minimumAccessBalance);
+        uint256 required = (_creatorAgentCount(msg.sender) + 1) * minimumAccessBalance;
+        if (balance < required) revert InsufficientAccessBalance(balance, required);
         if (petId > 6) revert InvalidPet();
         TaskConfig storage config = taskConfigs[taskId];
         if (!config.enabled) revert InvalidTask();
@@ -328,6 +329,25 @@ contract LiquidMuppetsFactoryV2 is Ownable {
         return newAgentRecords.length;
     }
 
+    /// @notice Returns live reusable creator capacity without locking or spending the access token.
+    function creatorSlotState(address creator)
+        external
+        view
+        returns (
+            uint256 balance,
+            uint256 slotCount,
+            uint256 slotsUsed,
+            uint256 slotsAvailable,
+            uint256 requiredForNextLaunch
+        )
+    {
+        balance = accessToken.balanceOf(creator);
+        slotCount = balance / minimumAccessBalance;
+        slotsUsed = _creatorAgentCount(creator);
+        slotsAvailable = slotCount > slotsUsed ? slotCount - slotsUsed : 0;
+        requiredForNextLaunch = (slotsUsed + 1) * minimumAccessBalance;
+    }
+
     function getAgent(uint256 id) public view returns (AgentRecord memory) {
         if (id < legacyAgentCount) {
             ILegacyLiquidMuppetsFactory.AgentRecord memory legacy = legacyFactory.getAgent(id);
@@ -356,6 +376,13 @@ contract LiquidMuppetsFactoryV2 is Ownable {
         for (uint256 index = 0; index < newIds.length; index++) {
             ids[legacyIds.length + index] = newIds[index];
         }
+    }
+
+    function _creatorAgentCount(address creator) private view returns (uint256) {
+        uint256 legacyCount = address(legacyFactory) == address(0)
+            ? 0
+            : legacyFactory.getCreatorAgentIds(creator).length;
+        return legacyCount + creatorNewAgentIds[creator].length;
     }
 
     function getTaskConfig(uint8 taskId) external view returns (TaskConfig memory) {

@@ -28,7 +28,7 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
     activity_service = ActivityService(app_settings, database)
     token_gate = TokenGateService(app_settings, chain.web3)
     performance_service = PerformanceService(app_settings, database, chain)
-    public_data_service = PublicDataService(app_settings, database, activity_service)
+    public_data_service = PublicDataService(app_settings, database, activity_service, token_gate)
 
     @asynccontextmanager
     async def lifespan(live_app: FastAPI) -> AsyncIterator[None]:
@@ -68,7 +68,7 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
 
     app = FastAPI(
         title="LiquidMuppets Strategy API",
-        version="0.6.0",
+        version="0.7.0",
         docs_url="/api/docs",
         openapi_url="/api/openapi.json",
         lifespan=lifespan,

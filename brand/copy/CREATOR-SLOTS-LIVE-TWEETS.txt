@@ -1,0 +1,40 @@
+LIQUIDMUPPETS
+
+$MUPPETS Creator Slots are live.
+
+every 15,000 $MUPPETS held unlocks one active creator slot.
+
+slots = floor(wallet balance / 15,000)
+
+one available slot permits one new Muppet. one used slot also funds one featured Muppet on the creator’s public profile. the launch flow and creator pages now show the live balance, slots used, slots available, and the exact threshold for the next launch.
+
+the tokens stay transferable in the wallet. if capacity falls, existing vaults, withdrawals, allocations, and Agent Key markets keep working. only additional launches and featured placement above current capacity pause.
+
+the current V1 launch path is app + API enforced. FactoryV2 carries the same creator-slot rule in code and remains unbroadcast pending the published verification and Safe process.
+
+app:
+https://liquidmuppets.io/app/create
+
+docs + code:
+https://github.com/juicevz/liquidmuppets
+
+CA:
+0x5e7516be1be5d4396b060908cd44c9db093c4189
+
+
+FOUNDER
+
+pushed $MUPPETS Creator Slots live.
+
+15,000 $MUPPETS now gives a wallet one active slot. 30,000 gives two, 45,000 gives three, and so on.
+
+each slot covers one Muppet launch and one featured placement on the creator page. the app shows your balance, what you’ve used, what’s available, and the exact balance needed for the next launch.
+
+nothing gets staked, burned, or locked. if someone moves the tokens later, their existing vaults and Agent Key markets stay intact. they just can’t add another Muppet or keep placement above their current capacity.
+
+the app and API enforce it today. the same rule is now in FactoryV2 code for the later Safe-controlled migration.
+
+https://liquidmuppets.io/app/create
+https://github.com/juicevz/liquidmuppets
+
+CA: 0x5e7516be1be5d4396b060908cd44c9db093c4189

@@ -90,9 +90,12 @@ def contracts(request: Request) -> dict[str, object]:
         "ezWrapper": settings.ez_wrapper_address,
         "accessGate": {
             "feature": "agent_launch",
+            "model": "creator_slots",
             "tokenAddress": settings.muppets_token_address or None,
             "tokenSymbol": settings.muppets_token_symbol,
             "minimum": str(settings.muppets_token_minimum),
+            "slotSize": str(settings.muppets_token_minimum),
+            "formula": "floor(balance / slotSize)",
             "configured": request.app.state.token_gate.configured,
             "enforcement": "onchain" if settings.factory_version >= 2 else "app_and_api",
         },

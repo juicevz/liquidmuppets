@@ -86,6 +86,34 @@ def test_creator_profile_groups_native_assets_and_deduplicates_receipts(tmp_path
         ]
         activity.cache_status = "cached"
         app.state.public_data.activity = activity
+        app.state.public_data.token_gate = MagicMock()
+        app.state.public_data.token_gate.check.return_value = {
+            "wallet": CREATOR,
+            "feature": "agent_launch",
+            "configured": True,
+            "eligible": False,
+            "tokenAddress": "0x9999999999999999999999999999999999999999",
+            "tokenSymbol": "MUPPETS",
+            "minimum": "15000",
+            "enforcement": "app_and_api",
+            "decimals": 18,
+            "balance": "30000",
+            "balanceRaw": str(30_000 * 10**18),
+            "minimumRaw": str(15_000 * 10**18),
+            "slotSize": "15000",
+            "slotSizeRaw": str(15_000 * 10**18),
+            "slotCount": 2,
+            "slotsUsed": 3,
+            "slotsAvailable": 0,
+            "featuredSlots": 2,
+            "overCapacity": 1,
+            "nextSlotThreshold": "45000",
+            "nextSlotThresholdRaw": str(45_000 * 10**18),
+            "requiredForNextLaunch": "60000",
+            "requiredForNextLaunchRaw": str(60_000 * 10**18),
+            "reason": "capacity_full",
+            "source": "Robinhood Chain RPC",
+        }
 
         response = client.get(f"/api/v1/creators/{CREATOR}")
 
@@ -105,6 +133,9 @@ def test_creator_profile_groups_native_assets_and_deduplicates_receipts(tmp_path
     assert body["agents"][0]["receipt_count"] == 1
     assert body["receipt_count"] == 1
     assert body["activity_status"] == "cached"
+    assert body["creator_capacity"]["slotsUsed"] == 3
+    assert body["creator_capacity"]["overCapacity"] == 1
+    assert body["featured_agent_ids"] == [2, 1]
 
 
 def test_pulse_merges_keeper_reason_and_keeps_holds_without_receipts(tmp_path: Path) -> None:

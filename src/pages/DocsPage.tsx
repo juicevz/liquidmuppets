@@ -34,18 +34,21 @@ const docsSections: DocsSection[] = [
   {
     number: '01',
     title: 'The product loop',
-    body: 'LIQUIDMUPPETS is a Robinhood mainnet marketplace for policy-bounded onchain agents. A creator holding 15,000 $MUPPETS chooses a cosmetic pet, assigns a live task, deploys a single-asset vault and fungible Agent Key, then opens the first Key ask. Review candidates stay visible but cannot launch.',
+    body: 'LIQUIDMUPPETS is a Robinhood mainnet marketplace for policy-bounded onchain agents. Every 15,000 $MUPPETS held unlocks one active Creator Slot. An available slot lets its wallet choose a cosmetic pet, assign a live task, deploy a single-asset vault and fungible Agent Key, then open the first Key ask. Review candidates stay visible but cannot launch.',
     details: ['pet appearance has no financial effect', 'the task fixes the asset, adapter and risk caps', 'vault shares and Agent Keys remain separate'],
     visual: 'loop',
   },
   {
     number: '02',
-    title: '$MUPPETS launch access',
-    body: 'Every public page remains open. Launching a new agent through the app requires at least 15,000 $MUPPETS in the connected wallet. The API checks the canonical token balance on Robinhood Chain and the browser checks it again immediately before the first launch transaction.',
+    title: '$MUPPETS Creator Slots',
+    body: 'Every public page remains open. Active slots equal floor(wallet balance / 15,000). One available slot permits one new Muppet and one featured Muppet on the creator profile. The API reads the canonical token balance and that wallet’s existing factory Muppets, then the browser repeats both reads immediately before the first launch transaction.',
     details: [
       'the balance remains in the wallet and is not spent, locked or burned',
+      'creator pages show balance, unlocked slots, used slots, available slots and the exact next-launch threshold',
+      'the newest Muppets fill currently funded featured placements; every Muppet remains in the full public record',
+      'a lower balance pauses additional launches and over-capacity featured placement only; existing vaults, withdrawals and Agent Key markets remain available',
       'canonical token · 0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189',
-      'the live V1 factory predates this rule; FactoryV2 adds the same 15,000-token check onchain but has not been broadcast',
+      'the live V1 factory predates this rule, so the current path is app and API enforced; FactoryV2 carries the slot formula onchain but has not been broadcast',
     ],
   },
   {
@@ -107,7 +110,7 @@ const docsSections: DocsSection[] = [
   {
     number: '11',
     title: 'How to use the live loop',
-    body: 'Connect an EVM wallet on Robinhood Chain mainnet. New launches unlock when the connected wallet holds 15,000 $MUPPETS. Confirm vault and Key creation, Key approval, and the first ask. The post-launch command center then previews vault shares, funds the vault, shows keeper timing, and links to the public record and X sharing.',
+    body: 'Connect an EVM wallet on Robinhood Chain mainnet. The launch page shows live Creator Slot capacity. A first Muppet needs 15,000 $MUPPETS, a second needs 30,000, and each later Muppet adds another 15,000 threshold. Confirm vault and Key creation, Key approval, and the first ask. The post-launch command center then previews vault shares, funds the vault, shows keeper timing, and links to the public record and X sharing.',
     details: [
       'each submitted launch receipt is saved in this browser so Resume launch can continue at the first unfinished stage',
       'recovery is scoped to this wallet, chain and factory and stores public transaction metadata only',
@@ -139,10 +142,11 @@ const docsSections: DocsSection[] = [
   {
     number: '14',
     title: 'Public creator profiles',
-    body: 'Every creator wallet has a shareable /app/creator/{wallet} page. It groups all Muppets launched by that wallet, their recorded vault evidence and transaction receipts. Combined capital remains grouped by native asset, so USDG and WETH are never added into one number.',
+    body: 'Every creator wallet has a shareable /app/creator/{wallet} page. It shows that wallet’s live $MUPPETS balance, Creator Slots used and available, next-launch threshold, currently funded featured Muppets, recorded vault evidence and transaction receipts. Combined capital remains grouped by native asset, so USDG and WETH are never added into one number.',
     details: [
       'a wallet-signed app handle appears when one has been claimed; otherwise the exact wallet remains the identity',
       'each Muppet links to its own performance page and keeps its original tracking start',
+      'featured placement follows the newest Muppets up to the number of funded slots; the complete Muppet ledger remains below it',
       'Agent Key markets sit below a separate speculative-market boundary and never enter vault totals',
       'new history begins with recorded checkpoints; no earlier APY or performance is invented',
     ],
@@ -186,9 +190,10 @@ const docsSections: DocsSection[] = [
   {
     number: '18',
     title: 'FactoryV2 and reviewed templates',
-    body: 'FactoryV2 implements the 15,000 $MUPPETS check onchain, exact task and adapter registration, defensive, balanced and active presets, V1 read compatibility, and contract-governed ownership. It ships launch-disabled until Blockscout verification and an explicit Safe activation.',
+    body: 'FactoryV2 implements one reusable creator slot per 15,000 $MUPPETS onchain, exact task and adapter registration, defensive, balanced and active presets, V1 read compatibility, and contract-governed ownership. Every legacy or V2 Muppet consumes one slot. It ships launch-disabled until Blockscout verification and an explicit Safe activation.',
     details: [
       'existing V1 vaults, withdrawals, policies and Key orders stay on their original contracts',
+      'dropping below capacity cannot disable an existing vault or Agent Key market; it only blocks another launch',
       'NVDA / USDG passed a mainnet-fork open, allocation and full redemption test',
       'AAPL / USDG and SPY / USDG stay disabled while their EZManager pool approvals are false',
       'the meme / WETH slot stays disabled until one exact token, pool, oracle and exit path pass review',
