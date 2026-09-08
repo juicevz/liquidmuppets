@@ -9,14 +9,23 @@ import {IEZWrapper, IUniswapV3PoolLike} from "../src/interfaces/IEZManager.sol";
 import {PolicyExecutor} from "../src/PolicyExecutor.sol";
 import {LiquidMuppetsFactory} from "../src/LiquidMuppetsFactory.sol";
 import {
+    IKeyMarketplaceRegistry,
     ILegacyLiquidMuppetsFactory,
     IMuppetBondBalance,
     LiquidMuppetsFactoryV2
 } from "../src/LiquidMuppetsFactoryV2.sol";
 import {KeyMarketplace} from "../src/KeyMarketplace.sol";
+import {IKeyRevenueReceiver, KeyMarketplaceV2} from "../src/KeyMarketplaceV2.sol";
 import {FeeRwaReserve} from "../src/FeeRwaReserve.sol";
 import {MuppetAgentBond} from "../src/MuppetAgentBond.sol";
-import {IMuppetAgentBondRewards, IWrappedRevenueToken, MuppetRevenueRouter} from "../src/MuppetRevenueRouter.sol";
+import {
+    IMuppetAgentBondRewards,
+    IMuppetBuybackVaultFunding,
+    IWrappedRevenueToken,
+    MuppetRevenueRouter
+} from "../src/MuppetRevenueRouter.sol";
+import {IMuppetsBuybackExecutor, MuppetBuybackVault} from "../src/MuppetBuybackVault.sol";
+import {IUniversalRouter, PonsV4MuppetsBuybackExecutor} from "../src/PonsV4MuppetsBuybackExecutor.sol";
 import {EZManagerPoolAdapter, IAggregatorV3Like} from "../src/adapters/EZManagerPoolAdapter.sol";
 
 interface ISafeLike {
@@ -29,7 +38,12 @@ contract DeployFactoryV2 is Script {
     uint256 private constant CHAIN_ID = 4663;
     uint256 private constant MINIMUM_ACCESS_BALANCE = 15_000 ether;
     uint40 private constant AGENT_BOND_LOCK = 30 days;
+    uint256 private constant MAX_BUYBACK_WEI = 0.01 ether;
+    uint40 private constant BUYBACK_COOLDOWN = 30 minutes;
     address private constant PONS_FEE_ESCROW = 0xd3AFEB2a57f70eF218Aa82451c51B2fb0416Ac9e;
+    address private constant PONS_HOOK = 0xE5e702641Ea86F4ae6cC3cDaeD2B886f976Be044;
+    address private constant UNIVERSAL_ROUTER = 0x8876789976dEcBfCbBbe364623C63652db8C0904;
+    address private constant BUYBACK_KEEPER = 0xA5960A69E57F4EbC924503bC829f1E6670BfBA51;
     IERC20 private constant MUPPETS = IERC20(0x5e7516BE1Be5d4396b060908Cd44c9dB093c4189);
     IERC20 private constant USDG = IERC20(0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168);
     IERC20 private constant WETH = IERC20(0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73);
@@ -65,30 +79,37 @@ contract DeployFactoryV2 is Script {
 
         uint256 deploymentBlock = block.number;
         vm.startBroadcast(deployerKey);
-        KeyMarketplace marketV2 = new KeyMarketplace(deployer, payable(address(RESERVE)), 300);
         MuppetAgentBond agentBond =
             new MuppetAgentBond(deployer, MUPPETS, WETH, MINIMUM_ACCESS_BALANCE, AGENT_BOND_LOCK);
+        PonsV4MuppetsBuybackExecutor buybackExecutor =
+            new PonsV4MuppetsBuybackExecutor(MUPPETS, IUniversalRouter(UNIVERSAL_ROUTER), PONS_HOOK, 200);
+        MuppetBuybackVault buybackVault = new MuppetBuybackVault(
+            deployer, IMuppetsBuybackExecutor(address(buybackExecutor)), safe, MAX_BUYBACK_WEI, BUYBACK_COOLDOWN
+        );
         MuppetRevenueRouter revenueRouter = new MuppetRevenueRouter(
             deployer,
             PONS_FEE_ESCROW,
             IWrappedRevenueToken(address(WETH)),
             IMuppetAgentBondRewards(address(agentBond)),
+            IMuppetBuybackVaultFunding(address(buybackVault)),
             payable(address(RESERVE)),
             payable(safe)
         );
+        buybackVault.setRevenueRouter(address(revenueRouter));
+        buybackVault.setKeeper(BUYBACK_KEEPER, true);
+        KeyMarketplaceV2 marketV2 = new KeyMarketplaceV2(deployer, IKeyRevenueReceiver(address(revenueRouter)), 300);
         agentBond.setKeyRegistry(address(LEGACY_MARKET), true);
         agentBond.setKeyRegistry(address(marketV2), true);
         agentBond.setRewardNotifier(address(revenueRouter));
         revenueRouter.setMarketplace(address(LEGACY_MARKET), true);
-        revenueRouter.setMarketplace(address(marketV2), true);
-        marketV2.setTreasury(payable(address(revenueRouter)));
+        revenueRouter.setKeyMarketplace(address(marketV2), true);
         LiquidMuppetsFactoryV2 factoryV2 = new LiquidMuppetsFactoryV2(
             deployer,
             MUPPETS,
             IMuppetBondBalance(address(agentBond)),
             MINIMUM_ACCESS_BALANCE,
             POLICY,
-            marketV2,
+            IKeyMarketplaceRegistry(address(marketV2)),
             ILegacyLiquidMuppetsFactory(address(LEGACY_FACTORY))
         );
         EZManagerPoolAdapter nvdaAdapter =
@@ -109,16 +130,22 @@ contract DeployFactoryV2 is Script {
         RESERVE.transferOwnership(safe);
         agentBond.transferOwnership(safe);
         revenueRouter.transferOwnership(safe);
+        buybackVault.transferOwnership(safe);
         marketV2.transferOwnership(safe);
         factoryV2.transferOwnership(safe);
         vm.stopBroadcast();
 
         require(factoryV2.owner() == safe && factoryV2.governanceReady(), "FactoryV2 governance incomplete");
         require(!factoryV2.launchesEnabled(), "launches must remain off before source verification");
-        require(agentBond.paused() && revenueRouter.paused(), "revenue contracts must remain paused");
+        require(
+            agentBond.paused() && revenueRouter.paused() && buybackVault.paused(),
+            "revenue contracts must remain paused"
+        );
         require(agentBond.rewardNotifier() == address(revenueRouter), "revenue notifier mismatch");
+        require(buybackVault.revenueRouter() == address(revenueRouter), "buyback router mismatch");
+        require(buybackVault.keepers(BUYBACK_KEEPER), "buyback keeper missing");
         require(LEGACY_MARKET.treasury() == address(revenueRouter), "legacy market routing inactive");
-        require(marketV2.treasury() == address(revenueRouter), "V2 market routing inactive");
+        require(address(marketV2.revenueRouter()) == address(revenueRouter), "V2 market routing inactive");
         require(POLICY.factory() == address(factoryV2), "FactoryV2 policy registration inactive");
         require(factoryV2.legacyAgentCount() == LEGACY_FACTORY.agentCount(), "legacy count mismatch");
 
@@ -128,6 +155,8 @@ contract DeployFactoryV2 is Script {
         console2.log("keyMarketplaceV2", address(marketV2));
         console2.log("agentBond", address(agentBond));
         console2.log("revenueRouter", address(revenueRouter));
+        console2.log("buybackVault", address(buybackVault));
+        console2.log("buybackExecutor", address(buybackExecutor));
         console2.log("nvdaAdapter", address(nvdaAdapter));
         console2.log("legacyFactory", address(LEGACY_FACTORY));
         console2.log("legacyKeyMarketplace", address(LEGACY_MARKET));
@@ -144,6 +173,11 @@ contract DeployFactoryV2 is Script {
             vm.serializeAddress(root, "keyMarketplace", address(marketV2));
             vm.serializeAddress(root, "agentBond", address(agentBond));
             vm.serializeAddress(root, "revenueRouter", address(revenueRouter));
+            vm.serializeAddress(root, "buybackVault", address(buybackVault));
+            vm.serializeAddress(root, "buybackExecutor", address(buybackExecutor));
+            vm.serializeAddress(root, "buybackKeeper", BUYBACK_KEEPER);
+            vm.serializeAddress(root, "universalRouter", UNIVERSAL_ROUTER);
+            vm.serializeAddress(root, "ponsHook", PONS_HOOK);
             vm.serializeAddress(root, "ponsFeeEscrow", PONS_FEE_ESCROW);
             vm.serializeAddress(root, "nvdaAdapter", address(nvdaAdapter));
             vm.serializeAddress(root, "legacyFactory", address(LEGACY_FACTORY));

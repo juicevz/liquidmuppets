@@ -68,7 +68,7 @@ const docsSections: DocsSection[] = [
   {
     number: '05',
     title: 'Marketplace fee reserve',
-    body: 'Every settled Key trade currently sends the 3% marketplace fee directly to FeeRwaReserve. At 0.0001 ETH, the private keeper can convert native ETH to USDG and buy the next eligible Robinhood Stock Token. The contract rotates across 26 enabled routes and caps each cycle at 0.01 ETH. After the verified Revenue Engine migration, Key fees enter the source-accounted router before its fixed split.',
+    body: 'Every settled legacy Key trade currently sends the 3% marketplace fee directly to FeeRwaReserve. At 0.0001 ETH, the private keeper can convert native ETH to USDG and buy the next eligible Robinhood Stock Token. The contract rotates across 26 enabled routes and caps each cycle at 0.01 ETH. After the verified migration, V2 fills enter an exact-Key 50/25/15/10 revenue lane.',
     details: [
       'the first 0.01 ETH bootstrap bought 0.076456289003050387 AAPL Stock Token',
       'each route requires live USDG pool liquidity, a fresh Chainlink price, and oraclePaused() = false',
@@ -99,8 +99,8 @@ const docsSections: DocsSection[] = [
   {
     number: '09',
     title: 'Agent Keys and their market',
-    body: 'The current factory creates a fixed-supply, zero-decimal ERC-20 Agent Key with each Muppet. No Key is approved or listed in the launch transaction. After launch, the creator can optionally approve a chosen quantity and open the first ask in a clearly separate flow. The actual floor is always the cheapest active ask. The native marketplace supports partial asks, bids, buys and sells. Its 3% fill fee currently goes directly to the Stock Token reserve.',
-    details: ['Key ownership is not vault ownership', 'Key price does not change vault share price', 'current utility is trading and permanent onchain binding'],
+    body: 'The factory creates a fixed-supply, zero-decimal ERC-20 Agent Key with each Muppet. No Key is approved or listed in the launch transaction. After launch, the creator can optionally approve a chosen quantity and open the first ask in a clearly separate flow. The actual floor is always the cheapest active ask. KeyMarketplaceV2 preserves partial asks, bids, buys and sells while attaching the exact Key and gross volume to every settled fee.',
+    details: ['Key ownership is not vault ownership', 'Key price does not change vault share price', 'utility is trading, permanent binding and exact-Key WETH eligibility after verified V2 activation', 'legacy fees stay global because the old marketplace transfer carries no Key address'],
     visual: 'keys',
   },
   {
@@ -111,15 +111,18 @@ const docsSections: DocsSection[] = [
   {
     number: '11',
     title: 'Revenue Engine and Agent Bonds',
-    body: 'The public Revenue Engine page and tested contract package are shipped, but the new contracts are not yet deployed on mainnet. One reward unit requires 15,000 bonded $MUPPETS plus one unused, permanently bound Agent Key. The token lock lasts 30 days. After verified activation, creator revenue and Key-market fees can route weekly, with 50% delivered as WETH to reward units, 30% sent to the existing Stock Token reserve, and 20% sent to keeper and operating costs.',
+    body: 'The public Revenue Engine, per-Muppet Key revenue views and tested contract package are shipped, but the new contracts are not yet deployed on mainnet. One reward unit requires 15,000 bonded $MUPPETS plus one unused, permanently bound Agent Key. Pons creator revenue keeps the global 50/30/20 route. Each V2 Key fee uses a separate 50/25/15/10 route for exact-Key WETH, $MUPPETS buyback, Stock Token reserve and operations.',
     details: [
       'the target 3% $MUPPETS trade-fee route is 0.300% Pons protocol, 0.350% Pons buyback, 1.175% Agent Bond rewards, 0.705% Stock Token reserve and 0.470% keeper and operations',
       'the Pons protocol and buyback portions happen before the 2.350% creator revenue enters the LiquidMuppets router',
+      'a V2 Key fee sends 50% as WETH only to bonds using that Key, 25% to a $MUPPETS market buy, 15% to the Stock Token reserve and 10% to operations',
+      'the buyback uses the graduated Pons v4 pool, a nonzero minimum output, a short deadline, a 0.01 ETH cap and a limited keeper',
+      'each purchased $MUPPETS lot vests to the Safe for five years',
       'third-party or seeded funding is accounted separately and cannot appear as protocol revenue',
       'revenue accumulates between weekly routes; a zero-revenue week distributes zero',
       'WETH rewards use a cumulative per-unit accounting model with no holder loop and no token emissions',
       'unbonding returns $MUPPETS after the lock, while the Agent Key remains permanently bound',
-      'the public /app/revenue page shows live Pons configuration, activation checks, totals, wallet units and exact receipts since deployment',
+      'the public /app/revenue page shows both routes; each Muppet page shows Key volume, fees, units, WETH per unit, $MUPPETS bought and receipts',
       'mainnet activation remains pending verified deployment, Safe ownership, independent review, Pons buyback activation and creator-recipient routing',
     ],
     link: { label: 'Open the public revenue record', href: '/app/revenue' },
@@ -156,6 +159,7 @@ const docsSections: DocsSection[] = [
       'when an oracle interface has no update timestamp, the page says timestamp not exposed instead of calling it fresh',
       'deposits, withdrawals, allocations and recalls link to their transaction receipts',
       'the Agent Key market stays in a separate section because Keys do not own vault assets',
+      'that separate section labels legacy fees global only and shows exact V2 Key revenue from the deployment block forward',
     ],
   },
   {

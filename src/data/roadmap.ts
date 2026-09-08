@@ -22,7 +22,8 @@ export const publicRoadmap: RoadmapPhase[] = [
       'System Pulse with restart-safe incremental indexing',
       'Watchlists, alerts and Market Radar',
       'Three live task routes and a 26-route Stock Token reserve',
-      'Public Revenue Engine page and tested Agent Bond contract package',
+      'Public Revenue Engine and per-Muppet exact-Key revenue views',
+      'Tested KeyMarketplaceV2, Agent Bond, Revenue Router and five-year buyback package',
     ],
   },
   {
@@ -35,7 +36,7 @@ export const publicRoadmap: RoadmapPhase[] = [
       'Complete source verification',
       'Move protocol ownership to a verified Safe',
       'Commission an independent contract review',
-      'Deploy and verify the Revenue Router and Agent Bond under the Safe',
+      'Deploy and verify the Revenue Router, Agent Bond, KeyMarketplaceV2 and buyback vault under the Safe',
       'Activate Pons buyback and point creator fees to the Revenue Router',
     ],
   },

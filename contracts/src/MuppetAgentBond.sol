@@ -37,6 +37,13 @@ contract MuppetAgentBond is Ownable, Pausable, ReentrancyGuard {
     uint256 public totalRewardsNotified;
     uint256 public totalRewardsClaimed;
 
+    mapping(address key => uint256 units) public totalRewardUnitsByKey;
+    mapping(address key => uint256 rewardPerUnit) public keyRewardPerUnitStored;
+    mapping(address key => uint256 remainderScaled) public keyRewardRemainderScaled;
+    mapping(address key => uint256 liability) public keyRewardLiability;
+    mapping(address key => uint256 amount) public totalKeyRewardsNotified;
+    mapping(address key => uint256 amount) public totalKeyRewardsClaimed;
+
     mapping(address registry => bool allowed) public keyRegistries;
     address[] private registryList;
     mapping(address account => uint256 amount) public bondedBalance;
@@ -45,6 +52,8 @@ contract MuppetAgentBond is Ownable, Pausable, ReentrancyGuard {
     mapping(address account => mapping(address key => uint40 timestamp)) public lockedUntil;
     mapping(address account => uint256 checkpoint) public userRewardPerUnitPaid;
     mapping(address account => uint256 amount) public accruedRewards;
+    mapping(address account => mapping(address key => uint256 checkpoint)) public userKeyRewardPerUnitPaid;
+    mapping(address account => mapping(address key => uint256 amount)) public accruedKeyRewards;
 
     event KeyRegistrySet(address indexed registry, bool allowed);
     event RewardNotifierSet(address indexed notifier);
@@ -54,6 +63,8 @@ contract MuppetAgentBond is Ownable, Pausable, ReentrancyGuard {
     event Unbonded(address indexed account, address indexed key, uint256 units, uint256 muppetsAmount);
     event RewardNotified(address indexed source, uint256 amount, uint256 totalUnits);
     event RewardClaimed(address indexed account, uint256 amount);
+    event KeyRewardNotified(address indexed source, address indexed key, uint256 amount, uint256 totalUnits);
+    event KeyRewardClaimed(address indexed account, address indexed key, uint256 amount);
 
     error AddressZero();
     error ContractGovernanceRequired();
@@ -133,6 +144,7 @@ contract MuppetAgentBond is Ownable, Pausable, ReentrancyGuard {
         if (available < units) revert MissingBoundKeys(available, units);
 
         _accrue(msg.sender);
+        _accrueKey(msg.sender, key);
         uint256 amount = units * UNIT_SIZE;
         uint256 balanceBefore = MUPPETS.balanceOf(address(this));
         MUPPETS.safeTransferFrom(msg.sender, address(this), amount);
@@ -142,6 +154,7 @@ contract MuppetAgentBond is Ownable, Pausable, ReentrancyGuard {
         rewardUnits[msg.sender] += units;
         bondedBalance[msg.sender] += amount;
         totalRewardUnits += units;
+        totalRewardUnitsByKey[key] += units;
         totalBondedMuppets += amount;
         uint40 nextUnlock = uint40(block.timestamp) + LOCK_DURATION;
         if (nextUnlock > lockedUntil[msg.sender][key]) lockedUntil[msg.sender][key] = nextUnlock;
@@ -158,11 +171,13 @@ contract MuppetAgentBond is Ownable, Pausable, ReentrancyGuard {
         if (block.timestamp < unlockTimestamp) revert LockActive(unlockTimestamp);
 
         _accrue(msg.sender);
+        _accrueKey(msg.sender, key);
         uint256 amount = units * UNIT_SIZE;
         unitsByKey[msg.sender][key] = committed - units;
         rewardUnits[msg.sender] -= units;
         bondedBalance[msg.sender] -= amount;
         totalRewardUnits -= units;
+        totalRewardUnitsByKey[key] -= units;
         totalBondedMuppets -= amount;
         userRewardPerUnitPaid[msg.sender] = rewardPerUnitStored;
         MUPPETS.safeTransfer(msg.sender, amount);
@@ -187,6 +202,26 @@ contract MuppetAgentBond is Ownable, Pausable, ReentrancyGuard {
         emit RewardNotified(msg.sender, amount, units);
     }
 
+    /// @notice Adds WETH revenue only for units bonded with the exact Agent Key.
+    function notifyKeyReward(address key, uint256 amount) external nonReentrant whenNotPaused onlyRewardNotifier {
+        if (amount == 0) revert InvalidAmount();
+        uint256 units = totalRewardUnitsByKey[key];
+        if (units == 0) revert NoRewardUnits();
+
+        uint256 balanceBefore = WETH.balanceOf(address(this));
+        WETH.safeTransferFrom(msg.sender, address(this), amount);
+        if (WETH.balanceOf(address(this)) - balanceBefore != amount) revert ExactTransferRequired();
+
+        uint256 scaled = amount * PRECISION + keyRewardRemainderScaled[key];
+        keyRewardPerUnitStored[key] += scaled / units;
+        keyRewardRemainderScaled[key] = scaled % units;
+        keyRewardLiability[key] += amount;
+        rewardLiability += amount;
+        totalKeyRewardsNotified[key] += amount;
+        totalRewardsNotified += amount;
+        emit KeyRewardNotified(msg.sender, key, amount, units);
+    }
+
     function claimReward() external nonReentrant returns (uint256 amount) {
         _accrue(msg.sender);
         amount = accruedRewards[msg.sender];
@@ -198,10 +233,29 @@ contract MuppetAgentBond is Ownable, Pausable, ReentrancyGuard {
         emit RewardClaimed(msg.sender, amount);
     }
 
+    function claimKeyReward(address key) external nonReentrant returns (uint256 amount) {
+        _accrueKey(msg.sender, key);
+        amount = accruedKeyRewards[msg.sender][key];
+        if (amount == 0) revert InvalidAmount();
+        accruedKeyRewards[msg.sender][key] = 0;
+        keyRewardLiability[key] -= amount;
+        rewardLiability -= amount;
+        totalKeyRewardsClaimed[key] += amount;
+        totalRewardsClaimed += amount;
+        WETH.safeTransfer(msg.sender, amount);
+        emit KeyRewardClaimed(msg.sender, key, amount);
+    }
+
     function pendingReward(address account) external view returns (uint256) {
         uint256 pending = accruedRewards[account];
         uint256 delta = rewardPerUnitStored - userRewardPerUnitPaid[account];
         return pending + rewardUnits[account] * delta / PRECISION;
+    }
+
+    function pendingKeyReward(address account, address key) external view returns (uint256) {
+        uint256 pending = accruedKeyRewards[account][key];
+        uint256 delta = keyRewardPerUnitStored[key] - userKeyRewardPerUnitPaid[account][key];
+        return pending + unitsByKey[account][key] * delta / PRECISION;
     }
 
     function availableBoundKeys(address account, address key) external view returns (uint256) {
@@ -225,6 +279,15 @@ contract MuppetAgentBond is Ownable, Pausable, ReentrancyGuard {
             accruedRewards[account] += rewardUnits[account] * delta / PRECISION;
         }
         userRewardPerUnitPaid[account] = checkpoint;
+    }
+
+    function _accrueKey(address account, address key) private {
+        uint256 checkpoint = keyRewardPerUnitStored[key];
+        uint256 delta = checkpoint - userKeyRewardPerUnitPaid[account][key];
+        if (delta != 0 && unitsByKey[account][key] != 0) {
+            accruedKeyRewards[account][key] += unitsByKey[account][key] * delta / PRECISION;
+        }
+        userKeyRewardPerUnitPaid[account][key] = checkpoint;
     }
 
     function _approvedAgentKey(address key) private view returns (bool) {

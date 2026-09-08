@@ -7,7 +7,10 @@ import {IStrategyAdapter} from "./interfaces/IStrategyAdapter.sol";
 import {PolicyExecutor} from "./PolicyExecutor.sol";
 import {StrategyVault} from "./StrategyVault.sol";
 import {AgentKey} from "./AgentKey.sol";
-import {KeyMarketplace} from "./KeyMarketplace.sol";
+
+interface IKeyMarketplaceRegistry {
+    function registerKey(IERC20 key) external;
+}
 
 interface ILegacyLiquidMuppetsFactory {
     struct AgentRecord {
@@ -73,7 +76,7 @@ contract LiquidMuppetsFactoryV2 is Ownable {
     IMuppetBondBalance public immutable agentBond;
     uint256 public immutable minimumAccessBalance;
     PolicyExecutor public immutable policyExecutor;
-    KeyMarketplace public immutable keyMarketplace;
+    IKeyMarketplaceRegistry public immutable keyMarketplace;
     ILegacyLiquidMuppetsFactory public immutable legacyFactory;
     uint256 public immutable legacyAgentCount;
     bool public launchesEnabled;
@@ -135,7 +138,7 @@ contract LiquidMuppetsFactoryV2 is Ownable {
         IMuppetBondBalance agentBond_,
         uint256 minimumAccessBalance_,
         PolicyExecutor policyExecutor_,
-        KeyMarketplace keyMarketplace_,
+        IKeyMarketplaceRegistry keyMarketplace_,
         ILegacyLiquidMuppetsFactory legacyFactory_
     ) Ownable(initialOwner) {
         if (address(accessToken_).code.length == 0 || minimumAccessBalance_ == 0) {

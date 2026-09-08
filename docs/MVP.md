@@ -43,7 +43,7 @@ All deployment receipts succeeded and runtime bytecode is present. The marketpla
 
 ## FactoryV2 migration and governance
 
-The repository now contains `LiquidMuppetsFactoryV2`, `MuppetRevenueRouter`, `MuppetAgentBond`, a guarded deployment script, an explorer verification script, and V1/V2 frontend and indexer compatibility. No V2, router or bond address is shown in the current deployment list because the migration has not been broadcast.
+The repository now contains `LiquidMuppetsFactoryV2`, `KeyMarketplaceV2`, `MuppetRevenueRouter`, `MuppetAgentBond`, `PonsV4MuppetsBuybackExecutor`, `MuppetBuybackVault`, a guarded deployment script, an explorer verification script, and V1/V2 frontend and indexer compatibility. No V2 revenue address is shown in the current deployment list because the migration has not been broadcast.
 
 FactoryV2 adds:
 
@@ -53,16 +53,16 @@ FactoryV2 adds:
 - global launch activation that defaults to off and can only be enabled after ownership moves to deployed governance code
 - a single global agent ID space that delegates legacy IDs and creator lookups to V1
 
-`DeployFactoryV2.s.sol` requires Safe-compatible code with at least two owners and a threshold of at least two. It creates a separate V2 Key marketplace, Revenue Router, Agent Bond and reviewed NVDA adapter, preserves the V1 marketplace for legacy orders, and switches PolicyExecutor so V1 cannot register new vaults. Existing V1 vault policies, deposits, withdrawals, recalls and redemptions continue against their original contracts. The app and indexer aggregate the legacy and V2 markets without pretending they are one contract.
+`DeployFactoryV2.s.sol` requires Safe-compatible code with at least two owners and a threshold of at least two. It creates KeyMarketplaceV2, the Revenue Router, Agent Bond, bounded Pons v4 buyback executor, five-year vesting vault and reviewed NVDA adapter. It preserves the V1 marketplace for legacy orders and switches PolicyExecutor so V1 cannot register new vaults. Existing V1 vault policies, deposits, withdrawals, recalls and redemptions continue against their original contracts. The app and indexer aggregate the legacy and V2 markets without pretending they are one contract.
 
-The migration leaves new launches, revenue routing and new bonding disabled. `scripts/verify-factory-v2.sh` submits all five new contracts to Blockscout, rechecks Safe ownership and paused states, then prints the Pons and Safe calldata needed for activation after review.
+The migration leaves new launches, revenue routing, bonding and buyback execution disabled. `scripts/verify-factory-v2.sh` submits every new contract to Blockscout, rechecks Safe ownership and paused states, then prints the Pons and Safe calldata needed for activation after review.
 
 ## Public roadmap
 
 The site exposes a four-phase roadmap backed by the current release and repository state:
 
-1. `shipped · market core`: public performance and creator pages, `$MUPPETS` Creator Slots, automatic Proof Cards, System Pulse, watchlists, alerts, Market Radar, the public Revenue Engine and tested contract package, three live task routes, and the 26-route Stock Token reserve
-2. `next · resilience`: configure an independent production RPC fallback, complete source verification, move protocol ownership to a verified Safe, commission an independent contract review, deploy and verify the Revenue Router and Agent Bond, then configure the Pons buyback and creator fee recipient
+1. `shipped · market core`: public performance and creator pages, `$MUPPETS` Creator Slots, automatic Proof Cards, System Pulse, watchlists, alerts, Market Radar, the public Revenue Engine and exact-Key revenue views, the tested router, bond, V2 marketplace and buyback package, three live task routes, and the 26-route Stock Token reserve
+2. `next · resilience`: configure an independent production RPC fallback, complete source verification, move protocol ownership to a verified Safe, commission an independent contract review, deploy and verify the Revenue Router, Agent Bond, KeyMarketplaceV2 and buyback vault, then configure the Pons buyback and creator fee recipient
 3. `conditional · FactoryV2 permissioning`: simulate and broadcast after Safe approval, enforce one creator slot per 15,000 liquid or Agent-Bonded `$MUPPETS` onchain, preserve V1 positions and markets, then enable launches through a separate Safe transaction
 4. `conditional · route review`: activate NVDA/USDG only after verified FactoryV2 activation, leave AAPL/USDG and SPY/USDG disabled until venue approval, keep meme/WETH disabled until every liquidity, age, volume, oracle, and exit gate passes, and expose new market evidence only when adapters source it
 
@@ -154,7 +154,7 @@ Stock Tokens are tokenized debt securities. They do not grant legal or beneficia
 
 ## Revenue Engine and Agent Bonds
 
-The public `/app/revenue` page exposes the proposed revenue route, current Pons fee configuration, activation checks, deployed contract totals, wallet reward-unit state and exact transaction receipts since tracking begins. The page is already public. The Revenue Router and Agent Bond are implemented and tested in the repository but are not deployed or active on mainnet. Until verified deployment receipts, Safe ownership and the required Pons configuration transactions agree, the page says `activation pending` and reports no rewards.
+The public `/app/revenue` page exposes both proposed revenue lanes, current Pons fee configuration, activation checks, deployed contract totals, wallet reward-unit state and exact transaction receipts since tracking begins. Each public Muppet page also contains a separate Key revenue record. The Revenue Router, Agent Bond, KeyMarketplaceV2 and buyback vault are implemented and tested in the repository but are not deployed or active on mainnet. Until verified deployment receipts, Safe ownership, independent review and the required Pons configuration transactions agree, the pages say `activation pending` and report no rewards or buybacks.
 
 One reward unit requires both:
 
@@ -173,7 +173,20 @@ The total Pons trade fee remains 3%. The activation target is:
 | LiquidMuppets Stock Token reserve | 0.705% |
 | keeper and operations | 0.470% |
 
-After Pons removes its protocol and buyback portions, `2.350%` creator revenue reaches `MuppetRevenueRouter`. Once per seven days, any account can route that recorded revenue through an immutable `50/30/20` split: 50% wraps into WETH for Agent Bonds, 30% enters the existing Stock Token reserve and 20% goes to the Safe-controlled keeper and operations treasury. Filled Agent Key marketplace fees are recorded as a separate protocol-revenue source and use the same router split.
+After Pons removes its protocol and buyback portions, `2.350%` creator revenue reaches `MuppetRevenueRouter`. Once per seven days, any account can route that recorded revenue through an immutable `50/30/20` split: 50% wraps into WETH for all Agent Bond units, 30% enters the existing Stock Token reserve and 20% goes to the Safe-controlled keeper and operations treasury.
+
+Every KeyMarketplaceV2 fill sends the exact Key, settled gross volume and 3% fee to a separate per-Key ledger. Any account can route one Key's accumulated revenue once per seven days:
+
+| V2 Key fee destination | Share |
+| --- | ---: |
+| WETH for Agent Bonds using that exact Key | 50% |
+| `$MUPPETS` market buy and five-year vest | 25% |
+| LiquidMuppets Stock Token reserve | 15% |
+| operations | 10% |
+
+Legacy marketplace fees remain in the global 50/30/20 lane. The V1 contract transfers only native ETH and cannot pass the Key address, so the interface never invents a per-Muppet allocation for those fees.
+
+The buyback executor uses the graduated `$MUPPETS` Pons Uniswap v4 pool. It requires a nonzero minimum output and a deadline no more than five minutes away, and its route passed a live mainnet-fork purchase. The Safe-owned vault limits execution to an approved keeper, caps a purchase at `0.01 ETH`, enforces a 30 minute per-Key cooldown and vests each bought lot for five years. Price-sensitive buyback execution is keeper-limited because this token has no independent oracle. Fee routing and the receipt ledger remain permissionless.
 
 Direct transfers, treasury top-ups and seeded funds are labeled funding and never enter the reported revenue total. If no reward unit exists, its share stays queued in native ETH. If a week has no recorded revenue, no reward distribution can execute. The contracts create no token emissions and the interface does not calculate an APY.
 
@@ -288,9 +301,11 @@ If creation is interrupted, `Resume launch` first checks the saved factory trans
 - `LaunchReserveAdapter` can only receive and return each vault's recorded WETH reserve.
 - `AgentKey` is a zero-decimal, fixed-supply ERC-20 used for marketplace transfer and permanent binding.
 - `KeyMarketplace` supports native-currency listings, offers, partial fills, and a 3% fee on filled value.
+- `KeyMarketplaceV2` adds the exact settled Key and gross volume to every fee transfer.
 - `FeeRwaReserve` receives marketplace fees, enforces route and oracle checks, rotates purchases, and holds the purchased Stock Tokens.
-- `MuppetRevenueRouter` records Pons and Agent Key marketplace revenue separately from outside funding and routes real revenue at most once per seven days.
-- `MuppetAgentBond` requires 15,000 `$MUPPETS` and one unused permanently bound Agent Key per reward unit, locks the tokens for 30 days, and accounts for WETH distributions without holder loops.
+- `MuppetRevenueRouter` keeps global and exact-Key revenue separate from outside funding and routes each real revenue lane at most once per seven days.
+- `MuppetAgentBond` requires 15,000 `$MUPPETS` and one unused permanently bound Agent Key per reward unit, locks the tokens for 30 days, and accounts for global plus exact-Key WETH without holder loops.
+- `MuppetBuybackVault` holds per-Key buyback budgets, enforces keeper and cycle limits, and vests purchased `$MUPPETS` to the Safe for five years.
 
 An Agent Key is not a vault share, debt claim, promised return, or permission to bypass policy. Key price never enters vault accounting.
 
@@ -357,6 +372,8 @@ Failure handling is explicit: RPC or decode failures keep the last healthy times
 
 `GET /api/v1/revenue` is public and accepts an optional checksummed or lowercase `wallet` query. It returns the target 3% fee route, current Pons state, deployment and activation checks, source-separated contract totals, receipt history since the configured deployment block and wallet reward-unit state. An upstream Pons read failure is exposed as unavailable evidence rather than converted into a false zero.
 
+`GET /api/v1/revenue/keys/{key}` returns exact V2 market volume, fees, routed value, bonded units, cumulative WETH per unit, `$MUPPETS` bought and Key-filtered receipts. Public Muppet pages pass `legacy_market=true` for V1 Keys. That response labels the fee `legacy_global` and leaves per-Key metrics empty instead of estimating them.
+
 ## Verification
 
 Run the deterministic suites:
@@ -389,9 +406,12 @@ forge test --match-contract EZManagerPoolAdapterForkTest \
 
 forge test --match-contract FeeRwaReserveForkTest \
   --fork-url https://rpc.mainnet.chain.robinhood.com -vv
+
+forge test --match-contract PonsV4MuppetsBuybackExecutorForkTest \
+  --fork-url https://rpc.mainnet.chain.robinhood.com -vv
 ```
 
-The Morpho fork test allocates and redeems canonical USDG. The current EZManager fork test deposits WETH, opens a real range, advances time, atomically recenters, and fully redeems. The FactoryV2 adapter fork test deposits USDG, opens the allowlisted NVDA/USDG range and fully redeems back to USDG. The reserve fork test buys AAPL through the live WETH, USDG, and Stock Token pools with the onchain oracle minimum.
+The Morpho fork test allocates and redeems canonical USDG. The current EZManager fork test deposits WETH, opens a real range, advances time, atomically recenters, and fully redeems. The FactoryV2 adapter fork test deposits USDG, opens the allowlisted NVDA/USDG range and fully redeems back to USDG. The reserve fork test buys AAPL through the live WETH, USDG, and Stock Token pools with the onchain oracle minimum. The buyback fork test executes a real native-token to `$MUPPETS` purchase through the graduated Pons v4 pool.
 
 FactoryV2, Revenue Router and Agent Bond must be simulated before broadcast, then verified before any launch, route or bond switch is enabled:
 
@@ -418,9 +438,11 @@ Before an unrestricted public launch:
 - the current owner is a dedicated EOA rather than a multisig; it can pause `FeeRwaReserve` and rescue reserve assets while paused
 - source verification for the current deployment is pending
 - FactoryV2 requires a verified Safe migration and a separate Safe launch-enable transaction; launches default to off
-- the Revenue Router and Agent Bond are implemented and tested but not deployed; both default to paused, require verified Safe ownership and need separate activation transactions
+- the Revenue Router, Agent Bond and buyback vault are implemented and tested but not deployed; all default to paused, require verified Safe ownership and need separate activation transactions
 - the current Pons buyback is off and its creator fee recipient does not point to the Revenue Router; no Agent Bond reward can be called live until both settings and the deployed receipt agree
 - Revenue Engine rewards are variable WETH distributions from recorded revenue only; there are no emissions, guaranteed payments, backfilled returns or projected APY
+- legacy Key fees cannot be attributed to one Muppet; only V2 fills enter the exact-Key lane
+- buyback execution is keeper-limited and subject to market execution risk; each buy has an explicit minimum output, short deadline, per-cycle cap and five-year vest
 - public keeper triggering is disabled; the host-encrypted A5 key is installed, both onchain allowlists are active, and scheduled checks run every five minutes
 - stable yield can be zero and can become temporarily illiquid
 - the range route has execution, LP, pricing, smart-contract, and impermanent-loss risk

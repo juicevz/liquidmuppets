@@ -5,8 +5,11 @@ import { FollowButton } from '../components/FollowButton'
 import { getPet } from '../data/pets'
 import {
   fetchAgentActivity,
+  fetchKeyRevenue,
   fetchMuppetPerformance,
+  fetchProtocolConfig,
   type ActivityItem,
+  type KeyRevenueState,
   type MarketEvidence,
   type MuppetPerformance,
   type PerformanceCheckpoint,
@@ -35,6 +38,7 @@ const VAULT_ACTIONS = new Set([
 export function MuppetPerformancePage({ agentId }: MuppetPerformancePageProps) {
   const [performance, setPerformance] = useState<MuppetPerformance | null>(null)
   const [activity, setActivity] = useState<ActivityItem[]>([])
+  const [keyRevenue, setKeyRevenue] = useState<KeyRevenueState | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [metric, setMetric] = useState<ChartMetric>('share')
@@ -50,8 +54,10 @@ export function MuppetPerformancePage({ agentId }: MuppetPerformancePageProps) {
       void fetchAgentActivity(agentId, 100)
         .then(setActivity)
         .catch(() => undefined)
-      const next = await fetchMuppetPerformance(agentId)
+      const [next, config] = await Promise.all([fetchMuppetPerformance(agentId), fetchProtocolConfig()])
       setPerformance(next)
+      const legacyMarket = config.factoryVersion < 2 || next.agent.id < config.legacyAgentCount
+      setKeyRevenue(await fetchKeyRevenue(next.agent.key, legacyMarket).catch(() => null))
       setError('')
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Performance evidence could not be loaded.')
@@ -214,7 +220,7 @@ export function MuppetPerformancePage({ agentId }: MuppetPerformancePageProps) {
         </aside>
       </div>
 
-      <AgentKeySection performance={performance} explorerUrl={explorerUrl} />
+      <AgentKeySection performance={performance} explorerUrl={explorerUrl} revenue={keyRevenue} />
     </div>
   )
 }
@@ -309,9 +315,11 @@ function ReceiptLedger({ activity, explorerUrl }: { activity: ActivityItem[]; ex
 function AgentKeySection({
   performance,
   explorerUrl,
+  revenue,
 }: {
   performance: MuppetPerformance
   explorerUrl: string
+  revenue: KeyRevenueState | null
 }) {
   const market = performance.key_market
   return (
@@ -333,6 +341,49 @@ function AgentKeySection({
           </>
         ) : <p className="performance-empty">{market.detail} The contract link remains available.</p>}
       </div>
+      <div className={`key-revenue-record ${revenue?.attribution === 'exact_key_v2' ? 'is-exact' : 'is-legacy'}`}>
+        <header>
+          <div>
+            <small>{revenue?.attribution === 'exact_key_v2' ? 'exact Key revenue' : 'legacy fee boundary'}</small>
+            <h3>Revenue attached to this Key</h3>
+          </div>
+          <span>{revenue?.status === 'exact_key_live' ? 'live' : revenue?.status === 'legacy_global' ? 'global only' : 'activation pending'}</span>
+        </header>
+        <p>{revenue?.detail ?? 'Reading the public Key revenue record.'}</p>
+        {revenue?.attribution === 'exact_key_v2' ? (
+          <>
+            <div className="key-revenue-metrics">
+              <Metric label="market volume" value={formatOptionalNative(revenue.market.volume_raw)} />
+              <Metric label="fees recorded" value={formatOptionalNative(revenue.market.fee_revenue_raw)} />
+              <Metric label="bonded units" value={revenue.bond.units ?? 'starts at deployment'} />
+              <Metric label="WETH / unit" value={formatOptionalToken(revenue.bond.cumulative_weth_per_unit_raw, 'WETH')} />
+              <Metric label="$MUPPETS bought" value={formatOptionalToken(revenue.buyback.muppets_bought_raw, '$MUPPETS')} />
+              <Metric label="receipts" value={revenue.receipts.length.toString()} />
+            </div>
+            <div className="key-revenue-split">
+              <span><b>{revenue.split?.agent_bond_weth}</b>exact-Key WETH</span>
+              <span><b>{revenue.split?.muppets_buyback}</b>$MUPPETS buyback</span>
+              <span><b>{revenue.split?.stock_token_reserve}</b>Stock Token reserve</span>
+              <span><b>{revenue.split?.operations}</b>operations</span>
+            </div>
+            <div className="key-revenue-foot">
+              <span>{revenue.tracking_started_at ? `since ${formatUtc(revenue.tracking_started_at)}` : 'tracking starts at V2 deployment'}</span>
+              <span>buyback lots vest for five years</span>
+            </div>
+            {revenue.receipts.length > 0 && (
+              <div className="key-revenue-receipts">
+                {revenue.receipts.slice(0, 6).map((receipt) => (
+                  <a href={receipt.url} target="_blank" rel="noreferrer" key={`${receipt.tx_hash}-${receipt.log_index ?? 0}`}>
+                    <span>{receipt.action}</span><small>block {receipt.block_number.toLocaleString()}</small><Icon name="arrow" />
+                  </a>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="key-revenue-legacy-note"><Icon name="shield" /><span>No per-Key volume, fee, reward or buyback number is inferred from the old marketplace transfer.</span></div>
+        )}
+      </div>
     </section>
   )
 }
@@ -346,6 +397,14 @@ function formatRaw(raw: string, decimals: number, digits = 6): string {
   const [whole, fraction = ''] = rendered.split('.')
   const compact = fraction.slice(0, digits).replace(/0+$/, '')
   return compact ? `${whole}.${compact}` : whole
+}
+
+function formatOptionalNative(raw: string | null): string {
+  return raw === null ? 'starts at deployment' : formatEthValue(BigInt(raw))
+}
+
+function formatOptionalToken(raw: string | null, symbol: string): string {
+  return raw === null ? 'starts at deployment' : `${formatRaw(raw, 18)} ${symbol}`
 }
 
 function formatSignedRaw(raw: string, decimals: number): string {

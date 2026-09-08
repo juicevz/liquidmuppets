@@ -110,12 +110,16 @@ def test_contract_config_exposes_fee_reserve(tmp_path: Path) -> None:
 def test_contract_config_exposes_revenue_contracts(tmp_path: Path) -> None:
     router = "0x1111111111111111111111111111111111111111"
     bond = "0x2222222222222222222222222222222222222222"
+    buyback = "0x4444444444444444444444444444444444444444"
+    executor = "0x5555555555555555555555555555555555555555"
     app = create_app(
         Settings(
             database_path=tmp_path / "test.sqlite3",
             rpc_url="http://127.0.0.1:1",
             revenue_router_address=router,
             agent_bond_address=bond,
+            buyback_vault_address=buyback,
+            buyback_executor_address=executor,
         )
     )
     with TestClient(app) as client:
@@ -124,6 +128,8 @@ def test_contract_config_exposes_revenue_contracts(tmp_path: Path) -> None:
     assert response.status_code == 200
     assert response.json()["revenueRouter"] == router
     assert response.json()["agentBond"] == bond
+    assert response.json()["buybackVault"] == buyback
+    assert response.json()["buybackExecutor"] == executor
 
 
 def test_revenue_api_keeps_activation_and_wallet_state_explicit(tmp_path: Path) -> None:
@@ -149,6 +155,32 @@ def test_revenue_api_rejects_an_invalid_wallet(tmp_path: Path) -> None:
     app = create_app(Settings(database_path=tmp_path / "test.sqlite3", rpc_url="http://127.0.0.1:1"))
     with TestClient(app) as client:
         response = client.get("/api/v1/revenue?wallet=not-a-wallet")
+    assert response.status_code == 422
+
+
+def test_key_revenue_api_preserves_legacy_attribution_flag(tmp_path: Path) -> None:
+    key = "0x4444444444444444444444444444444444444444"
+    app = create_app(Settings(database_path=tmp_path / "test.sqlite3", rpc_url="http://127.0.0.1:1"))
+    app.state.revenue = MagicMock()
+    app.state.revenue.read_key.return_value = {
+        "status": "legacy_global",
+        "key": key,
+        "attribution": "legacy_global",
+        "receipts": [],
+    }
+
+    with TestClient(app) as client:
+        response = client.get(f"/api/v1/revenue/keys/{key}?legacy_market=true")
+
+    assert response.status_code == 200
+    assert response.json()["attribution"] == "legacy_global"
+    app.state.revenue.read_key.assert_called_once_with(key, legacy_market=True)
+
+
+def test_key_revenue_api_rejects_invalid_key(tmp_path: Path) -> None:
+    app = create_app(Settings(database_path=tmp_path / "test.sqlite3", rpc_url="http://127.0.0.1:1"))
+    with TestClient(app) as client:
+        response = client.get("/api/v1/revenue/keys/not-a-key")
     assert response.status_code == 422
 
 

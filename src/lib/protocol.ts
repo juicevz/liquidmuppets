@@ -78,6 +78,8 @@ const agentBondAbi = [
   { type: 'function', name: 'bond', stateMutability: 'nonpayable', inputs: [{ type: 'address' }, { type: 'uint256' }], outputs: [] },
   { type: 'function', name: 'unbond', stateMutability: 'nonpayable', inputs: [{ type: 'address' }, { type: 'uint256' }], outputs: [] },
   { type: 'function', name: 'claimReward', stateMutability: 'nonpayable', inputs: [], outputs: [{ type: 'uint256' }] },
+  { type: 'function', name: 'pendingKeyReward', stateMutability: 'view', inputs: [{ type: 'address' }, { type: 'address' }], outputs: [{ type: 'uint256' }] },
+  { type: 'function', name: 'claimKeyReward', stateMutability: 'nonpayable', inputs: [{ type: 'address' }], outputs: [{ type: 'uint256' }] },
 ] as const
 
 const vaultAbi = [
@@ -760,6 +762,7 @@ export interface AgentBondKeyPosition {
   committedUnits: bigint
   availableBoundKeys: bigint
   lockedUntil: number
+  pendingKeyReward: bigint
 }
 
 export async function readAgentBondKeyPosition(
@@ -769,12 +772,13 @@ export async function readAgentBondKeyPosition(
 ): Promise<AgentBondKeyPosition> {
   if (!config.agentBond) throw new Error('Agent Bond is not configured.')
   const client = createProtocolClient(config, { fresh: true })
-  const [committedUnits, availableBoundKeys, lockedUntil] = await Promise.all([
+  const [committedUnits, availableBoundKeys, lockedUntil, pendingKeyReward] = await Promise.all([
     client.readContract({ address: config.agentBond, abi: agentBondAbi, functionName: 'unitsByKey', args: [account, key] }),
     client.readContract({ address: config.agentBond, abi: agentBondAbi, functionName: 'availableBoundKeys', args: [account, key] }),
     client.readContract({ address: config.agentBond, abi: agentBondAbi, functionName: 'lockedUntil', args: [account, key] }),
+    client.readContract({ address: config.agentBond, abi: agentBondAbi, functionName: 'pendingKeyReward', args: [account, key] }),
   ])
-  return { committedUnits, availableBoundKeys, lockedUntil: Number(lockedUntil) }
+  return { committedUnits, availableBoundKeys, lockedUntil: Number(lockedUntil), pendingKeyReward }
 }
 
 export async function bondAgentKeyUnit(
@@ -817,6 +821,19 @@ export async function claimAgentBondReward(
   const client = createProtocolClient(config)
   return (await sendAndWait(provider, client, account, config.agentBond, encodeFunctionData({
     abi: agentBondAbi, functionName: 'claimReward', args: [],
+  }))).transactionHash
+}
+
+export async function claimAgentBondKeyReward(
+  config: ProtocolConfig,
+  provider: WalletProvider,
+  account: Address,
+  key: Address,
+): Promise<Hash> {
+  if (!config.agentBond) throw new Error('Agent Bond is not configured.')
+  const client = createProtocolClient(config)
+  return (await sendAndWait(provider, client, account, config.agentBond, encodeFunctionData({
+    abi: agentBondAbi, functionName: 'claimKeyReward', args: [key],
   }))).transactionHash
 }
 

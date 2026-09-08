@@ -16,6 +16,8 @@ export interface ProtocolConfig {
   feeRwaReserve: `0x${string}` | null
   revenueRouter: `0x${string}` | null
   agentBond: `0x${string}` | null
+  buybackVault: `0x${string}` | null
+  buybackExecutor: `0x${string}` | null
   testUSDG: `0x${string}` | null
   testWETH: `0x${string}` | null
   stablePool: `0x${string}` | null
@@ -578,9 +580,13 @@ export interface RevenueContractState {
   block_number?: number
   total_pons_revenue?: string
   total_marketplace_revenue?: string
+  total_legacy_marketplace_revenue?: string
+  total_key_marketplace_revenue?: string
+  total_key_marketplace_volume?: string
   total_funding_received?: string
   total_revenue_routed?: string
   total_bond_rewards_delivered?: string
+  total_buyback_routed?: string
   total_stock_reserve_routed?: string
   total_operations_routed?: string
   pending_bond_rewards_native?: string
@@ -602,6 +608,9 @@ export interface RevenueState {
     weth: `0x${string}`
     revenue_router: `0x${string}` | null
     agent_bond: `0x${string}` | null
+    buyback_vault: `0x${string}` | null
+    buyback_executor: `0x${string}` | null
+    universal_router: `0x${string}` | null
     stock_reserve: `0x${string}` | null
     pons_fee_policy: `0x${string}` | null
     pons_fee_escrow: `0x${string}` | null
@@ -623,6 +632,15 @@ export interface RevenueState {
     operations: string
     cadence: string
     zero_revenue_rule: string
+  }
+  key_market_split: {
+    input: string
+    agent_bond_weth: string
+    muppets_buyback: string
+    stock_token_reserve: string
+    operations: string
+    cadence: string
+    vesting: string
   }
   pons: {
     available: boolean
@@ -647,6 +665,12 @@ export interface RevenueState {
   }
   router: RevenueContractState
   bond: RevenueContractState
+  buyback: RevenueContractState & {
+    total_pending_native?: string
+    total_funded_native?: string
+    total_spent_native?: string
+    total_muppets_purchased?: string
+  }
   activation_checks: Array<{ label: string; complete: boolean }>
   tracking_started_at: string | null
   receipt_status: string
@@ -673,6 +697,59 @@ export interface RevenueState {
 export function fetchRevenue(wallet?: string): Promise<RevenueState> {
   const query = wallet ? `?wallet=${encodeURIComponent(wallet)}` : ''
   return request(`/revenue${query}`, { cache: 'no-store' })
+}
+
+export interface KeyRevenueState {
+  status: 'exact_key_live' | 'activation_pending' | 'legacy_global' | 'invalid_key'
+  available: boolean
+  key: `0x${string}`
+  attribution: 'exact_key_v2' | 'legacy_global'
+  detail: string
+  split: {
+    agent_bond_weth: string
+    muppets_buyback: string
+    stock_token_reserve: string
+    operations: string
+  } | null
+  market: {
+    volume_raw: string | null
+    fee_revenue_raw: string | null
+    routed_raw: string | null
+    last_route_at?: number
+  }
+  bond: {
+    units: string | null
+    cumulative_weth_per_unit_raw: string | null
+    weth_delivered_raw: string | null
+    pending_native_raw?: string
+  }
+  buyback: {
+    routed_raw?: string
+    funded_raw: string | null
+    pending_raw: string | null
+    spent_raw: string | null
+    muppets_bought_raw: string | null
+    last_buyback_at?: number
+    vesting?: string
+  }
+  stock_reserve_routed_raw?: string
+  operations_routed_raw?: string
+  block_number?: number
+  tracking_started_at: string | null
+  receipt_status: string
+  receipts: Array<{
+    action: string
+    contract: `0x${string}`
+    tx_hash: `0x${string}`
+    log_index?: number
+    block_number: number
+    timestamp: string
+    url: string
+  }>
+}
+
+export function fetchKeyRevenue(key: string, legacyMarket: boolean): Promise<KeyRevenueState> {
+  return request(`/revenue/keys/${key}?legacy_market=${legacyMarket ? 'true' : 'false'}`, { cache: 'no-store' })
 }
 
 export interface KeeperResult {

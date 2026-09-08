@@ -7,8 +7,14 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {MockERC20} from "../src/mocks/MockERC20.sol";
 import {AgentKey} from "../src/AgentKey.sol";
 import {KeyMarketplace} from "../src/KeyMarketplace.sol";
+import {IKeyRevenueReceiver, KeyMarketplaceV2} from "../src/KeyMarketplaceV2.sol";
 import {MuppetAgentBond} from "../src/MuppetAgentBond.sol";
-import {IMuppetAgentBondRewards, IWrappedRevenueToken, MuppetRevenueRouter} from "../src/MuppetRevenueRouter.sol";
+import {
+    IMuppetAgentBondRewards,
+    IMuppetBuybackVaultFunding,
+    IWrappedRevenueToken,
+    MuppetRevenueRouter
+} from "../src/MuppetRevenueRouter.sol";
 
 contract MockWrappedRevenueToken is ERC20 {
     constructor() ERC20("Wrapped Ether", "WETH") {}
@@ -43,6 +49,20 @@ contract RevenueGovernanceHarness {
     }
 }
 
+contract MockBuybackVault {
+    address public revenueRouter;
+    mapping(address key => uint256 amount) public fundedByKey;
+
+    function setRevenueRouter(address router) external {
+        revenueRouter = router;
+    }
+
+    function fundKey(address key) external payable {
+        require(msg.sender == revenueRouter, "router only");
+        fundedByKey[key] += msg.value;
+    }
+}
+
 contract MuppetRevenueTest is Test {
     MockERC20 internal muppets;
     MockWrappedRevenueToken internal weth;
@@ -51,8 +71,10 @@ contract MuppetRevenueTest is Test {
     RevenueGovernanceHarness internal reserve;
     RevenueGovernanceHarness internal operations;
     KeyMarketplace internal market;
+    KeyMarketplaceV2 internal marketV2;
     MuppetAgentBond internal bond;
     MuppetRevenueRouter internal router;
+    MockBuybackVault internal buybackVault;
     AgentKey internal key;
 
     address internal holder = makeAddr("holder");
@@ -71,17 +93,25 @@ contract MuppetRevenueTest is Test {
         market.registerKey(IERC20(address(key)));
 
         bond = new MuppetAgentBond(address(this), muppets, weth, 15_000 ether, 30 days);
+        buybackVault = new MockBuybackVault();
         router = new MuppetRevenueRouter(
             address(this),
             address(feeEscrow),
             IWrappedRevenueToken(address(weth)),
             IMuppetAgentBondRewards(address(bond)),
+            IMuppetBuybackVaultFunding(address(buybackVault)),
             payable(address(reserve)),
             payable(address(operations))
         );
+        buybackVault.setRevenueRouter(address(router));
+        marketV2 = new KeyMarketplaceV2(address(this), IKeyRevenueReceiver(address(router)), 300);
+        marketV2.setFactory(address(this));
+        marketV2.registerKey(IERC20(address(key)));
         bond.setKeyRegistry(address(market), true);
+        bond.setKeyRegistry(address(marketV2), true);
         bond.setRewardNotifier(address(router));
         router.setMarketplace(address(market), true);
+        router.setKeyMarketplace(address(marketV2), true);
         market.setTreasury(payable(address(router)));
         bond.transferOwnership(address(governance));
         router.transferOwnership(address(governance));
@@ -155,8 +185,70 @@ contract MuppetRevenueTest is Test {
         market.buy{value: 1.03 ether}(1, 1);
 
         assertEq(router.totalMarketplaceRevenue(), 0.03 ether);
+        assertEq(router.totalLegacyMarketplaceRevenue(), 0.03 ether);
         assertEq(router.unroutedRevenue(), 0.03 ether);
         assertEq(router.totalFundingReceived(), 0);
+    }
+
+    function testV2MarketplaceRoutesExactKeyRevenueFiftyTwentyFiveFifteenTen() public {
+        _bindAndBond(1);
+        vm.startPrank(holder);
+        key.approve(address(marketV2), 1);
+        marketV2.createListing(IERC20(address(key)), 1, 2 ether);
+        vm.stopPrank();
+
+        uint256 reserveBefore = address(reserve).balance;
+        uint256 operationsBefore = address(operations).balance;
+        vm.prank(buyer);
+        marketV2.buy{value: 2.06 ether}(1, 1);
+
+        MuppetRevenueRouter.KeyRevenueAccount memory beforeRoute = router.keyRevenueState(address(key));
+        assertEq(beforeRoute.totalVolume, 2 ether);
+        assertEq(beforeRoute.totalRevenue, 0.06 ether);
+        assertEq(router.unroutedRevenue(), 0);
+        assertEq(router.keyUnroutedRevenue(address(key)), 0.06 ether);
+
+        router.routeKeyRevenue(address(key));
+        MuppetRevenueRouter.KeyRevenueAccount memory afterRoute = router.keyRevenueState(address(key));
+        assertEq(afterRoute.totalBondRewardsAllocated, 0.03 ether);
+        assertEq(afterRoute.totalBuybackRouted, 0.015 ether);
+        assertEq(afterRoute.totalStockReserveRouted, 0.009 ether);
+        assertEq(afterRoute.totalOperationsRouted, 0.006 ether);
+        assertEq(buybackVault.fundedByKey(address(key)), 0.015 ether);
+        assertEq(address(reserve).balance - reserveBefore, 0.009 ether);
+        assertEq(address(operations).balance - operationsBefore, 0.006 ether);
+        assertEq(bond.pendingKeyReward(holder, address(key)), 0.03 ether);
+        assertEq(bond.pendingReward(holder), 0);
+
+        vm.prank(holder);
+        assertEq(bond.claimKeyReward(address(key)), 0.03 ether);
+        assertEq(weth.balanceOf(holder), 0.03 ether);
+    }
+
+    function testKeyRevenueDoesNotLeakToAnotherKeyBond() public {
+        address secondHolder = makeAddr("second-holder");
+        AgentKey secondKey = new AgentKey("Fox Key", "FOX", secondHolder, 100);
+        marketV2.registerKey(IERC20(address(secondKey)));
+        muppets.mint(secondHolder, 15_000 ether);
+
+        _bindAndBond(1);
+        vm.startPrank(secondHolder);
+        secondKey.bind(1);
+        muppets.approve(address(bond), 15_000 ether);
+        bond.bond(address(secondKey), 1);
+        vm.stopPrank();
+
+        vm.startPrank(holder);
+        key.approve(address(marketV2), 1);
+        marketV2.createListing(IERC20(address(key)), 1, 1 ether);
+        vm.stopPrank();
+        vm.prank(buyer);
+        marketV2.buy{value: 1.03 ether}(1, 1);
+        router.routeKeyRevenue(address(key));
+
+        assertEq(bond.pendingKeyReward(holder, address(key)), 0.015 ether);
+        assertEq(bond.pendingKeyReward(secondHolder, address(secondKey)), 0);
+        assertEq(bond.pendingReward(secondHolder), 0);
     }
 
     function testRevenueAccumulatesBetweenWeeklyRoutes() public {

@@ -9,6 +9,7 @@ import {MockYieldPool} from "../src/mocks/MockYieldPool.sol";
 import {PolicyExecutor} from "../src/PolicyExecutor.sol";
 import {LiquidMuppetsFactory} from "../src/LiquidMuppetsFactory.sol";
 import {
+    IKeyMarketplaceRegistry,
     ILegacyLiquidMuppetsFactory,
     IMuppetBondBalance,
     LiquidMuppetsFactoryV2
@@ -75,7 +76,7 @@ contract LiquidMuppetsFactoryV2Test is Test {
             bondBalance,
             15_000 ether,
             policy,
-            marketV2,
+            IKeyMarketplaceRegistry(address(marketV2)),
             ILegacyLiquidMuppetsFactory(address(legacyFactory))
         );
         policy.setFactory(address(factoryV2));
@@ -280,7 +281,7 @@ contract LiquidMuppetsFactoryV2Test is Test {
             IMuppetBondBalance(address(0)),
             15_000 ether,
             policy,
-            anotherMarket,
+            IKeyMarketplaceRegistry(address(anotherMarket)),
             ILegacyLiquidMuppetsFactory(address(0))
         );
         accessToken.mint(creator, 15_000 ether);

@@ -8,6 +8,7 @@ import { getInjectedProvider } from '../lib/protocol'
 import {
   bindKeys,
   bondAgentKeyUnit,
+  claimAgentBondKeyReward,
   claimAgentBondReward,
   readAgentBondKeyPosition,
   unbondAgentKeyUnit,
@@ -164,6 +165,24 @@ export function RevenuePage({ walletAddress, onConnect }: RevenuePageProps) {
         </div>
       </section>
 
+      <section className="revenue-route revenue-key-route" aria-labelledby="key-revenue-route-title">
+        <header>
+          <div><small>V2 Agent Key fees · exact Key attribution</small><h2 id="key-revenue-route-title">One Key, one revenue lane</h2></div>
+          <p>Each V2 fill records its Key, volume and fee before the weekly route. Legacy marketplace fees stay global because the old transfer contains no Key address.</p>
+        </header>
+        <div className="key-revenue-split revenue-key-split">
+          <span><b>{state.key_market_split.agent_bond_weth}</b>WETH to bonds using that Key</span>
+          <span><b>{state.key_market_split.muppets_buyback}</b>$MUPPETS buyback</span>
+          <span><b>{state.key_market_split.stock_token_reserve}</b>Stock Token reserve</span>
+          <span><b>{state.key_market_split.operations}</b>operations</span>
+        </div>
+        <div className="revenue-key-rule">
+          <span><small>cadence</small><strong>{state.key_market_split.cadence}</strong></span>
+          <span><small>buyback custody</small><strong>{state.key_market_split.vesting}</strong></span>
+          <span><small>history</small><strong>since V2 tracking begins</strong></span>
+        </div>
+      </section>
+
       <div className="revenue-two-column">
         <section className="revenue-bond" aria-labelledby="revenue-bond-title">
           <header><small>one unit at a time</small><h2 id="revenue-bond-title">Agent Bond</h2></header>
@@ -219,6 +238,10 @@ export function RevenuePage({ walletAddress, onConnect }: RevenuePageProps) {
                     const { config, provider, account } = actionContext()
                     return [await unbondAgentKeyUnit(config, provider, account, agent.key.address)]
                   })}
+                  onClaimKey={() => void runAction(`claim-key-${agent.key.address}`, async () => {
+                    const { config, provider, account } = actionContext()
+                    return [await claimAgentBondKeyReward(config, provider, account, agent.key.address)]
+                  })}
                   key={agent.key.address}
                 />
               ))}
@@ -249,6 +272,7 @@ export function RevenuePage({ walletAddress, onConnect }: RevenuePageProps) {
           <div className="revenue-contract-links">
             {contractLink(state.network.explorer_url, state.contracts.revenue_router, 'Revenue Router')}
             {contractLink(state.network.explorer_url, state.contracts.agent_bond, 'Agent Bond')}
+            {contractLink(state.network.explorer_url, state.contracts.buyback_vault, 'Buyback vault')}
             {contractLink(state.network.explorer_url, state.contracts.stock_reserve, 'Stock reserve')}
             {contractLink(state.network.explorer_url, state.contracts.pons_fee_policy, 'Pons fee policy')}
           </div>
@@ -283,6 +307,7 @@ function RevenueAgentControl({
   onBind,
   onBond,
   onUnbond,
+  onClaimKey,
 }: {
   agent: ChainAgent
   position?: AgentBondKeyPosition
@@ -291,6 +316,7 @@ function RevenueAgentControl({
   onBind: () => void
   onBond: () => void
   onUnbond: () => void
+  onClaimKey: () => void
 }) {
   const actionId = agent.key.address
   const unlockReady = Boolean(position?.committedUnits && position.lockedUntil <= Math.floor(Date.now() / 1_000))
@@ -300,6 +326,7 @@ function RevenueAgentControl({
       <span><small>transferable</small><b>{agent.key.walletBalance.toString()}</b></span>
       <span><small>bound free</small><b>{position?.availableBoundKeys.toString() ?? '…'}</b></span>
       <span><small>units</small><b>{position?.committedUnits.toString() ?? '…'}</b></span>
+      <span><small>Key WETH</small><b>{position ? formatNative(position.pendingKeyReward) : '…'}</b></span>
       <div className="revenue-agent-actions">
         {(position?.availableBoundKeys ?? 0n) > 0n ? (
           <button type="button" disabled={busy} onClick={onBond}>{action === `bond-${actionId}` ? 'Waiting' : 'Bond 15,000'}</button>
@@ -309,6 +336,11 @@ function RevenueAgentControl({
         {(position?.committedUnits ?? 0n) > 0n && (
           <button className="secondary" type="button" disabled={busy || !unlockReady} onClick={onUnbond} title={unlockReady ? 'Return 15,000 MUPPETS' : `Unlocks ${formatUtc(new Date((position?.lockedUntil ?? 0) * 1_000).toISOString())}`}>
             {action === `unbond-${actionId}` ? 'Waiting' : unlockReady ? 'Unbond 1' : `Locked until ${shortDate(position?.lockedUntil ?? 0)}`}
+          </button>
+        )}
+        {(position?.pendingKeyReward ?? 0n) > 0n && (
+          <button className="secondary" type="button" disabled={busy} onClick={onClaimKey}>
+            {action === `claim-key-${actionId}` ? 'Waiting' : 'Claim Key WETH'}
           </button>
         )}
       </div>

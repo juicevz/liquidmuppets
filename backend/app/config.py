@@ -37,6 +37,11 @@ class Settings:
     fee_rwa_reserve_address: str = getenv("FEE_RWA_RESERVE_ADDRESS", "")
     revenue_router_address: str = getenv("REVENUE_ROUTER_ADDRESS", "")
     agent_bond_address: str = getenv("AGENT_BOND_ADDRESS", "")
+    buyback_vault_address: str = getenv("BUYBACK_VAULT_ADDRESS", "")
+    buyback_executor_address: str = getenv("BUYBACK_EXECUTOR_ADDRESS", "")
+    universal_router_address: str = getenv(
+        "UNIVERSAL_ROUTER_ADDRESS", "0x8876789976DeCBFCBbBE364623c63652db8C0904"
+    )
     revenue_deployment_block: int = int(getenv("REVENUE_DEPLOYMENT_BLOCK", "0"))
     pons_fee_policy_address: str = getenv(
         "PONS_FEE_POLICY_ADDRESS", "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044"

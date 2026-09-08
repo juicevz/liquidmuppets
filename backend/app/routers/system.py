@@ -77,6 +77,8 @@ def contracts(request: Request) -> dict[str, object]:
         "feeRwaReserve": settings.fee_rwa_reserve_address or None,
         "revenueRouter": settings.revenue_router_address or None,
         "agentBond": settings.agent_bond_address or None,
+        "buybackVault": settings.buyback_vault_address or None,
+        "buybackExecutor": settings.buyback_executor_address or None,
         "testUSDG": settings.test_usdg_address or None,
         "testWETH": settings.test_weth_address or None,
         "stablePool": settings.stable_pool_address or None,

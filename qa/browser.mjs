@@ -459,6 +459,9 @@ results.performanceOracleBoundary = await page.getByText(/timestamp not exposed/
 results.performanceKeeper = await page.getByRole('heading', { name: 'Last keeper decision' }).count() === 1
 results.performanceReceipts = await page.locator('.receipt-row').count()
 results.performanceKeySeparate = await page.getByRole('heading', { name: 'Agent Key market' }).count() === 1
+results.performanceKeyRevenue = await page.getByRole('heading', { name: 'Revenue attached to this Key' }).count() === 1
+results.performanceLegacyRevenueBoundary = await page.getByText('global only', { exact: true }).count() === 1
+  && await page.getByText(/No per-Key volume, fee, reward or buyback number is inferred/i).count() === 1
 results.performanceNoHistoricalApy = await page.getByText(/historical APY/i).count() === 0
 results.performanceFollowControl = await page.getByRole('button', { name: /Follow range fox/i }).isVisible()
 results.performanceOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
@@ -646,6 +649,8 @@ results.revenueTitle = await page.title()
 results.revenuePending = await page.getByText('activation pending', { exact: true }).count() === 1
 results.revenueFeeDestinations = await page.locator('.revenue-route-grid article').count()
 results.revenueRouterSplits = await page.locator('.revenue-router-split > span').count()
+results.revenueKeySplits = await page.locator('.revenue-key-split > span').count()
+results.revenueKeyRoute = await page.getByRole('heading', { name: 'One Key, one revenue lane' }).count() === 1
 results.revenueActivationChecks = await page.locator('.revenue-checks > span').count()
 results.revenuePonsObserved = await page.getByText(/block [\d,]+/i).count() > 0
 results.revenueBuybackOff = await page.getByText('off', { exact: true }).count() === 1
@@ -664,8 +669,11 @@ results.revenueEndpoint = await page.evaluate(async () => {
     && body.router_split?.agent_bonds === '50%'
     && body.router_split?.stock_reserve === '30%'
     && body.router_split?.operations === '20%'
+    && body.key_market_split?.agent_bond_weth === '50%'
+    && body.key_market_split?.muppets_buyback === '25%'
     && body.router?.deployed === false
     && body.bond?.deployed === false
+    && body.buyback?.deployed === false
     && Array.isArray(body.receipts)
     && body.receipts.length === 0
 })
@@ -1007,6 +1015,8 @@ const failed =
   || !results.performanceKeeper
   || results.performanceReceipts < 1
   || !results.performanceKeySeparate
+  || !results.performanceKeyRevenue
+  || !results.performanceLegacyRevenueBoundary
   || !results.performanceNoHistoricalApy
   || !results.performanceFollowControl
   || results.performanceOverflow
@@ -1066,7 +1076,9 @@ const failed =
   || !results.revenuePending
   || results.revenueFeeDestinations !== 5
   || results.revenueRouterSplits !== 4
-  || results.revenueActivationChecks !== 5
+  || results.revenueKeySplits !== 4
+  || !results.revenueKeyRoute
+  || results.revenueActivationChecks !== 6
   || !results.revenuePonsObserved
   || !results.revenueBuybackOff
   || !results.revenueNoReceipt

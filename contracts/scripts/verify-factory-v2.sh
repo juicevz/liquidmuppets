@@ -15,6 +15,11 @@ market="$(jq -r '.keyMarketplace' "$deployment_file")"
 adapter="$(jq -r '.nvdaAdapter' "$deployment_file")"
 bond="$(jq -r '.agentBond' "$deployment_file")"
 router="$(jq -r '.revenueRouter' "$deployment_file")"
+buyback_vault="$(jq -r '.buybackVault' "$deployment_file")"
+buyback_executor="$(jq -r '.buybackExecutor' "$deployment_file")"
+buyback_keeper="$(jq -r '.buybackKeeper' "$deployment_file")"
+universal_router="$(jq -r '.universalRouter' "$deployment_file")"
+pons_hook="$(jq -r '.ponsHook' "$deployment_file")"
 deployer="$(jq -r '.deployer' "$deployment_file")"
 safe="$(jq -r '.owner' "$deployment_file")"
 minimum="$(jq -r '.minimumMuppetsRaw' "$deployment_file")"
@@ -32,9 +37,15 @@ market_args="$(cast abi-encode 'constructor(address,address,uint16)' "$deployer"
 bond_args="$(cast abi-encode \
   'constructor(address,address,address,uint256,uint40)' \
   "$deployer" "$muppets" "$weth" "$minimum" 2592000)"
+buyback_executor_args="$(cast abi-encode \
+  'constructor(address,address,address,int24)' \
+  "$muppets" "$universal_router" "$pons_hook" 200)"
+buyback_vault_args="$(cast abi-encode \
+  'constructor(address,address,address,uint256,uint40)' \
+  "$deployer" "$buyback_executor" "$safe" 10000000000000000 1800)"
 router_args="$(cast abi-encode \
-  'constructor(address,address,address,address,address,address)' \
-  "$deployer" "$pons_fee_escrow" "$weth" "$bond" "$reserve" "$safe")"
+  'constructor(address,address,address,address,address,address,address)' \
+  "$deployer" "$pons_fee_escrow" "$weth" "$bond" "$buyback_vault" "$reserve" "$safe")"
 adapter_args="$(cast abi-encode \
   'constructor(address,address,address,address,int24,uint16,uint32,uint256)' \
   0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168 \
@@ -43,7 +54,7 @@ adapter_args="$(cast abi-encode \
   0x379EC4f7C378F34a1B47E4F3cbeBCbAC3E8E9F15 \
   1200 300 259200 10000000)"
 
-forge verify-contract "$market" src/KeyMarketplace.sol:KeyMarketplace \
+forge verify-contract "$market" src/KeyMarketplaceV2.sol:KeyMarketplaceV2 \
   --chain-id 4663 --rpc-url "$rpc_url" --verifier blockscout --verifier-url "$verifier_url" \
   --constructor-args "$market_args" --watch
 forge verify-contract "$adapter" src/adapters/EZManagerPoolAdapter.sol:EZManagerPoolAdapter \
@@ -52,6 +63,12 @@ forge verify-contract "$adapter" src/adapters/EZManagerPoolAdapter.sol:EZManager
 forge verify-contract "$bond" src/MuppetAgentBond.sol:MuppetAgentBond \
   --chain-id 4663 --rpc-url "$rpc_url" --verifier blockscout --verifier-url "$verifier_url" \
   --constructor-args "$bond_args" --watch
+forge verify-contract "$buyback_executor" src/PonsV4MuppetsBuybackExecutor.sol:PonsV4MuppetsBuybackExecutor \
+  --chain-id 4663 --rpc-url "$rpc_url" --verifier blockscout --verifier-url "$verifier_url" \
+  --constructor-args "$buyback_executor_args" --watch
+forge verify-contract "$buyback_vault" src/MuppetBuybackVault.sol:MuppetBuybackVault \
+  --chain-id 4663 --rpc-url "$rpc_url" --verifier blockscout --verifier-url "$verifier_url" \
+  --constructor-args "$buyback_vault_args" --watch
 forge verify-contract "$router" src/MuppetRevenueRouter.sol:MuppetRevenueRouter \
   --chain-id 4663 --rpc-url "$rpc_url" --verifier blockscout --verifier-url "$verifier_url" \
   --constructor-args "$router_args" --watch
@@ -63,8 +80,12 @@ owner="$(cast call "$factory" 'owner()(address)' --rpc-url "$rpc_url")"
 enabled="$(cast call "$factory" 'launchesEnabled()(bool)' --rpc-url "$rpc_url")"
 bond_owner="$(cast call "$bond" 'owner()(address)' --rpc-url "$rpc_url")"
 router_owner="$(cast call "$router" 'owner()(address)' --rpc-url "$rpc_url")"
+buyback_owner="$(cast call "$buyback_vault" 'owner()(address)' --rpc-url "$rpc_url")"
 bond_paused="$(cast call "$bond" 'paused()(bool)' --rpc-url "$rpc_url")"
 router_paused="$(cast call "$router" 'paused()(bool)' --rpc-url "$rpc_url")"
+buyback_paused="$(cast call "$buyback_vault" 'paused()(bool)' --rpc-url "$rpc_url")"
+configured_buyback_router="$(cast call "$buyback_vault" 'revenueRouter()(address)' --rpc-url "$rpc_url")"
+configured_buyback_keeper="$(cast call "$buyback_vault" 'keepers(address)(bool)' "$buyback_keeper" --rpc-url "$rpc_url")"
 if [[ "${owner,,}" != "${safe,,}" ]]; then
   echo "factory owner does not match the recorded Safe" >&2
   exit 1
@@ -73,12 +94,16 @@ if [[ "$enabled" != "false" ]]; then
   echo "launches were enabled before post-verification review" >&2
   exit 1
 fi
-if [[ "${bond_owner,,}" != "${safe,,}" || "${router_owner,,}" != "${safe,,}" ]]; then
+if [[ "${bond_owner,,}" != "${safe,,}" || "${router_owner,,}" != "${safe,,}" || "${buyback_owner,,}" != "${safe,,}" ]]; then
   echo "revenue contract owner does not match the recorded Safe" >&2
   exit 1
 fi
-if [[ "$bond_paused" != "true" || "$router_paused" != "true" ]]; then
+if [[ "$bond_paused" != "true" || "$router_paused" != "true" || "$buyback_paused" != "true" ]]; then
   echo "revenue contracts were activated before post-verification review" >&2
+  exit 1
+fi
+if [[ "${configured_buyback_router,,}" != "${router,,}" || "$configured_buyback_keeper" != "true" ]]; then
+  echo "buyback vault routing or keeper configuration is incomplete" >&2
   exit 1
 fi
 
@@ -88,6 +113,8 @@ echo "Pons creator calldata to direct fees to the router: $(cast calldata 'setCr
 echo "Pons creator calldata to enable the built-in buyback: $(cast calldata 'setBuybackEnabled(bytes32,bool)' 0x917d90894a647c3cb4f7bad482a1b3276f643f69a36278371acbf4afaa16b128 true)"
 echo "Safe target: $bond"
 echo "Safe calldata to activate Agent Bonds after review: $(cast calldata 'activate()')"
+echo "Safe target: $buyback_vault"
+echo "Safe calldata to activate the buyback vault after review: $(cast calldata 'activate()')"
 echo "Safe target: $router"
 echo "Safe calldata to activate revenue routing after Pons setup: $(cast calldata 'activate()')"
 echo "Safe target: $factory"
