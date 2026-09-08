@@ -38,6 +38,7 @@ contract MuppetAgentBond is Ownable, Pausable, ReentrancyGuard {
     uint40 public constant EPOCH_DURATION = 7 days;
     uint40 public constant MATURATION_DURATION = 7 days;
     uint256 public constant REINVESTMENT_VERSION = 1;
+    uint256 public constant EARN_ACCOUNTING_VERSION = 1;
     uint256 public constant MAX_REINVESTMENT_DEADLINE_WINDOW = 5 minutes;
 
     enum BondTerm {
@@ -76,6 +77,8 @@ contract MuppetAgentBond is Ownable, Pausable, ReentrancyGuard {
     uint256 public totalRewardsClaimed;
     uint256 public totalGlobalRewardsNotified;
     uint256 public totalGlobalRewardsClaimed;
+    mapping(address account => uint256 amount) public accountRewardsClaimed;
+    mapping(address account => uint256 amount) public accountRewardsReinvested;
 
     mapping(address key => uint256 units) public totalRewardUnitsByKey;
     mapping(address key => uint256 liability) public keyRewardLiability;
@@ -353,6 +356,7 @@ contract MuppetAgentBond is Ownable, Pausable, ReentrancyGuard {
         uint256 wethReturned = claimed - wethToSpend;
         if (muppetsReturned != 0) MUPPETS.safeTransfer(msg.sender, muppetsReturned);
         if (wethReturned != 0) WETH.safeTransfer(msg.sender, wethReturned);
+        accountRewardsReinvested[msg.sender] += wethToSpend;
         emit PositionRewardsReinvested(
             positionId,
             newPositionId,
@@ -378,6 +382,7 @@ contract MuppetAgentBond is Ownable, Pausable, ReentrancyGuard {
         totalGlobalRewardsClaimed += globalWeth;
         totalKeyRewardsClaimed[position.key] += keyWeth;
         totalRewardsClaimed += amount;
+        accountRewardsClaimed[msg.sender] += amount;
         emit PositionRewardsClaimed(positionId, msg.sender, position.key, globalWeth, keyWeth);
     }
 

@@ -25,6 +25,9 @@ describe('viewFromPath', () => {
     expect(viewFromPath('/app/pulse')).toBe('pulse')
     expect(viewFromPath('/app/watchlist')).toBe('monitor')
     expect(viewFromPath('/app/revenue')).toBe('revenue')
+    expect(viewFromPath('/app/earn')).toBe('revenue')
+    expect(viewFromPath('/app/earn/')).toBe('revenue')
+    expect(pathForView.revenue).toBe('/app/earn')
     expect(viewFromPath('/docs')).toBe('docs')
   })
 

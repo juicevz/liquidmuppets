@@ -8,6 +8,7 @@ from typing import Any
 from web3 import Web3
 
 from app.config import Settings
+from app.services.earn import EarnService
 
 PONS_LAUNCH_ABI: list[dict[str, Any]] = [
     {
@@ -358,6 +359,15 @@ EVENT_LABELS = {
     Web3.keccak(
         text="PositionRewardsReinvested(uint256,uint256,address,uint256,uint256,uint256,uint256,uint256)"
     ).hex(): "earned WETH reinvested into a new Agent Bond",
+    Web3.keccak(text="RevenueEpochRecorded(address,uint40,bytes32,address,uint256,uint256)").hex(): (
+        "fees recorded in their router receipt week"
+    ),
+    Web3.keccak(
+        text="RevenueEpochFinalized(address,uint40,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)"
+    ).hex(): "receipt week finalized",
+    Web3.keccak(text="BondRewardsUnallocated(address,uint40,uint256)").hex(): (
+        "unallocated rewards held for original week"
+    ),
 }
 
 
@@ -402,11 +412,12 @@ class RevenueService:
         self.web3 = web3
         self._cache_lock = Lock()
         self._cache: tuple[float, dict[str, object]] | None = None
+        self.earn = EarnService(settings, web3)
 
-    def read(self, wallet: str | None = None) -> dict[str, object]:
+    def read(self, wallet: str | None = None, *, position_cursor: int = 0) -> dict[str, object]:
         public_state = self._read_public_state()
         state = dict(public_state)
-        state["wallet"] = self._read_wallet(wallet) if wallet else None
+        state["wallet"] = self._read_wallet(wallet, position_cursor) if wallet else None
         return state
 
     def read_key(self, key: str, *, legacy_market: bool = False) -> dict[str, object]:
@@ -436,6 +447,7 @@ class RevenueService:
                 "tracking_started_at": None,
                 "receipt_status": "legacy_market_has_no_key_attribution",
                 "receipts": [],
+                "earn_weeks": self.earn.read_weeks(),
             }
 
         router_address = self.settings.revenue_router_address
@@ -519,6 +531,7 @@ class RevenueService:
                 "tracking_started_at": tracking_started_at,
                 "receipt_status": receipt_status,
                 "receipts": receipts,
+                "earn_weeks": self.earn.read_weeks(checksum_key),
             }
         except Exception as error:
             return self._pending_key_state(checksum_key, f"read_unavailable:{type(error).__name__}")
@@ -608,7 +621,7 @@ class RevenueService:
                     "agent_bonds": "50%",
                     "stock_reserve": "30%",
                     "operations": "20%",
-                    "cadence": "weekly",
+                    "cadence": "completed router receipt weeks",
                     "zero_revenue_rule": "No revenue means no reward distribution.",
                 },
                 "key_market_split": {
@@ -617,7 +630,7 @@ class RevenueService:
                     "muppets_buyback": "25%",
                     "stock_token_reserve": "15%",
                     "operations": "10%",
-                    "cadence": "weekly per Key",
+                    "cadence": "completed router receipt weeks per Key",
                     "vesting": "Each buyback lot vests to the Safe over five years.",
                 },
                 "pons": pons,
@@ -625,6 +638,7 @@ class RevenueService:
                 "bond": bond,
                 "buyback": buyback,
                 "reinvestment": self._read_reinvestment(live=live),
+                "earn_weeks": self.earn.read_weeks(),
                 "activation_checks": [
                     {"label": "Revenue Router deployed", "complete": bool(router.get("deployed"))},
                     {"label": "Agent Bond deployed", "complete": bool(bond.get("deployed"))},
@@ -649,6 +663,10 @@ class RevenueService:
                         "Purchased MUPPETS vest for five years."
                     ),
                     "No APY is projected or reconstructed before tracking begins.",
+                    (
+                        "Receipt weeks record when fees reach the router. Unallocated reward shares remain with "
+                        "their original week and are not promised to later stakers."
+                    ),
                     "The contracts are tested but have not been independently audited.",
                 ],
             }
@@ -858,15 +876,19 @@ class RevenueService:
         except Exception as error:
             return {"deployed": False, "address": configured_address, "error": type(error).__name__}
 
-    def _read_wallet(self, wallet: str | None) -> dict[str, object] | None:
+    def _read_wallet(self, wallet: str | None, position_cursor: int = 0) -> dict[str, object] | None:
         if wallet is None or not Web3.is_address(wallet):
             return None
         if not Web3.is_address(self.settings.agent_bond_address):
-            return {"address": Web3.to_checksum_address(wallet), "available": False}
+            pending_state: dict[str, object] = {"address": Web3.to_checksum_address(wallet), "available": False}
+            pending_state["earn"] = self.earn.read_wallet(wallet, pending_state, position_cursor)
+            return pending_state
         try:
             address = Web3.to_checksum_address(self.settings.agent_bond_address)
             if len(self.web3.eth.get_code(address)) == 0:
-                return {"address": Web3.to_checksum_address(wallet), "available": False}
+                missing: dict[str, object] = {"address": Web3.to_checksum_address(wallet), "available": False}
+                missing["earn"] = self.earn.read_wallet(wallet, missing, position_cursor)
+                return missing
             account = Web3.to_checksum_address(wallet)
             contract = self.web3.eth.contract(address=address, abi=BOND_ABI)
             block = self.web3.eth.block_number
@@ -876,7 +898,7 @@ class RevenueService:
                 contract.functions.pendingTotalReward(account).call(block_identifier=block),
                 contract.functions.accountPositionCount(account).call(block_identifier=block),
             )
-            return {
+            result: dict[str, object] = {
                 "address": account,
                 "available": True,
                 "bonded_muppets_raw": str(int(bonded)),
@@ -885,8 +907,14 @@ class RevenueService:
                 "position_count": str(int(position_count)),
                 "block_number": block,
             }
+            result["earn"] = self.earn.read_wallet(account, result, position_cursor)
+            return result
         except Exception as error:
-            return {"address": Web3.to_checksum_address(wallet), "available": False, "error": type(error).__name__}
+            unavailable: dict[str, object] = {
+                "address": Web3.to_checksum_address(wallet), "available": False, "error": type(error).__name__,
+            }
+            unavailable["earn"] = self.earn.read_wallet(wallet, unavailable, position_cursor)
+            return unavailable
 
     def _pending_key_state(self, key: str, receipt_status: str) -> dict[str, object]:
         return {

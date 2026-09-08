@@ -98,6 +98,8 @@ contract MuppetRewardReinvestmentForkTest is Test {
         assertEq(MUPPETS.balanceOf(address(bond)), 2 * UNIT);
         assertEq(WETH.balanceOf(address(bond)), 0);
         assertEq(bond.pendingTotalReward(DEV), 0);
+        assertEq(bond.accountRewardsClaimed(DEV), 0.2 ether);
+        assertEq(bond.accountRewardsReinvested(DEV), 0.001 ether);
         assertEq(address(executor).balance, 0);
         emit log_named_uint("fork measured MUPPETS bought", bought);
     }
@@ -119,10 +121,14 @@ contract MuppetRewardReinvestmentForkTest is Test {
         assertEq(bond.accountPositionCount(DEV), 1);
         assertEq(MUPPETS.balanceOf(address(bond)), UNIT);
         assertEq(WETH.balanceOf(address(bond)), 0.2 ether);
+        assertEq(bond.accountRewardsClaimed(DEV), 0);
+        assertEq(bond.accountRewardsReinvested(DEV), 0);
         uint256 beforeWeth = WETH.balanceOf(DEV);
         vm.prank(DEV);
         bond.claimPositionRewards(originalPosition);
         assertEq(WETH.balanceOf(DEV) - beforeWeth, 0.2 ether);
+        assertEq(bond.accountRewardsClaimed(DEV), 0.2 ether);
+        assertEq(bond.accountRewardsReinvested(DEV), 0);
     }
 
     function testForkDevExpiredQuoteDoesNotSpendOrConsumeRewards() public {
@@ -140,6 +146,8 @@ contract MuppetRewardReinvestmentForkTest is Test {
         );
         assertEq(bond.pendingTotalReward(DEV), 0.2 ether);
         assertEq(bond.bondedBalance(DEV), UNIT);
+        assertEq(bond.accountRewardsClaimed(DEV), 0);
+        assertEq(bond.accountRewardsReinvested(DEV), 0);
         assertEq(WETH.balanceOf(address(bond)), 0.2 ether);
         assertEq(address(executor).balance, 0);
     }

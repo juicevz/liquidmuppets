@@ -11,7 +11,10 @@ router = APIRouter(tags=["revenue"])
 def revenue(
     request: Request,
     wallet: str | None = Query(default=None, pattern=r"^0x[a-fA-F0-9]{40}$"),
+    position_cursor: int = Query(default=0, ge=0, le=1_000_000_000),
 ) -> dict[str, object]:
+    if position_cursor:
+        return cast(dict[str, object], request.app.state.revenue.read(wallet, position_cursor=position_cursor))
     return cast(dict[str, object], request.app.state.revenue.read(wallet))
 
 

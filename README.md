@@ -134,7 +134,7 @@ verified revenue migration
   -> the external Pons protocol keeps 0.300% of each $MUPPETS trade
   -> the enabled Pons buyback receives 0.350% and follows its five-year vest
   -> 2.350% creator revenue enters MuppetRevenueRouter
-  -> 50% becomes WETH rewards for eligible Agent Bond weight in the latest completed weekly epoch
+  -> 50% becomes WETH rewards for eligible Agent Bond weight in the completed receipt week
   -> 30% enters FeeRwaReserve and 20% funds keeper and operating costs
   -> one base unit requires 15,000 bonded $MUPPETS and one unused bound Agent Key
   -> positions mature for 7 days, then earn only for full completed epochs
@@ -171,7 +171,15 @@ The first dev-funded cycle spent `0.01 ETH`, routed `24.587800 USDG`, and bought
 
 ## Revenue Engine and Agent Bonds
 
-`MuppetRevenueRouter` keeps two accounting lanes. Pons creator revenue and legacy Key fees use the existing permissionless weekly 50/30/20 route: 50% WETH to eligible Agent Bond weight in the latest completed epoch, 30% to the Stock Token reserve and 20% to operations. Each KeyMarketplaceV2 fill calls the router with its exact Key, gross volume and fee. That Key's permissionless weekly route sends 50% as WETH only to eligible bonds using the same Key, 25% to the `$MUPPETS` buyback vault, 15% to the Stock Token reserve and 10% to operations. Direct funding remains separate from revenue.
+`MuppetRevenueRouter` keeps two accounting lanes and records fee receipts in Unix seven-day buckets. Pons creator revenue and legacy Key fees use the 50/30/20 route: 50% WETH to eligible Agent Bond weight in that original receipt week, 30% to the Stock Token reserve and 20% to operations. Each KeyMarketplaceV2 fill records its exact Key, gross volume and fee in a separate Key/week bucket. Its 50/25/15/10 split remains unchanged. Only completed weeks can finalize. A late route cannot move older fees into a later holder cohort. Pons escrow exposes only aggregate claimed ETH, so its bucket identifies the router receipt week, not the original token-trade week. Direct funding remains separate from revenue.
+
+`routeRevenue()` and `routeKeyRevenue(key)` finalize the oldest nonempty completed week. The `routeRevenueEpochs(maxEpochs)` and `routeKeyRevenueEpochs(key, maxEpochs)` variants catch up at most 20 nonempty weeks per call, without scanning empty gaps. Each week's split and eligible denominator are recorded once. If its eligible weight is zero, the reward share remains permanently held for that week and visibly unallocated. It cannot be recycled, withdrawn as funding, or paid to a later cohort; the old `releasePending*` methods now revert. There is no recovery route for this balance. This deliberate empty-week policy requires review before activation, particularly for fees received during the initial maturation period.
+
+### Earn page
+
+`/app/earn` is the canonical wallet rewards page; existing `/app/revenue` links still work. It shows staked MUPPETS, claimable WETH, lifetime rewards claimed, the portion received as wallet WETH and the portion reinvested. Lifetime values come from versioned Agent Bond account counters, never a sum of a capped receipt list. Deposits and token purchases are excluded from rewards. Failed or unsupported reads display unavailable, not zero; a genuine zero is shown only after a successful read.
+
+Each bond shows its first eligible week, end of eligibility, unlock and position-scoped claim, reinvest and withdrawal controls. Wallet history links confirmed claim/reinvestment receipts and preserves global versus exact-Key amounts. Claim-and-reinvest events are grouped into one receipt, so their WETH is not counted twice or mislabeled as all arriving in the wallet. The API paginates positions in pages of 50 and labels its bounded receipt window and any truncation. Fee splits, weekly receipt accounting, activation checks and protocol-wide receipts are under the collapsed **Protocol details** section. This page release does not activate staking, change the fee splits or enable no-Key staking.
 
 `MuppetAgentBond` requires `15,000 $MUPPETS` and one unused, permanently bound Agent Key per base unit. It accepts Keys only from approved LiquidMuppets marketplaces. Every bond is a separate non-transferable position with an immutable term: 30 days at `1x`, 90 days at `1.25x`, or 180 days at `1.5x`. A position first matures for seven days, then contributes its fixed weight only to full weekly epochs that begin after maturation and end before unlock. A late bond cannot claim a previously completed epoch. Longer terms change distribution weight, not the amount of real revenue in the reward pot.
 
@@ -201,7 +209,7 @@ The target route for the external 3% `$MUPPETS` trade fee is exact:
 | LiquidMuppets Stock Token reserve | 0.705% |
 | keeper and operations | 0.470% |
 
-The current Pons buyback is still off and its creator-fee recipient does not point to the undeployed router. `/app/revenue` reads those values from chain and keeps the release labeled `activation pending`. Every `/app/muppet/{agentId}` page has a separate Key revenue section. Legacy Muppets say `global only`; V2 pages read exact volume, fees, committed units, eligible epoch weight, WETH per `1x` unit for the latest completed epoch, `$MUPPETS` bought and receipts from `GET /api/v1/revenue/keys/{key}`. Tracking begins at the V2 deployment block. Nothing is backfilled or annualized.
+The current Pons buyback is still off and its creator-fee recipient does not point to the undeployed router. `/app/earn` reads those values from chain under Protocol details and keeps the release labeled `activation pending`. Every `/app/muppet/{agentId}` page has a separate Key revenue section. Legacy Muppets say `global only`; V2 pages read exact volume, fees, committed units, eligible epoch weight, WETH per `1x` unit for the latest completed epoch, `$MUPPETS` bought and receipts from `GET /api/v1/revenue/keys/{key}`. Tracking begins at the V2 deployment block. Nothing is backfilled or annualized.
 
 ## Public activity
 
@@ -349,6 +357,8 @@ Browser chain reads use `/api/v1/rpc`, a same-origin relay that allowlists read-
 
 ```bash
 npm run check
+npm run qa:earn # synthetic wallet and weekly-accounting UI checks against the local Vite server
+npm run qa:reinvestment # synthetic quote, allowance and reward-funded transaction UI checks
 npm run qa:fork # with the documented local mainnet fork, API, and Vite server running
 cd backend
 .venv/bin/ruff check app tests
@@ -363,6 +373,7 @@ forge test --match-contract EZManagerRangeAdapterForkTest --fork-url https://rpc
 forge test --match-contract EZManagerPoolAdapterForkTest --fork-url https://rpc.mainnet.chain.robinhood.com -vv
 forge test --match-contract FeeRwaReserveForkTest --fork-url https://rpc.mainnet.chain.robinhood.com -vv
 forge test --match-contract PonsV4MuppetsBuybackExecutorForkTest --fork-url https://rpc.mainnet.chain.robinhood.com -vv
+forge test --match-contract MuppetRewardReinvestmentForkTest --fork-url https://rpc.mainnet.chain.robinhood.com -vv
 ```
 
 The fork suites enter and redeem the current Morpho route, open, atomically recenter, and redeem the current WETH range, exercise a full NVDA/USDG deposit and exit through the new reviewed adapter, buy an oracle-bounded AAPL Stock Token through the live reserve route, and execute a real `$MUPPETS` buy through its graduated Pons v4 pool.

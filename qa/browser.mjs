@@ -643,8 +643,15 @@ results.portfolioChainNumberRemoved = !((await page.locator('.portfolio-page').i
 await page.close()
 page = await desktop.newPage()
 watch(page, 'revenue')
+await page.goto(`${baseUrl}/app/earn`, { waitUntil: 'networkidle' })
+await page.getByRole('heading', { name: 'Earn.', exact: true }).waitFor({ timeout: 60_000 })
+results.earnCanonicalRoute = new URL(page.url()).pathname === '/app/earn'
+results.earnNavigationLabel = await page.getByRole('navigation', { name: 'App navigation', exact: true }).getByRole('button', { name: 'Earn', exact: true }).count() === 1
+results.earnAdvancedInitiallyCollapsed = await page.locator('.earn-advanced').getAttribute('open') === null
 await page.goto(`${baseUrl}/app/revenue`, { waitUntil: 'networkidle' })
-await page.getByRole('heading', { name: 'Revenue Engine.' }).waitFor({ timeout: 60_000 })
+await page.getByRole('heading', { name: 'Earn.', exact: true }).waitFor({ timeout: 60_000 })
+results.earnLegacyAlias = await page.title() === 'Earn | LIQUIDMUPPETS'
+await page.locator('.earn-advanced > summary').click()
 results.revenueTitle = await page.title()
 results.revenuePending = await page.getByText('activation pending', { exact: true }).count() === 1
 results.revenueFeeDestinations = await page.locator('.revenue-route-grid article').count()
@@ -670,6 +677,10 @@ results.revenueEndpoint = await page.evaluate(async () => {
     && Array.isArray(body.target_fee_route)
     && body.target_fee_route.length === 5
     && body.reward_unit?.muppets === '15000'
+    && body.earn_weeks?.accounting === 'router_receipt_week'
+    && body.earn_weeks?.status === 'activation_pending'
+    && Array.isArray(body.earn_weeks?.rows)
+    && body.earn_weeks.rows.length === 0
     && body.reinvestment?.available === false
     && body.reinvestment?.capability === 'claim_buy_and_bond'
     && body.reinvestment?.version === 1
@@ -690,7 +701,8 @@ results.revenueEndpoint = await page.evaluate(async () => {
     && body.receipts.length === 0
 })
 results.revenueOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
-await page.screenshot({ path: new URL('revenue-engine.png', screenshotDir).pathname, fullPage: true })
+await page.locator('.earn-advanced > summary').click()
+await page.screenshot({ path: new URL('earn-page.png', screenshotDir).pathname, fullPage: true })
 
 await page.close()
 page = await desktop.newPage()
@@ -704,7 +716,7 @@ results.docsSimpleCreator = await page.getByText(/Creation now has three stages/
 results.docsOptionalKeyMarket = await page.getByText(/Opening an Agent Key market is optional and separate after launch/i).count() === 1
 results.docsSevenPets = await page.getByRole('heading', { name: 'Seven pets, three live tasks' }).count() === 1
 results.docsFeeReserve = await page.getByRole('heading', { name: 'Marketplace fee reserve' }).count() === 1
-results.docsRevenue = await page.getByRole('heading', { name: 'Revenue Engine and Agent Bonds' }).count() === 1
+results.docsRevenue = await page.getByRole('heading', { name: 'Earn and Agent Bonds' }).count() === 1
 results.docsRevenueBoundary = await page.getByText(/not yet deployed on mainnet/i).count() === 1
 results.docsBondEpochs = await page.getByText(/positions mature for seven days and earn only for full weekly epochs/i).count() === 1
 results.docsFactorySizeBoundary = await page.getByText(/exceeds the EIP-170 runtime-size limit/i).count() === 1
@@ -807,8 +819,8 @@ results.mobileLaunchOverflow = await mobilePage.evaluate(() => document.document
 await mobilePage.screenshot({ path: new URL('launch-mobile.png', screenshotDir).pathname, fullPage: false })
 await mobilePage.goto(`${baseUrl}/docs`, { waitUntil: 'networkidle' })
 results.mobileDocsOverflow = await mobilePage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
-await mobilePage.goto(`${baseUrl}/app/revenue`, { waitUntil: 'networkidle' })
-await mobilePage.getByRole('heading', { name: 'Revenue Engine.' }).waitFor({ timeout: 60_000 })
+await mobilePage.goto(`${baseUrl}/app/earn`, { waitUntil: 'networkidle' })
+await mobilePage.getByRole('heading', { name: 'Earn.', exact: true }).waitFor({ timeout: 60_000 })
 results.mobileRevenueOverflow = await mobilePage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
 await mobilePage.goto(`${baseUrl}/app/muppet/1`, { waitUntil: 'domcontentloaded' })
 await mobilePage.getByRole('heading', { name: 'range fox' }).waitFor({ timeout: 60_000 })
@@ -864,7 +876,7 @@ results.narrowHeaderVisible = await narrowPage.locator('.mobile-app-nav').isVisi
 await narrowPage.goto(`${baseUrl}/docs`, { waitUntil: 'networkidle' })
 results.narrowDocsOverflow = await narrowPage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
 await narrowPage.goto(`${baseUrl}/app/revenue`, { waitUntil: 'networkidle' })
-await narrowPage.getByRole('heading', { name: 'Revenue Engine.' }).waitFor({ timeout: 60_000 })
+await narrowPage.getByRole('heading', { name: 'Earn.', exact: true }).waitFor({ timeout: 60_000 })
 results.narrowRevenueOverflow = await narrowPage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
 await narrowPage.goto(`${baseUrl}/app/muppet/1`, { waitUntil: 'domcontentloaded' })
 await narrowPage.getByRole('heading', { name: 'range fox' }).waitFor({ timeout: 60_000 })
@@ -1086,7 +1098,11 @@ const failed =
   || !results.portfolioHonestCopy
   || !results.portfolioConnectState
   || !results.portfolioChainNumberRemoved
-  || results.revenueTitle !== 'Revenue Engine | LIQUIDMUPPETS'
+  || results.revenueTitle !== 'Earn | LIQUIDMUPPETS'
+  || !results.earnCanonicalRoute
+  || !results.earnNavigationLabel
+  || !results.earnLegacyAlias
+  || !results.earnAdvancedInitiallyCollapsed
   || !results.revenuePending
   || results.revenueFeeDestinations !== 5
   || results.revenueRouterSplits !== 4

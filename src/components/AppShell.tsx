@@ -118,7 +118,7 @@ export function AppShell({ view, performanceAgentId, creatorAddress, proofId, on
             Monitor
           </button>
           <button className={view === 'revenue' ? 'active' : ''} onClick={() => onNavigate('revenue')} type="button">
-            Revenue
+            Earn
           </button>
           <button className={view === 'portfolio' ? 'active' : ''} onClick={() => onNavigate('portfolio')} type="button">
             Portfolio
@@ -175,7 +175,7 @@ export function AppShell({ view, performanceAgentId, creatorAddress, proofId, on
         <button type="button" className={view === 'marketplace' || view === 'performance' || view === 'creator' ? 'active' : ''} onClick={() => onNavigate('marketplace')}>Market</button>
         <button type="button" className={view === 'pulse' || view === 'proofs' || view === 'proof' ? 'active' : ''} onClick={() => onNavigate('pulse')}>Pulse</button>
         <button type="button" className={view === 'monitor' ? 'active' : ''} onClick={() => onNavigate('monitor')}>Watch</button>
-        <button type="button" className={view === 'revenue' ? 'active' : ''} onClick={() => onNavigate('revenue')}>Revenue</button>
+        <button type="button" className={view === 'revenue' ? 'active' : ''} onClick={() => onNavigate('revenue')}>Earn</button>
         <button type="button" className={view === 'portfolio' ? 'active' : ''} onClick={() => onNavigate('portfolio')}>Portfolio</button>
         <button type="button" className={view === 'create' ? 'active' : ''} onClick={() => onNavigate('create')}>Launch</button>
         <button type="button" className={view === 'docs' ? 'active' : ''} onClick={() => onNavigate('docs')}>Docs</button>

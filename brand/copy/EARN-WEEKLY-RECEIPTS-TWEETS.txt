@@ -1,0 +1,21 @@
+LIQUIDMUPPETS
+
+the Earn page is live.
+
+one place for your staked $MUPPETS, claimable WETH, unlock dates and reward receipts once Agent Bonds activate.
+
+the page is live. staking activation is still pending.
+
+liquidmuppets.io/app/earn
+github.com/juicevz/liquidmuppets
+
+FOUNDER
+
+shipped a simpler Earn page for liquidmuppets.
+
+your bonds, rewards and unlock dates in one view. receipts separate WETH paid to your wallet from rewards you reinvest.
+
+staking is still awaiting activation.
+
+liquidmuppets.io/app/earn
+github.com/juicevz/liquidmuppets

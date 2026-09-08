@@ -163,7 +163,7 @@ One base bond unit requires both:
 
 The committed-unit formula is `units = min(floor(bonded MUPPETS / 15,000), committed bound Agent Keys)`. Each bound Key can support only one unit. Every bond is a separate non-transferable position. The fixed choices are 30 days at `1x`, 90 days at `1.25x`, or 180 days at `1.5x`. These multipliers change a position's share of a real WETH distribution; they do not increase the reward pot or promise a return.
 
-Every position matures for seven days. It then contributes weight only to full seven-day epochs that start after maturation and end before its unlock. Revenue routes to the latest completed epoch, so a position opened after that epoch cannot share it. The `$MUPPETS` become withdrawable after the chosen lock, but the Key binding remains permanent. Bonded `$MUPPETS` continue to count toward FactoryV2 Creator Slots. A Key remains separate from a vault share and provides no claim on vault assets.
+Every position matures for seven days. It then contributes weight only to full seven-day epochs that start after maturation and end before its unlock. Revenue is recorded by router receipt week and, after that week closes, distributed to its original eligible weight even when routed much later. A later position cannot share those older receipts. The `$MUPPETS` become withdrawable after the chosen lock, but the Key binding remains permanent. Bonded `$MUPPETS` continue to count toward FactoryV2 Creator Slots. A Key remains separate from a vault share and provides no claim on vault assets.
 
 The total Pons trade fee remains 3%. The activation target is:
 
@@ -175,9 +175,9 @@ The total Pons trade fee remains 3%. The activation target is:
 | LiquidMuppets Stock Token reserve | 0.705% |
 | keeper and operations | 0.470% |
 
-After Pons removes its protocol and buyback portions, `2.350%` creator revenue reaches `MuppetRevenueRouter`. Once per seven days, any account can route that recorded revenue through an immutable `50/30/20` split: 50% wraps into WETH for Agent Bond weight in the latest completed epoch, 30% enters the existing Stock Token reserve and 20% goes to the Safe-controlled keeper and operations treasury.
+After Pons removes its protocol and buyback portions, `2.350%` creator revenue reaches `MuppetRevenueRouter`. The router records it in the current Unix seven-day receipt bucket. Once that week is complete, any account can finalize its immutable `50/30/20` split: 50% wraps into WETH for Agent Bond weight in that original week, 30% enters the existing Stock Token reserve and 20% goes to the Safe-controlled keeper and operations treasury. Pons exposes only aggregate escrow claims, so this is the week ETH reached the router, not a reconstruction of original trade dates.
 
-Every KeyMarketplaceV2 fill sends the exact Key, settled gross volume and 3% fee to a separate per-Key ledger. Any account can route one Key's accumulated revenue once per seven days:
+Every KeyMarketplaceV2 fill sends the exact Key, settled gross volume and 3% fee to a separate per-Key, per-receipt-week ledger. Any account can finalize that bucket after its week closes:
 
 | V2 Key fee destination | Share |
 | --- | ---: |
@@ -190,7 +190,15 @@ Legacy marketplace fees remain in the global 50/30/20 lane. The V1 contract tran
 
 The buyback executor uses the graduated `$MUPPETS` Pons Uniswap v4 pool. It requires a nonzero minimum output and a deadline no more than five minutes away, and its route passed a live mainnet-fork purchase. The Safe-owned vault limits execution to an approved keeper, caps a purchase at `0.01 ETH`, enforces a 30 minute per-Key cooldown and vests each bought lot for five years. Price-sensitive buyback execution is keeper-limited because this token has no independent oracle. Fee routing and the receipt ledger remain permissionless.
 
-Direct transfers, treasury top-ups and seeded funds are labeled funding and never enter the reported revenue total. If no eligible weight exists for the completed epoch, its share stays queued in native ETH. If an epoch has no recorded revenue, no reward distribution can execute. Global and exact-Key WETH stay in separate epoch ledgers. Claims and withdrawals are position-scoped, and the longest term spans at most 25 eligible weekly epochs. The contracts create no token emissions and the interface does not calculate an APY.
+Direct transfers, treasury top-ups and seeded funds are labeled funding and never enter the reported revenue total. If no eligible weight exists for a completed receipt week, its reward share remains permanently held in native ETH, labeled unallocated for that week. It cannot be recycled to a later cohort or withdrawn as funding; the contract has no recovery mechanism for that balance. Review this empty-week policy before activation, including fees during initial maturation. If an epoch has no recorded revenue, no reward distribution can execute. Global and exact-Key WETH stay in separate epoch ledgers. Claims and withdrawals are position-scoped, and the longest term spans at most 25 eligible weekly epochs. The contracts create no token emissions and the interface does not calculate an APY.
+
+The single-week `routeRevenue()` and `routeKeyRevenue(key)` wrappers finalize the oldest nonempty completed bucket. Catch-up methods `routeRevenueEpochs(maxEpochs)` and `routeKeyRevenueEpochs(key, maxEpochs)` process at most 20 such buckets. Append-only nonempty-week lists avoid scanning empty calendar gaps. Finalized buckets cannot be changed or paid twice. `RevenueEpochRecorded` identifies receipt source and week; `RevenueEpochFinalized` records the fixed split, eligible weight, delivered WETH and unallocated native balance. The old `releasePending*` compatibility methods revert instead of retargeting historical funds.
+
+### Wallet-first Earn page
+
+`/app/earn` shows staked MUPPETS, claimable WETH, total rewards claimed, WETH actually received in the wallet and rewards spent on reinvestment. `/app/revenue` remains a working alias. Lifetime totals use `EARN_ACCOUNTING_VERSION`, `accountRewardsClaimed(account)` and `accountRewardsReinvested(account)`; received WETH is the difference. They exclude vault deposits and external funding. Missing capabilities or RPC errors return null metrics, never invented zeroes.
+
+The page lists first eligibility, final eligibility and unlock for each bond. Existing claim and matured withdrawal actions stay accessible if new bonds or reinvestment are paused. Claim/reinvestment history contains confirmed, wallet-filtered receipts, with global and exact-Key components separate. Reinvestment is grouped with its corresponding claim rather than counted twice. Receipt windows and truncation are explicit, and lifetime counters are independent of that limited list. The first view focuses on wallet actions; Protocol details is collapsed and contains fee splits, receipt-week records, contract links and activation checks. No new staking mode or mainnet activation is implied.
 
 ### Claim or buy more and stake
 
@@ -317,7 +325,7 @@ If creation is interrupted, `Resume launch` first checks the saved factory trans
 - `KeyMarketplace` supports native-currency listings, offers, partial fills, and a 3% fee on filled value.
 - `KeyMarketplaceV2` adds the exact settled Key and gross volume to every fee transfer.
 - `FeeRwaReserve` receives marketplace fees, enforces route and oracle checks, rotates purchases, and holds the purchased Stock Tokens.
-- `MuppetRevenueRouter` keeps global and exact-Key revenue separate from outside funding and routes each real revenue lane at most once per seven days into the latest completed epoch.
+- `MuppetRevenueRouter` keeps global and exact-Key receipt weeks separate from outside funding, finalizes each completed bucket once for its original cohort, and supports bounded catch-up batches.
 - `MuppetAgentBond` requires 15,000 `$MUPPETS` and one unused permanently bound Agent Key per base unit, applies seven-day maturation, schedules only full completed epochs, and supports fixed 30 day `1x`, 90 day `1.25x`, and 180 day `1.5x` positions.
 - `MuppetBuybackVault` holds per-Key buyback budgets, enforces keeper and cycle limits, and vests purchased `$MUPPETS` to the Safe for five years.
 
@@ -384,7 +392,7 @@ Failure handling is explicit: RPC or decode failures keep the last healthy times
 
 `GET /api/v1/access/{wallet}` returns the token address, total slot balance, liquid wallet balance, Agent Bond balance, slot size, slots unlocked, slots used, slots available, funded featured placements, over-capacity count, next balance-slot threshold, next-launch threshold and eligibility decision. Access verification fails closed when a configured token, factory, Agent Bond or RPC read is unavailable.
 
-`GET /api/v1/revenue` is public and accepts an optional checksummed or lowercase `wallet` query. It returns the target 3% fee route, current Pons state, deployment and activation checks, source-separated contract totals, the latest completed epoch and eligible weight, the three fixed bond terms, receipt history since the configured deployment block and wallet position state. An upstream Pons read failure is exposed as unavailable evidence rather than converted into a false zero.
+`GET /api/v1/revenue` is public and accepts an optional checksummed or lowercase `wallet` query plus a nonnegative `position_cursor`. It returns the target 3% fee route, Pons state, activation checks, source-separated contract totals, bond terms and receipts. `wallet.earn` adds nullable lifetime counters, 50-position pages, exact eligibility/unlock times, and bounded wallet receipt history with explicit read status and coverage. `earn_weeks` exposes bounded router receipt-week rows and version/read status. An upstream failure is unavailable evidence rather than a false zero; unsupported legacy counters are not inferred from partial history.
 
 `GET /api/v1/revenue/keys/{key}` returns exact V2 market volume, fees, routed value, committed units, eligible weight and WETH per `1x` unit for the latest completed epoch, `$MUPPETS` bought and Key-filtered receipts. Public Muppet pages pass `legacy_market=true` for V1 Keys. That response labels the fee `legacy_global` and leaves per-Key metrics empty instead of estimating them.
 

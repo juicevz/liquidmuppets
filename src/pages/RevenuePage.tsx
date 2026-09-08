@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { formatEther, type Address, type Hash } from 'viem'
 import { Icon } from '../components/Icon'
 import { RewardReinvestment } from '../components/RewardReinvestment'
+import { EarnWallet, EarnWeeks } from '../components/EarnWallet'
+import { formatEarnAmount } from '../lib/earn'
 import { fetchRevenue, type ProtocolConfig, type RevenueState } from '../lib/api'
 import { shortenAddress } from '../lib/format'
 import { useProtocol } from '../hooks/useProtocol'
@@ -31,7 +33,10 @@ export function RevenuePage({ walletAddress, onConnect }: RevenuePageProps) {
   const [action, setAction] = useState('')
   const [actionError, setActionError] = useState('')
   const [actionReceipts, setActionReceipts] = useState<Hash[]>([])
+  const [positionCursor, setPositionCursor] = useState(0)
   const protocol = useProtocol(walletAddress, Boolean(walletAddress && state?.wallet?.available && state?.bond.deployed))
+
+  useEffect(() => { setPositionCursor(0); setActionReceipts([]); setActionError('') }, [walletAddress])
 
   useEffect(() => {
     let active = true
@@ -40,7 +45,7 @@ export function RevenuePage({ walletAddress, onConnect }: RevenuePageProps) {
       if (running) return
       running = true
       try {
-        const next = await fetchRevenue(walletAddress)
+        const next = await fetchRevenue(walletAddress, positionCursor)
         if (!active) return
         setState(next)
         setError('')
@@ -57,7 +62,7 @@ export function RevenuePage({ walletAddress, onConnect }: RevenuePageProps) {
       active = false
       window.clearInterval(timer)
     }
-  }, [walletAddress, refreshToken])
+  }, [walletAddress, refreshToken, positionCursor])
 
   useEffect(() => {
     if (!state?.wallet?.available || !state.bond.deployed || !walletAddress || !protocol.config || !protocol.snapshot) {
@@ -79,17 +84,14 @@ export function RevenuePage({ walletAddress, onConnect }: RevenuePageProps) {
   }, [protocol.config, protocol.snapshot, state?.wallet?.available, state?.bond.deployed, walletAddress])
 
   if (loading && !state) {
-    return <div className="app-page revenue-page revenue-state"><Icon name="clock" /><p>Reading the public revenue record.</p></div>
+    return <div className="app-page revenue-page revenue-state"><Icon name="clock" /><p>Loading your rewards.</p></div>
   }
 
   if (!state) {
-    return <div className="app-page revenue-page revenue-state" role="alert"><Icon name="alert" /><h1>Revenue record unavailable.</h1><p>{error}</p></div>
+    return <div className="app-page revenue-page revenue-state" role="alert"><Icon name="alert" /><h1>Earn is reconnecting.</h1><p>{error}</p></div>
   }
 
   const isLive = state.status === 'live'
-  const totalRevenue = BigInt(state.router.total_revenue_routed ?? '0')
-  const totalRewards = BigInt(state.router.total_bond_rewards_delivered ?? '0')
-  const rewardUnits = BigInt(state.bond.total_reward_units ?? '0')
   const walletAgents = protocol.snapshot?.agents.filter((agent) => {
     const position = positions[agent.key.address.toLowerCase()]
     return agent.key.walletBalance > 0n || agent.key.walletBound > 0n || (position?.committedUnits ?? 0n) > 0n
@@ -122,26 +124,54 @@ export function RevenuePage({ walletAddress, onConnect }: RevenuePageProps) {
     <div className="app-page revenue-page">
       <header className="revenue-hero">
         <div>
-          <span className="revenue-kicker"><i aria-hidden="true" />public revenue record</span>
-          <h1>Revenue Engine.</h1>
-          <p>Bond 15,000 $MUPPETS with one permanently bound Agent Key. Positions mature for seven days, then earn from real revenue only during full completed weekly epochs.</p>
+          <span className="revenue-kicker"><i aria-hidden="true" />your wallet and rewards</span>
+          <h1>Earn.</h1>
+          <p>Your staked $MUPPETS, WETH rewards and upcoming unlocks, together.</p>
         </div>
         <div className={`revenue-release-state ${isLive ? 'is-live' : 'is-pending'}`}>
           <small>{isLive ? 'mainnet state' : 'release state'}</small>
-          <strong>{isLive ? 'active' : 'activation pending'}</strong>
-          <p>{state.status_detail}</p>
+          <strong>{isLive ? 'active' : state.bond.deployed ? 'new bonds unavailable' : 'activation pending'}</strong>
+          <p>{isLive ? 'Rewards depend on collected fees and your eligible share. They can be zero.' : state.bond.deployed ? 'New bonds are unavailable. Existing claims and unlocked withdrawals remain available.' : 'Staking and reward payouts are not active yet. No wallet deposit is needed to browse.'}</p>
         </div>
       </header>
 
       {error && <div className="pulse-error" role="status"><Icon name="alert" />{error}</div>}
 
+      <EarnWallet
+        walletAddress={walletAddress}
+        state={state}
+        config={protocol.config}
+        keyPositions={positions}
+        agents={protocol.snapshot?.agents ?? []}
+        busy={Boolean(action) || Boolean(error)}
+        positionCursor={positionCursor}
+        onCursor={setPositionCursor}
+        onConnect={onConnect}
+        onBusy={(isBusy) => setAction(isBusy ? 'reinvest' : '')}
+        onConfirmed={(hash) => { setActionReceipts([hash]); protocol.refresh(); setRefreshToken((value) => value + 1) }}
+        onClaim={(id) => void runAction(`claim-${id}`, async () => {
+          const { config, provider, account } = actionContext()
+          return [await claimAgentBondPositionRewards(config, provider, account, id)]
+        })}
+        onUnbond={(id) => void runAction(`unbond-${id}`, async () => {
+          const { config, provider, account } = actionContext()
+          return [await unbondAgentPosition(config, provider, account, id)]
+        })}
+      />
+      {(actionError || actionReceipts.length > 0) && <div className={`revenue-action-result ${actionError ? 'is-error' : ''}`} role="status">{actionError || 'Transaction confirmed.'}{actionReceipts.map((hash) => <a href={`${state.network.explorer_url}/tx/${hash}`} target="_blank" rel="noreferrer" key={hash}>View receipt <Icon name="arrow" /></a>)}</div>}
+
+      <details className="earn-advanced">
+      <summary>Protocol details</summary>
+
       <section className="revenue-summary" aria-label="Revenue summary">
         <span><small>reward unit</small><strong>15,000 $MUPPETS + 1 Key</strong></span>
         <span><small>distribution</small><strong>weekly WETH</strong></span>
-        <span><small>reward units</small><strong>{formatInteger(rewardUnits)}</strong></span>
-        <span><small>routed revenue</small><strong>{formatNative(totalRevenue)} ETH</strong></span>
-        <span><small>WETH delivered</small><strong>{formatNative(totalRewards)} WETH</strong></span>
+        <span><small>reward units</small><strong>{state.bond.total_reward_units == null ? 'Unavailable' : formatInteger(BigInt(state.bond.total_reward_units))}</strong></span>
+        <span><small>routed revenue</small><strong>{formatEarnAmount(state.router.total_revenue_routed, 'ETH')}</strong></span>
+        <span><small>WETH delivered</small><strong>{formatEarnAmount(state.router.total_bond_rewards_delivered, 'WETH')}</strong></span>
       </section>
+
+      <EarnWeeks state={state.earn_weeks} />
 
       <section className="revenue-reinvest-intro" aria-labelledby="reward-choice-title">
         <div><small>your rewards, your choice</small><h2 id="reward-choice-title">Claim WETH or buy more and stake.</h2><p>Keep your earned WETH, or choose an amount to buy $MUPPETS and open a new bond in one transaction. Review the quote, minimum received, gas and lock before signing.</p></div>
@@ -306,6 +336,7 @@ export function RevenuePage({ walletAddress, onConnect }: RevenuePageProps) {
         <span>read this first</span>
         <div>{state.boundaries.map((boundary) => <p key={boundary}><i aria-hidden="true" />{boundary}</p>)}</div>
       </section>
+      </details>
     </div>
   )
 }

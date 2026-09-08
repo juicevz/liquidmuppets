@@ -133,6 +133,8 @@ contract MuppetRewardReinvestmentTest is Test {
         assertEq(bond.rewardLiability(), 0);
         assertEq(bond.keyRewardLiability(address(key)), 0);
         assertEq(bond.totalRewardsClaimed(), 3 ether);
+        assertEq(bond.accountRewardsClaimed(DEV), 3 ether);
+        assertEq(bond.accountRewardsReinvested(DEV), 1 ether);
         assertEq(bond.totalBondedMuppets(), 2 * UNIT);
         assertEq(muppets.balanceOf(address(bond)), 2 * UNIT);
         assertEq(address(bond).balance, 0);
@@ -153,6 +155,8 @@ contract MuppetRewardReinvestmentTest is Test {
         assertEq(bond.getPosition(created).units, 2);
         assertEq(bond.getPosition(created).multiplierBps, 15_000);
         assertEq(weth.balanceOf(DEV), 0);
+        assertEq(bond.accountRewardsClaimed(DEV), 3 ether);
+        assertEq(bond.accountRewardsReinvested(DEV), 3 ether);
         assertEq(muppets.balanceOf(DEV), 45_000 ether);
         assertEq(bond.bondedBalance(DEV), 3 * UNIT);
     }
@@ -163,6 +167,8 @@ contract MuppetRewardReinvestmentTest is Test {
         assertEq(weth.balanceOf(DEV), 3 ether - spend);
         assertEq(executor.nativeSpent(), spend);
         assertEq(weth.balanceOf(address(bond)), 0);
+        assertEq(bond.accountRewardsClaimed(DEV), 3 ether);
+        assertEq(bond.accountRewardsReinvested(DEV), spend);
     }
 
     function testStrayTokensAndNativeFundsAreNotReinvested() public {
@@ -270,6 +276,8 @@ contract MuppetRewardReinvestmentTest is Test {
         vm.prank(DEV);
         vm.expectRevert(MuppetAgentBond.InvalidAmount.selector);
         bond.claimPositionRewards(originalPosition);
+        assertEq(bond.accountRewardsClaimed(DEV), 3 ether);
+        assertEq(bond.accountRewardsReinvested(DEV), 1 ether);
     }
 
     function testPausedBlocksReinvestmentButAllowsClaimAndMaturedWithdrawal() public {
@@ -279,6 +287,8 @@ contract MuppetRewardReinvestmentTest is Test {
         vm.prank(DEV);
         bond.claimPositionRewards(originalPosition);
         assertEq(weth.balanceOf(DEV), 3 ether);
+        assertEq(bond.accountRewardsClaimed(DEV), 3 ether);
+        assertEq(bond.accountRewardsReinvested(DEV), 0);
         vm.warp(bond.getPosition(originalPosition).unlockAt);
         vm.prank(DEV);
         bond.unbondPosition(originalPosition);
@@ -330,6 +340,8 @@ contract MuppetRewardReinvestmentTest is Test {
     function _assertUntouched() internal view {
         assertEq(bond.pendingTotalReward(DEV), 3 ether);
         assertEq(bond.totalRewardsClaimed(), 0);
+        assertEq(bond.accountRewardsClaimed(DEV), 0);
+        assertEq(bond.accountRewardsReinvested(DEV), 0);
         assertEq(bond.rewardLiability(), 3 ether);
         assertEq(bond.keyRewardLiability(address(key)), 1 ether);
         assertEq(bond.accountPositionCount(DEV), 1);

@@ -13,7 +13,6 @@ interface IWrappedRevenueToken is IERC20 {
 
 interface IMuppetAgentBondRewards {
     function rewardNotifier() external view returns (address);
-    function latestCompletedEpoch() external view returns (uint40);
     function totalRewardWeightAtEpoch(uint40 epoch) external view returns (uint256);
     function totalKeyRewardWeightAtEpoch(address key, uint40 epoch) external view returns (uint256);
     function notifyReward(uint40 epoch, uint256 amount) external;
@@ -25,7 +24,7 @@ interface IMuppetBuybackVaultFunding {
     function fundKey(address key) external payable;
 }
 
-/// @notice Records creator revenue and keeps legacy/global routing separate from exact-Key routing.
+/// @notice Records fee receipts by Unix week and keeps global routing separate from exact-Key routing.
 /// @dev Pons creator revenue and legacy Key fees use 50/30/20. V2 Key fees use 50/25/15/10.
 contract MuppetRevenueRouter is Ownable, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -39,6 +38,23 @@ contract MuppetRevenueRouter is Ownable, Pausable, ReentrancyGuard {
     uint16 public constant KEY_STOCK_RESERVE_SHARE_BPS = 1_500;
     uint16 public constant KEY_OPERATIONS_SHARE_BPS = 1_000;
     uint40 public constant ROUTE_INTERVAL = 7 days;
+    uint256 public constant REVENUE_EPOCH_VERSION = 1;
+    uint256 public constant MAX_ROUTE_EPOCHS = 20;
+
+    struct RevenueEpochAccount {
+        uint256 revenue;
+        uint256 volume;
+        uint256 ponsRevenue;
+        uint256 legacyMarketplaceRevenue;
+        uint256 bondRewards;
+        uint256 bondRewardsDelivered;
+        uint256 unallocatedBondRewards;
+        uint256 buyback;
+        uint256 stockReserve;
+        uint256 operations;
+        uint256 eligibleWeight;
+        uint40 finalizedAt;
+    }
 
     struct KeyRevenueAccount {
         uint256 totalVolume;
@@ -49,6 +65,7 @@ contract MuppetRevenueRouter is Ownable, Pausable, ReentrancyGuard {
         uint256 totalBuybackRouted;
         uint256 totalStockReserveRouted;
         uint256 totalOperationsRouted;
+        // Legacy tuple name retained for readers. These funds are permanently unallocated, never queued for later users.
         uint256 pendingBondRewardsNative;
         uint40 lastRouteAt;
     }
@@ -63,6 +80,13 @@ contract MuppetRevenueRouter is Ownable, Pausable, ReentrancyGuard {
     mapping(address marketplace => bool allowed) public marketplaces;
     mapping(address marketplace => bool allowed) public keyMarketplaces;
     mapping(address key => KeyRevenueAccount account) private keyRevenueAccounts;
+    mapping(uint40 epoch => RevenueEpochAccount account) private globalRevenueEpochAccounts;
+    mapping(address key => mapping(uint40 epoch => RevenueEpochAccount account)) private keyRevenueEpochAccounts;
+    uint40[] private globalRevenueEpochs;
+    mapping(address key => uint40[] epochs) private keyRevenueEpochs;
+    uint256 public globalEpochCursor;
+    mapping(address key => uint256 cursor) public keyEpochCursor;
+    uint256 public totalUnallocatedBondRewardsNative;
     uint256 public totalPonsRevenue;
     uint256 public totalMarketplaceRevenue;
     uint256 public totalLegacyMarketplaceRevenue;
@@ -77,6 +101,7 @@ contract MuppetRevenueRouter is Ownable, Pausable, ReentrancyGuard {
     uint256 public totalBuybackRouted;
     uint256 public totalStockReserveRouted;
     uint256 public totalOperationsRouted;
+    /// @notice Legacy getter for global unallocated native rewards. No future distribution or reclaim is permitted.
     uint256 public pendingBondRewardsNative;
     uint256 public withdrawableFunding;
     uint40 public lastRouteAt;
@@ -99,8 +124,27 @@ contract MuppetRevenueRouter is Ownable, Pausable, ReentrancyGuard {
         uint256 stockReserve,
         uint256 operations
     );
-    event BondRewardsQueued(uint256 amount, uint256 pendingTotal);
-    event KeyBondRewardsQueued(address indexed key, uint256 amount, uint256 pendingTotal);
+    event RevenueEpochRecorded(
+        address indexed key,
+        uint40 indexed epoch,
+        bytes32 indexed source,
+        address sender,
+        uint256 revenue,
+        uint256 volume
+    );
+    event RevenueEpochFinalized(
+        address indexed key,
+        uint40 indexed epoch,
+        uint256 revenue,
+        uint256 bondRewards,
+        uint256 delivered,
+        uint256 unallocated,
+        uint256 buyback,
+        uint256 stockReserve,
+        uint256 operations,
+        uint256 eligibleWeight
+    );
+    event BondRewardsUnallocated(address indexed key, uint40 indexed epoch, uint256 amount);
     event BondRewardsDelivered(uint40 indexed epoch, uint256 amount, uint256 totalWeight);
     event KeyBondRewardsDelivered(address indexed key, uint40 indexed epoch, uint256 amount, uint256 totalWeight);
     event FundingWithdrawn(address indexed receiver, uint256 amount);
@@ -109,14 +153,15 @@ contract MuppetRevenueRouter is Ownable, Pausable, ReentrancyGuard {
     error AddressZero();
     error ContractGovernanceRequired();
     error InvalidAmount();
-    error NoRewardUnits();
     error NoRevenue();
     error NotKeyMarketplace();
     error OwnershipRenunciationDisabled();
     error PaymentFailed();
     error PonsClaimFailed();
-    error RouteCooldown(uint256 nextRouteAt);
     error UnsafeActivation();
+    error EpochNotComplete(uint256 epoch);
+    error InvalidBatchSize();
+    error UnallocatedRewardsLockedToEpoch();
 
     constructor(
         address initialOwner,
@@ -148,10 +193,12 @@ contract MuppetRevenueRouter is Ownable, Pausable, ReentrancyGuard {
     receive() external payable {
         if (msg.sender == PONS_FEE_ESCROW) {
             totalPonsRevenue += msg.value;
+            _recordGlobalRevenue(msg.value, true);
             emit RevenueReceived(keccak256("PONS_CREATOR_FEES"), msg.sender, msg.value);
         } else if (marketplaces[msg.sender]) {
             totalMarketplaceRevenue += msg.value;
             totalLegacyMarketplaceRevenue += msg.value;
+            _recordGlobalRevenue(msg.value, false);
             emit RevenueReceived(keccak256("LEGACY_AGENT_KEY_MARKET_FEES"), msg.sender, msg.value);
         } else {
             totalFundingReceived += msg.value;
@@ -213,6 +260,12 @@ contract MuppetRevenueRouter is Ownable, Pausable, ReentrancyGuard {
         totalMarketplaceRevenue += msg.value;
         totalKeyMarketplaceRevenue += msg.value;
         totalKeyMarketplaceVolume += grossVolume;
+        uint40 epoch = currentRevenueEpoch();
+        RevenueEpochAccount storage receipt = keyRevenueEpochAccounts[key][epoch];
+        if (receipt.revenue == 0) keyRevenueEpochs[key].push(epoch);
+        receipt.revenue += msg.value;
+        receipt.volume += grossVolume;
+        emit RevenueEpochRecorded(key, epoch, keccak256("V2_AGENT_KEY_MARKET_FEES"), msg.sender, msg.value, grossVolume);
         emit KeyRevenueRecorded(key, msg.sender, grossVolume, msg.value);
     }
 
@@ -238,18 +291,87 @@ contract MuppetRevenueRouter is Ownable, Pausable, ReentrancyGuard {
         return keyRevenueAccounts[key];
     }
 
+    function currentRevenueEpoch() public view returns (uint40) {
+        return uint40(block.timestamp / ROUTE_INTERVAL);
+    }
+
+    function globalRevenueEpoch(uint40 epoch) external view returns (RevenueEpochAccount memory) {
+        return globalRevenueEpochAccounts[epoch];
+    }
+
+    function keyRevenueEpoch(address key, uint40 epoch) external view returns (RevenueEpochAccount memory) {
+        return keyRevenueEpochAccounts[key][epoch];
+    }
+
+    function globalRevenueEpochCount() external view returns (uint256) {
+        return globalRevenueEpochs.length;
+    }
+
+    function globalRevenueEpochAt(uint256 index) external view returns (uint40) {
+        return globalRevenueEpochs[index];
+    }
+
+    function keyRevenueEpochCount(address key) external view returns (uint256) {
+        return keyRevenueEpochs[key].length;
+    }
+
+    function keyRevenueEpochAt(address key, uint256 index) external view returns (uint40) {
+        return keyRevenueEpochs[key][index];
+    }
+
+    function globalUnallocatedBondRewardsNative() external view returns (uint256) {
+        return pendingBondRewardsNative;
+    }
+
+    function keyUnallocatedBondRewardsNative(address key) external view returns (uint256) {
+        return keyRevenueAccounts[key].pendingBondRewardsNative;
+    }
+
     function routeRevenue()
         external
         nonReentrant
         whenNotPaused
         returns (uint256 amount, uint256 bondRewards, uint256 stockReserve, uint256 operations)
     {
-        amount = unroutedRevenue();
-        if (amount == 0) revert NoRevenue();
-        uint40 previousRouteAt = lastRouteAt;
-        if (previousRouteAt != 0 && block.timestamp < uint256(previousRouteAt) + ROUTE_INTERVAL) {
-            revert RouteCooldown(uint256(previousRouteAt) + ROUTE_INTERVAL);
+        uint256 cursor = globalEpochCursor;
+        if (cursor == globalRevenueEpochs.length) revert NoRevenue();
+        uint40 epoch = globalRevenueEpochs[cursor];
+        if (epoch >= currentRevenueEpoch()) revert EpochNotComplete(epoch);
+        globalEpochCursor = cursor + 1;
+        return _routeGlobalEpoch(epoch);
+    }
+
+    /// @notice Finalizes up to twenty nonempty completed receipt weeks, oldest first.
+    function routeRevenueEpochs(uint256 maxEpochs)
+        external
+        nonReentrant
+        whenNotPaused
+        returns (uint256 epochsRouted, uint256 amount)
+    {
+        if (maxEpochs == 0 || maxEpochs > MAX_ROUTE_EPOCHS) revert InvalidBatchSize();
+        uint40 current = currentRevenueEpoch();
+        while (epochsRouted < maxEpochs && globalEpochCursor < globalRevenueEpochs.length) {
+            uint40 epoch = globalRevenueEpochs[globalEpochCursor];
+            if (epoch >= current) break;
+            ++globalEpochCursor;
+            (uint256 routed,,,) = _routeGlobalEpoch(epoch);
+            amount += routed;
+            ++epochsRouted;
         }
+        if (epochsRouted == 0) {
+            if (globalEpochCursor < globalRevenueEpochs.length) {
+                revert EpochNotComplete(globalRevenueEpochs[globalEpochCursor]);
+            }
+            revert NoRevenue();
+        }
+    }
+
+    function _routeGlobalEpoch(uint40 epoch)
+        private
+        returns (uint256 amount, uint256 bondRewards, uint256 stockReserve, uint256 operations)
+    {
+        RevenueEpochAccount storage receipt = globalRevenueEpochAccounts[epoch];
+        amount = receipt.revenue;
 
         bondRewards = amount * BOND_REWARD_SHARE_BPS / BPS;
         stockReserve = amount * STOCK_RESERVE_SHARE_BPS / BPS;
@@ -261,19 +383,36 @@ contract MuppetRevenueRouter is Ownable, Pausable, ReentrancyGuard {
         totalOperationsRouted += operations;
         lastRouteAt = uint40(block.timestamp);
 
-        uint40 epoch = AGENT_BOND.latestCompletedEpoch();
         uint256 weight = AGENT_BOND.totalRewardWeightAtEpoch(epoch);
+        receipt.bondRewards = bondRewards;
+        receipt.stockReserve = stockReserve;
+        receipt.operations = operations;
+        receipt.eligibleWeight = weight;
+        receipt.finalizedAt = uint40(block.timestamp);
         if (weight == 0) {
             pendingBondRewardsNative += bondRewards;
-            emit BondRewardsQueued(bondRewards, pendingBondRewardsNative);
+            totalUnallocatedBondRewardsNative += bondRewards;
+            receipt.unallocatedBondRewards = bondRewards;
+            if (bondRewards != 0) emit BondRewardsUnallocated(address(0), epoch, bondRewards);
         } else {
-            uint256 rewardAmount = bondRewards + pendingBondRewardsNative;
-            pendingBondRewardsNative = 0;
-            _deliverBondRewards(epoch, rewardAmount, weight);
+            receipt.bondRewardsDelivered = bondRewards;
+            _deliverBondRewards(epoch, bondRewards, weight);
         }
 
         _pay(STOCK_RESERVE, stockReserve);
         _pay(OPERATIONS_TREASURY, operations);
+        emit RevenueEpochFinalized(
+            address(0),
+            epoch,
+            amount,
+            bondRewards,
+            receipt.bondRewardsDelivered,
+            receipt.unallocatedBondRewards,
+            0,
+            stockReserve,
+            operations,
+            weight
+        );
         emit RevenueRouted(msg.sender, amount, bondRewards, stockReserve, operations);
     }
 
@@ -283,13 +422,45 @@ contract MuppetRevenueRouter is Ownable, Pausable, ReentrancyGuard {
         whenNotPaused
         returns (uint256 amount, uint256 bondRewards, uint256 buyback, uint256 stockReserve, uint256 operations)
     {
-        KeyRevenueAccount storage account = keyRevenueAccounts[key];
-        amount = account.totalRevenue - account.totalRouted;
-        if (amount == 0) revert NoRevenue();
-        uint40 previousRouteAt = account.lastRouteAt;
-        if (previousRouteAt != 0 && block.timestamp < uint256(previousRouteAt) + ROUTE_INTERVAL) {
-            revert RouteCooldown(uint256(previousRouteAt) + ROUTE_INTERVAL);
+        uint256 cursor = keyEpochCursor[key];
+        if (cursor == keyRevenueEpochs[key].length) revert NoRevenue();
+        uint40 epoch = keyRevenueEpochs[key][cursor];
+        if (epoch >= currentRevenueEpoch()) revert EpochNotComplete(epoch);
+        keyEpochCursor[key] = cursor + 1;
+        return _routeKeyEpoch(key, epoch);
+    }
+
+    function routeKeyRevenueEpochs(address key, uint256 maxEpochs)
+        external
+        nonReentrant
+        whenNotPaused
+        returns (uint256 epochsRouted, uint256 amount)
+    {
+        if (maxEpochs == 0 || maxEpochs > MAX_ROUTE_EPOCHS) revert InvalidBatchSize();
+        uint40 current = currentRevenueEpoch();
+        while (epochsRouted < maxEpochs && keyEpochCursor[key] < keyRevenueEpochs[key].length) {
+            uint40 epoch = keyRevenueEpochs[key][keyEpochCursor[key]];
+            if (epoch >= current) break;
+            ++keyEpochCursor[key];
+            (uint256 routed,,,,) = _routeKeyEpoch(key, epoch);
+            amount += routed;
+            ++epochsRouted;
         }
+        if (epochsRouted == 0) {
+            if (keyEpochCursor[key] < keyRevenueEpochs[key].length) {
+                revert EpochNotComplete(keyRevenueEpochs[key][keyEpochCursor[key]]);
+            }
+            revert NoRevenue();
+        }
+    }
+
+    function _routeKeyEpoch(address key, uint40 epoch)
+        private
+        returns (uint256 amount, uint256 bondRewards, uint256 buyback, uint256 stockReserve, uint256 operations)
+    {
+        KeyRevenueAccount storage account = keyRevenueAccounts[key];
+        RevenueEpochAccount storage receipt = keyRevenueEpochAccounts[key][epoch];
+        amount = receipt.revenue;
 
         bondRewards = amount * KEY_BOND_REWARD_SHARE_BPS / BPS;
         buyback = amount * KEY_BUYBACK_SHARE_BPS / BPS;
@@ -308,42 +479,48 @@ contract MuppetRevenueRouter is Ownable, Pausable, ReentrancyGuard {
         totalStockReserveRouted += stockReserve;
         totalOperationsRouted += operations;
 
-        uint40 epoch = AGENT_BOND.latestCompletedEpoch();
         uint256 weight = AGENT_BOND.totalKeyRewardWeightAtEpoch(key, epoch);
+        receipt.bondRewards = bondRewards;
+        receipt.buyback = buyback;
+        receipt.stockReserve = stockReserve;
+        receipt.operations = operations;
+        receipt.eligibleWeight = weight;
+        receipt.finalizedAt = uint40(block.timestamp);
         if (weight == 0) {
             account.pendingBondRewardsNative += bondRewards;
-            emit KeyBondRewardsQueued(key, bondRewards, account.pendingBondRewardsNative);
+            totalUnallocatedBondRewardsNative += bondRewards;
+            receipt.unallocatedBondRewards = bondRewards;
+            if (bondRewards != 0) emit BondRewardsUnallocated(key, epoch, bondRewards);
         } else {
-            uint256 rewardAmount = bondRewards + account.pendingBondRewardsNative;
-            account.pendingBondRewardsNative = 0;
-            _deliverKeyBondRewards(key, epoch, rewardAmount, weight, account);
+            receipt.bondRewardsDelivered = bondRewards;
+            _deliverKeyBondRewards(key, epoch, bondRewards, weight, account);
         }
 
         if (buyback != 0) BUYBACK_VAULT.fundKey{value: buyback}(key);
         _pay(STOCK_RESERVE, stockReserve);
         _pay(OPERATIONS_TREASURY, operations);
+        emit RevenueEpochFinalized(
+            key,
+            epoch,
+            amount,
+            bondRewards,
+            receipt.bondRewardsDelivered,
+            receipt.unallocatedBondRewards,
+            buyback,
+            stockReserve,
+            operations,
+            weight
+        );
         emit KeyRevenueRouted(key, msg.sender, amount, bondRewards, buyback, stockReserve, operations);
     }
 
-    function releasePendingBondRewards() external nonReentrant whenNotPaused returns (uint256 amount) {
-        uint40 epoch = AGENT_BOND.latestCompletedEpoch();
-        uint256 weight = AGENT_BOND.totalRewardWeightAtEpoch(epoch);
-        if (weight == 0) revert NoRewardUnits();
-        amount = pendingBondRewardsNative;
-        if (amount == 0) revert NoRevenue();
-        pendingBondRewardsNative = 0;
-        _deliverBondRewards(epoch, amount, weight);
+    /// @notice Historical zero-eligibility shares are never reassigned to later stakers.
+    function releasePendingBondRewards() external pure returns (uint256) {
+        revert UnallocatedRewardsLockedToEpoch();
     }
 
-    function releasePendingKeyBondRewards(address key) external nonReentrant whenNotPaused returns (uint256 amount) {
-        uint40 epoch = AGENT_BOND.latestCompletedEpoch();
-        uint256 weight = AGENT_BOND.totalKeyRewardWeightAtEpoch(key, epoch);
-        if (weight == 0) revert NoRewardUnits();
-        KeyRevenueAccount storage account = keyRevenueAccounts[key];
-        amount = account.pendingBondRewardsNative;
-        if (amount == 0) revert NoRevenue();
-        account.pendingBondRewardsNative = 0;
-        _deliverKeyBondRewards(key, epoch, amount, weight, account);
+    function releasePendingKeyBondRewards(address) external pure returns (uint256) {
+        revert UnallocatedRewardsLockedToEpoch();
     }
 
     function withdrawFunding(address payable receiver, uint256 amount) external onlyOwner nonReentrant whenPaused {
@@ -391,5 +568,23 @@ contract MuppetRevenueRouter is Ownable, Pausable, ReentrancyGuard {
         if (amount == 0) return;
         (bool ok,) = receiver.call{value: amount}("");
         if (!ok) revert PaymentFailed();
+    }
+
+    function _recordGlobalRevenue(uint256 amount, bool pons) private {
+        if (amount == 0) return;
+        uint40 epoch = currentRevenueEpoch();
+        RevenueEpochAccount storage receipt = globalRevenueEpochAccounts[epoch];
+        if (receipt.revenue == 0) globalRevenueEpochs.push(epoch);
+        receipt.revenue += amount;
+        if (pons) receipt.ponsRevenue += amount;
+        else receipt.legacyMarketplaceRevenue += amount;
+        emit RevenueEpochRecorded(
+            address(0),
+            epoch,
+            pons ? keccak256("PONS_CREATOR_FEES") : keccak256("LEGACY_AGENT_KEY_MARKET_FEES"),
+            msg.sender,
+            amount,
+            0
+        );
     }
 }

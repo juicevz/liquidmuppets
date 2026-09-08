@@ -172,6 +172,7 @@ contract MuppetRevenueTest is Test {
         assertEq(router.claimPonsFees(), 2.35 ether);
         uint256 reserveBefore = address(reserve).balance;
         uint256 operationsBefore = address(operations).balance;
+        _finishReceiptWeek();
         router.routeRevenue();
 
         assertEq(router.totalPonsRevenue(), 2.35 ether);
@@ -191,18 +192,24 @@ contract MuppetRevenueTest is Test {
         assertEq(bond.totalRewardsClaimed(), 1.175 ether);
     }
 
-    function testRewardsQueueUntilARealUnitExists() public {
+    function testEmptyReceiptWeekNeverPaysFutureBondHolders() public {
         feeEscrow.addCredit{value: 1 ether}(address(router));
         router.claimPonsFees();
+        uint40 receiptEpoch = router.currentRevenueEpoch();
+        _finishReceiptWeek();
         router.routeRevenue();
         assertEq(router.pendingBondRewardsNative(), 0.5 ether);
         assertEq(router.totalBondRewardsDelivered(), 0);
 
         uint256 positionId = _bindAndBond(1);
         _completeFirstEligibleEpoch(positionId);
+        vm.expectRevert(MuppetRevenueRouter.UnallocatedRewardsLockedToEpoch.selector);
         router.releasePendingBondRewards();
-        assertEq(router.pendingBondRewardsNative(), 0);
-        assertEq(bond.pendingReward(holder), 0.5 ether);
+        assertEq(router.pendingBondRewardsNative(), 0.5 ether);
+        assertEq(router.totalUnallocatedBondRewardsNative(), 0.5 ether);
+        assertEq(router.globalRevenueEpoch(receiptEpoch).unallocatedBondRewards, 0.5 ether);
+        assertEq(bond.totalRewardWeightAtEpoch(receiptEpoch), 0);
+        assertEq(bond.pendingReward(holder), 0);
     }
 
     function testMarketplaceFeesAreRecordedAsRevenue() public {
@@ -239,6 +246,7 @@ contract MuppetRevenueTest is Test {
         assertEq(router.unroutedRevenue(), 0);
         assertEq(router.keyUnroutedRevenue(address(key)), 0.06 ether);
 
+        _finishReceiptWeek();
         router.routeKeyRevenue(address(key));
         MuppetRevenueRouter.KeyRevenueAccount memory afterRoute = router.keyRevenueState(address(key));
         assertEq(afterRoute.totalBondRewardsAllocated, 0.03 ether);
@@ -279,6 +287,7 @@ contract MuppetRevenueTest is Test {
         vm.stopPrank();
         vm.prank(buyer);
         marketV2.buy{value: 1.03 ether}(1, 1);
+        _finishReceiptWeek();
         router.routeKeyRevenue(address(key));
 
         assertEq(bond.pendingKeyReward(holder, address(key)), 0.015 ether);
@@ -291,16 +300,17 @@ contract MuppetRevenueTest is Test {
         _completeFirstEligibleEpoch(positionId);
         feeEscrow.addCredit{value: 1 ether}(address(router));
         router.claimPonsFees();
+        _finishReceiptWeek();
         router.routeRevenue();
 
         feeEscrow.addCredit{value: 0.5 ether}(address(router));
         router.claimPonsFees();
-        uint256 nextRouteAt = router.lastRouteAt() + router.ROUTE_INTERVAL();
-        vm.expectRevert(abi.encodeWithSelector(MuppetRevenueRouter.RouteCooldown.selector, nextRouteAt));
+        uint40 receiptEpoch = router.currentRevenueEpoch();
+        vm.expectRevert(abi.encodeWithSelector(MuppetRevenueRouter.EpochNotComplete.selector, receiptEpoch));
         router.routeRevenue();
         assertEq(router.unroutedRevenue(), 0.5 ether);
 
-        vm.warp(nextRouteAt);
+        _finishReceiptWeek();
         router.routeRevenue();
         assertEq(router.unroutedRevenue(), 0);
         assertEq(router.totalRevenueRouted(), 1.5 ether);
@@ -354,6 +364,7 @@ contract MuppetRevenueTest is Test {
 
         feeEscrow.addCredit{value: 1 ether}(address(router));
         router.claimPonsFees();
+        _finishReceiptWeek();
         router.routeRevenue();
         assertEq(bond.pendingReward(holder), 0);
         assertEq(router.pendingBondRewardsNative(), 0.5 ether);
@@ -374,6 +385,7 @@ contract MuppetRevenueTest is Test {
         vm.stopPrank();
         vm.prank(buyer);
         marketV2.buy{value: 2.06 ether}(1, 1);
+        _finishReceiptWeek();
         router.routeKeyRevenue(address(key));
 
         (, uint256 thirtyDayKeyWeth) = bond.pendingPositionRewards(thirtyDayPosition);
@@ -408,6 +420,7 @@ contract MuppetRevenueTest is Test {
 
         feeEscrow.addCredit{value: 1 ether}(address(router));
         router.claimPonsFees();
+        _finishReceiptWeek();
         router.routeRevenue();
 
         (uint256 matureGlobal,) = bond.pendingPositionRewards(maturePosition);
@@ -421,6 +434,7 @@ contract MuppetRevenueTest is Test {
         _completeFirstEligibleEpoch(positionId);
         feeEscrow.addCredit{value: 1 ether}(address(router));
         router.claimPonsFees();
+        _finishReceiptWeek();
         router.routeRevenue();
 
         vm.expectRevert(MuppetAgentBond.NotPositionOwner.selector);
@@ -444,6 +458,7 @@ contract MuppetRevenueTest is Test {
         _completeFirstEligibleEpoch(positionId);
         feeEscrow.addCredit{value: 1 ether}(address(router));
         router.claimPonsFees();
+        _finishReceiptWeek();
         router.routeRevenue();
 
         vm.prank(holder);
@@ -461,6 +476,7 @@ contract MuppetRevenueTest is Test {
         _completeFirstEligibleEpoch(positionId);
         feeEscrow.addCredit{value: 1 ether}(address(router));
         router.claimPonsFees();
+        _finishReceiptWeek();
         router.routeRevenue();
 
         vm.warp(bond.getPosition(positionId).unlockAt);
@@ -474,6 +490,324 @@ contract MuppetRevenueTest is Test {
         assertEq(muppets.balanceOf(holder), 60_000 ether);
     }
 
+    function testDelayedGlobalRoutePaysOriginalReceiptWeekNotNewcomer() public {
+        uint256 original = _bindAndBond(1);
+        _completeFirstEligibleEpoch(original);
+        uint40 receiptEpoch = router.currentRevenueEpoch();
+        feeEscrow.addCredit{value: 1 ether}(address(router));
+        router.claimPonsFees();
+        _finishReceiptWeek();
+        uint256 newcomer = _bindAndBond(1);
+        _completeFirstEligibleEpoch(newcomer);
+        assertGt(bond.latestCompletedEpoch(), receiptEpoch);
+        assertGt(block.timestamp, bond.getPosition(original).unlockAt);
+        vm.prank(holder);
+        bond.unbondPosition(original);
+
+        router.routeRevenue();
+        (uint256 originalReward,) = bond.pendingPositionRewards(original);
+        (uint256 newcomerReward,) = bond.pendingPositionRewards(newcomer);
+        assertEq(originalReward, 0.5 ether);
+        assertEq(newcomerReward, 0);
+        assertEq(bond.totalRewardWeightAtEpoch(receiptEpoch), 10_000);
+        MuppetRevenueRouter.RevenueEpochAccount memory receipt = router.globalRevenueEpoch(receiptEpoch);
+        assertEq(receipt.eligibleWeight, 10_000);
+        assertEq(receipt.bondRewardsDelivered, 0.5 ether);
+        assertEq(receipt.finalizedAt, block.timestamp);
+        vm.prank(holder);
+        bond.claimPositionRewards(original);
+        assertEq(weth.balanceOf(holder), 0.5 ether);
+        assertEq(bond.accountRewardsClaimed(holder), 0.5 ether);
+        assertEq(bond.accountRewardsReinvested(holder), 0);
+    }
+
+    function testDelayedKeyRouteKeepsOriginalKeyAndReceiptWeek() public {
+        uint256 original = _bindAndBond(1);
+        _completeFirstEligibleEpoch(original);
+        uint40 receiptEpoch = router.currentRevenueEpoch();
+        _recordKeyFee(address(key), 1 ether, 10 ether);
+        _finishReceiptWeek();
+        uint256 newcomer = _bindAndBond(1);
+        _completeFirstEligibleEpoch(newcomer);
+        router.routeKeyRevenue(address(key));
+        (, uint256 originalReward) = bond.pendingPositionRewards(original);
+        (, uint256 newcomerReward) = bond.pendingPositionRewards(newcomer);
+        assertEq(originalReward, 0.5 ether);
+        assertEq(newcomerReward, 0);
+        assertEq(bond.pendingReward(holder), 0);
+        assertEq(router.keyRevenueEpoch(address(key), receiptEpoch).bondRewardsDelivered, 0.5 ether);
+        assertEq(router.keyRevenueEpoch(address(key), receiptEpoch).eligibleWeight, 10_000);
+    }
+
+    function testReceiptWeekSourcesAccumulateAndFundingStaysSeparate() public {
+        uint40 epoch = router.currentRevenueEpoch();
+        feeEscrow.addCredit{value: 0.7 ether}(address(router));
+        router.claimPonsFees();
+        vm.deal(address(market), 0.3 ether);
+        vm.prank(address(market));
+        (bool sent,) = address(router).call{value: 0.3 ether}("");
+        assertTrue(sent);
+        router.fund{value: 0.25 ether}();
+        (sent,) = address(router).call{value: 0.25 ether}("");
+        assertTrue(sent);
+
+        MuppetRevenueRouter.RevenueEpochAccount memory receipt = router.globalRevenueEpoch(epoch);
+        assertEq(receipt.revenue, 1 ether);
+        assertEq(receipt.ponsRevenue, 0.7 ether);
+        assertEq(receipt.legacyMarketplaceRevenue, 0.3 ether);
+        assertEq(receipt.volume, 0);
+        assertEq(receipt.finalizedAt, 0);
+        assertEq(router.globalRevenueEpochCount(), 1);
+        assertEq(router.globalRevenueEpochAt(0), epoch);
+        assertEq(router.totalFundingReceived(), 0.5 ether);
+        assertEq(router.withdrawableFunding(), 0.5 ether);
+        assertEq(router.unroutedRevenue(), 1 ether);
+    }
+
+    function testPonsEpochIsReceiptWeekNotExternalEscrowAccrualWeek() public {
+        uint40 accrualEpoch = router.currentRevenueEpoch();
+        feeEscrow.addCredit{value: 1 ether}(address(router));
+        vm.warp(block.timestamp + 3 * 7 days);
+        uint40 receiptEpoch = router.currentRevenueEpoch();
+        router.claimPonsFees();
+        assertEq(router.globalRevenueEpoch(accrualEpoch).revenue, 0);
+        assertEq(router.globalRevenueEpoch(receiptEpoch).ponsRevenue, 1 ether);
+        assertEq(router.globalRevenueEpochCount(), 1);
+    }
+
+    function testEmptyKeyWeekStaysUnallocatedEvenAfterNewBondExists() public {
+        uint40 emptyEpoch = router.currentRevenueEpoch();
+        _recordKeyFee(address(key), 1 ether, 10 ether);
+        _finishReceiptWeek();
+        router.routeKeyRevenue(address(key));
+        uint256 positionId = _bindAndBond(1);
+        _completeFirstEligibleEpoch(positionId);
+        assertEq(bond.totalKeyRewardWeightAtEpoch(address(key), emptyEpoch), 0);
+        vm.expectRevert(MuppetRevenueRouter.UnallocatedRewardsLockedToEpoch.selector);
+        router.releasePendingKeyBondRewards(address(key));
+
+        uint40 productiveEpoch = router.currentRevenueEpoch();
+        _recordKeyFee(address(key), 0.4 ether, 4 ether);
+        _finishReceiptWeek();
+        router.routeKeyRevenue(address(key));
+        assertEq(bond.pendingKeyReward(holder, address(key)), 0.2 ether);
+        assertEq(router.keyUnallocatedBondRewardsNative(address(key)), 0.5 ether);
+        assertEq(router.totalUnallocatedBondRewardsNative(), 0.5 ether);
+        assertEq(router.keyRevenueEpoch(address(key), emptyEpoch).unallocatedBondRewards, 0.5 ether);
+        assertEq(router.keyRevenueEpoch(address(key), productiveEpoch).bondRewardsDelivered, 0.2 ether);
+        assertEq(address(router).balance, 0.5 ether);
+    }
+
+    function testUnallocatedGlobalSharesCannotBeWithdrawnAsFunding() public {
+        feeEscrow.addCredit{value: 1 ether}(address(router));
+        router.claimPonsFees();
+        _finishReceiptWeek();
+        router.routeRevenue();
+        assertEq(router.withdrawableFunding(), 0);
+        governance.execute(address(router), abi.encodeCall(MuppetRevenueRouter.pause, ()));
+        vm.prank(address(governance));
+        vm.expectRevert(MuppetRevenueRouter.InvalidAmount.selector);
+        router.withdrawFunding(payable(address(governance)), 0.5 ether);
+        assertEq(address(router).balance, 0.5 ether);
+    }
+
+    function testCurrentWeekCannotRouteThroughSingleOrBatchMethods() public {
+        uint40 epoch = router.currentRevenueEpoch();
+        feeEscrow.addCredit{value: 1 ether}(address(router));
+        router.claimPonsFees();
+        _recordKeyFee(address(key), 1 ether, 10 ether);
+        vm.expectRevert(abi.encodeWithSelector(MuppetRevenueRouter.EpochNotComplete.selector, epoch));
+        router.routeRevenue();
+        vm.expectRevert(abi.encodeWithSelector(MuppetRevenueRouter.EpochNotComplete.selector, epoch));
+        router.routeRevenueEpochs(20);
+        vm.expectRevert(abi.encodeWithSelector(MuppetRevenueRouter.EpochNotComplete.selector, epoch));
+        router.routeKeyRevenue(address(key));
+        vm.expectRevert(abi.encodeWithSelector(MuppetRevenueRouter.EpochNotComplete.selector, epoch));
+        router.routeKeyRevenueEpochs(address(key), 20);
+        assertEq(router.globalEpochCursor(), 0);
+        assertEq(router.keyEpochCursor(address(key)), 0);
+    }
+
+    function testClosedWeekCannotRouteTwice() public {
+        feeEscrow.addCredit{value: 1 ether}(address(router));
+        router.claimPonsFees();
+        _recordKeyFee(address(key), 1 ether, 10 ether);
+        _finishReceiptWeek();
+        router.routeRevenue();
+        router.routeKeyRevenue(address(key));
+        uint256 routed = router.totalRevenueRouted();
+        vm.expectRevert(MuppetRevenueRouter.NoRevenue.selector);
+        router.routeRevenue();
+        vm.expectRevert(MuppetRevenueRouter.NoRevenue.selector);
+        router.routeKeyRevenue(address(key));
+        assertEq(router.totalRevenueRouted(), routed);
+        assertEq(router.globalEpochCursor(), 1);
+        assertEq(router.keyEpochCursor(address(key)), 1);
+    }
+
+    function testBatchUsesOnlyNonemptyWeeksAcrossLongGaps() public {
+        uint40 firstEpoch = router.currentRevenueEpoch();
+        feeEscrow.addCredit{value: 1 ether}(address(router));
+        router.claimPonsFees();
+        vm.warp(block.timestamp + 1000 * 7 days);
+        uint40 secondEpoch = router.currentRevenueEpoch();
+        feeEscrow.addCredit{value: 2 ether}(address(router));
+        router.claimPonsFees();
+        _finishReceiptWeek();
+        (uint256 count, uint256 amount) = router.routeRevenueEpochs(20);
+        assertEq(count, 2);
+        assertEq(amount, 3 ether);
+        assertEq(router.globalEpochCursor(), 2);
+        assertEq(router.globalRevenueEpochCount(), 2);
+        assertEq(router.globalRevenueEpochAt(0), firstEpoch);
+        assertEq(router.globalRevenueEpochAt(1), secondEpoch);
+        assertEq(router.totalUnallocatedBondRewardsNative(), 1.5 ether);
+    }
+
+    function testBoundedBatchesAdvanceCursorWithoutSkippingCurrentWeek() public {
+        for (uint256 i; i < 3; ++i) {
+            feeEscrow.addCredit{value: 1 ether}(address(router));
+            router.claimPonsFees();
+            _finishReceiptWeek();
+        }
+        feeEscrow.addCredit{value: 1 ether}(address(router));
+        router.claimPonsFees();
+        (uint256 count, uint256 amount) = router.routeRevenueEpochs(2);
+        assertEq(count, 2);
+        assertEq(amount, 2 ether);
+        assertEq(router.globalEpochCursor(), 2);
+        (count, amount) = router.routeRevenueEpochs(20);
+        assertEq(count, 1);
+        assertEq(amount, 1 ether);
+        assertEq(router.globalEpochCursor(), 3);
+        assertEq(router.globalRevenueEpochCount(), 4);
+        assertEq(router.unroutedRevenue(), 1 ether);
+        vm.expectRevert(MuppetRevenueRouter.InvalidBatchSize.selector);
+        router.routeRevenueEpochs(0);
+        vm.expectRevert(MuppetRevenueRouter.InvalidBatchSize.selector);
+        router.routeRevenueEpochs(21);
+    }
+
+    function testSecondBatchPaymentRevertRollsBackEveryWeekAndCursor() public {
+        uint40 firstEpoch = router.currentRevenueEpoch();
+        feeEscrow.addCredit{value: 1 ether}(address(router));
+        router.claimPonsFees();
+        _finishReceiptWeek();
+        uint40 secondEpoch = router.currentRevenueEpoch();
+        feeEscrow.addCredit{value: 2 ether}(address(router));
+        router.claimPonsFees();
+        _finishReceiptWeek();
+        vm.mockCallRevert(address(reserve), 0.6 ether, bytes(""), abi.encodeWithSignature("Error(string)", "reject"));
+        vm.expectRevert(MuppetRevenueRouter.PaymentFailed.selector);
+        router.routeRevenueEpochs(2);
+        assertEq(router.globalEpochCursor(), 0);
+        assertEq(router.totalRevenueRouted(), 0);
+        assertEq(router.totalUnallocatedBondRewardsNative(), 0);
+        assertEq(router.globalRevenueEpoch(firstEpoch).finalizedAt, 0);
+        assertEq(router.globalRevenueEpoch(secondEpoch).finalizedAt, 0);
+        assertEq(address(router).balance, 3 ether);
+        assertEq(address(reserve).balance, 0);
+        assertEq(address(operations).balance, 0);
+
+        vm.clearMockedCalls();
+        (uint256 count, uint256 amount) = router.routeRevenueEpochs(2);
+        assertEq(count, 2);
+        assertEq(amount, 3 ether);
+        assertEq(router.globalEpochCursor(), 2);
+        assertEq(router.totalUnallocatedBondRewardsNative(), 1.5 ether);
+        assertEq(address(reserve).balance, 0.9 ether);
+        assertEq(address(operations).balance, 0.6 ether);
+    }
+
+    function testKeyBatchKeepsKeysSeparateAndValidatesBounds() public {
+        address secondKey = address(new AgentKey("Other Key", "OTHER", holder, 100));
+        _recordKeyFee(address(key), 1 ether, 10 ether);
+        _recordKeyFee(secondKey, 2 ether, 20 ether);
+        _finishReceiptWeek();
+        _recordKeyFee(address(key), 0.5 ether, 5 ether);
+        _finishReceiptWeek();
+        (uint256 count, uint256 amount) = router.routeKeyRevenueEpochs(address(key), 1);
+        assertEq(count, 1);
+        assertEq(amount, 1 ether);
+        assertEq(router.keyEpochCursor(secondKey), 0);
+        assertEq(router.keyUnroutedRevenue(secondKey), 2 ether);
+        (count, amount) = router.routeKeyRevenueEpochs(address(key), 20);
+        assertEq(count, 1);
+        assertEq(amount, 0.5 ether);
+        assertEq(router.keyEpochCursor(address(key)), 2);
+        assertEq(router.keyRevenueEpochCount(address(key)), 2);
+        assertEq(router.keyRevenueEpochCount(secondKey), 1);
+        vm.expectRevert(MuppetRevenueRouter.InvalidBatchSize.selector);
+        router.routeKeyRevenueEpochs(address(key), 0);
+        vm.expectRevert(MuppetRevenueRouter.InvalidBatchSize.selector);
+        router.routeKeyRevenueEpochs(address(key), 21);
+    }
+
+    function testRoundingIsPerReceiptWeekAndConservesEveryWei() public {
+        uint40 firstEpoch = router.currentRevenueEpoch();
+        feeEscrow.addCredit{value: 1 wei}(address(router));
+        router.claimPonsFees();
+        feeEscrow.addCredit{value: 1 wei}(address(router));
+        router.claimPonsFees();
+        _recordKeyFee(address(key), 3 wei, 100 wei);
+        _recordKeyFee(address(key), 4 wei, 100 wei);
+        _finishReceiptWeek();
+        router.routeRevenue();
+        router.routeKeyRevenue(address(key));
+        MuppetRevenueRouter.RevenueEpochAccount memory global = router.globalRevenueEpoch(firstEpoch);
+        MuppetRevenueRouter.RevenueEpochAccount memory exactKey = router.keyRevenueEpoch(address(key), firstEpoch);
+        assertEq(global.bondRewards, 1);
+        assertEq(global.operations, 1);
+        assertEq(global.stockReserve, 0);
+        assertEq(global.revenue, global.bondRewards + global.stockReserve + global.operations);
+        assertEq(exactKey.bondRewards, 3);
+        assertEq(exactKey.buyback, 1);
+        assertEq(exactKey.stockReserve, 1);
+        assertEq(exactKey.operations, 2);
+        assertEq(
+            exactKey.revenue, exactKey.bondRewards + exactKey.buyback + exactKey.stockReserve + exactKey.operations
+        );
+        assertEq(address(router).balance, 4);
+    }
+
+    function testZeroFeeReceiveDoesNotAppendAnEmptyWeek() public {
+        vm.prank(address(market));
+        (bool sent,) = address(router).call("");
+        assertTrue(sent);
+        assertEq(router.globalRevenueEpochCount(), 0);
+        assertEq(router.unroutedRevenue(), 0);
+    }
+
+    function testFuzzWeeklySplitsConserveNativeRevenue(uint96 globalInput, uint96 keyInput) public {
+        uint256 globalAmount = bound(uint256(globalInput), 1, 2 ether);
+        uint256 keyAmount = bound(uint256(keyInput), 1, 2 ether);
+        uint40 epoch = router.currentRevenueEpoch();
+        feeEscrow.addCredit{value: globalAmount}(address(router));
+        router.claimPonsFees();
+        _recordKeyFee(address(key), keyAmount, keyAmount * 10);
+        _finishReceiptWeek();
+        router.routeRevenueEpochs(20);
+        router.routeKeyRevenueEpochs(address(key), 20);
+        MuppetRevenueRouter.RevenueEpochAccount memory global = router.globalRevenueEpoch(epoch);
+        MuppetRevenueRouter.RevenueEpochAccount memory exactKey = router.keyRevenueEpoch(address(key), epoch);
+        assertEq(globalAmount, global.bondRewards + global.stockReserve + global.operations);
+        assertEq(keyAmount, exactKey.bondRewards + exactKey.buyback + exactKey.stockReserve + exactKey.operations);
+        assertEq(router.totalRevenueRouted(), globalAmount + keyAmount);
+        assertEq(router.totalBondRewardsAllocated(), global.bondRewards + exactKey.bondRewards);
+        assertEq(router.totalBondRewardsDelivered(), 0);
+        assertEq(router.totalUnallocatedBondRewardsNative(), global.bondRewards + exactKey.bondRewards);
+        assertEq(address(router).balance, router.totalUnallocatedBondRewardsNative());
+        assertEq(address(reserve).balance, global.stockReserve + exactKey.stockReserve);
+        assertEq(address(operations).balance, global.operations + exactKey.operations);
+        assertEq(buybackVault.fundedByKey(address(key)), exactKey.buyback);
+    }
+
+    function _recordKeyFee(address targetKey, uint256 fee, uint256 volume) private {
+        vm.deal(address(marketV2), fee);
+        vm.prank(address(marketV2));
+        router.recordKeyMarketplaceRevenue{value: fee}(targetKey, volume);
+    }
+
     function _bindAndBond(uint256 units) private returns (uint256 positionId) {
         vm.startPrank(holder);
         key.bind(units);
@@ -485,5 +819,9 @@ contract MuppetRevenueTest is Test {
     function _completeFirstEligibleEpoch(uint256 positionId) private {
         MuppetAgentBond.BondPosition memory position = bond.getPosition(positionId);
         vm.warp(bond.epochStart(position.firstEligibleEpoch + 1));
+    }
+
+    function _finishReceiptWeek() private {
+        vm.warp((uint256(router.currentRevenueEpoch()) + 1) * 7 days);
     }
 }

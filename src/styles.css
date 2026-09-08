@@ -20769,6 +20769,59 @@ button.header-social-link {
   background: rgba(100, 214, 173, 0.025);
 }
 
+.earn-wallet { display: grid; gap: 24px; margin: 24px 0; }
+.earn-connect, .earn-wallet > section, .earn-weeks { padding: 24px; border: 1px solid var(--app-line); border-radius: 12px; background: rgba(100, 214, 173, 0.02); }
+.earn-connect { margin: 24px 0; }
+.earn-connect h2, .earn-section-header h2 { margin: 0; font-size: 22px; color: #e7eee9; letter-spacing: -0.04em; }
+.earn-connect p, .earn-wallet p, .earn-weeks > p { color: #a0ada5; font-size: 13px; line-height: 1.65; }
+.earn-connect button, .earn-position-actions button, .earn-pagination button { min-height: 42px; padding: 10px 15px; border: 1px solid var(--app-line); border-radius: 8px; background: #e7eee9; color: #111713; font-size: 12px; cursor: pointer; }
+.earn-position-actions button:disabled, .earn-pagination button:disabled { opacity: 0.45; cursor: not-allowed; }
+.earn-position-actions button:not(:first-child), .earn-pagination button { background: transparent; color: #b6c6bb; }
+.earn-section-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.earn-section-header > span { color: #8e9f93; font: 10px 'JetBrains Mono Variable', monospace; }
+.earn-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.earn-metrics article { min-width: 0; padding: 20px; border: 1px solid var(--app-line); border-radius: 9px; background: rgba(100, 214, 173, 0.025); }
+.earn-metrics article > span { color: #a0ada5; font-size: 12px; }
+.earn-metrics strong { display: block; margin-top: 14px; color: #e7eee9; font-size: clamp(20px, 2vw, 30px); font-weight: 560; letter-spacing: -0.04em; overflow-wrap: anywhere; }
+.earn-metrics p { margin-bottom: 0; font-size: 11px; }
+.earn-reward-breakdown { display: flex; flex-wrap: wrap; gap: 18px 32px; margin: 22px 0 14px; color: #a0ada5; font-size: 12px; }
+.earn-reward-breakdown b { margin-left: 10px; color: #cddbd2; font-weight: 550; }
+.earn-wallet .earn-footnote, .earn-weeks .earn-footnote { color: #8c9d91; font-size: 11px; }
+.earn-notice { border-left: 2px solid #c9a97a; padding-left: 12px; }
+.earn-position-list, .earn-receipt-list, .earn-week-list { display: grid; gap: 14px; }
+.earn-position, .earn-receipt-list article, .earn-week-list article { min-width: 0; padding: 20px; border: 1px solid var(--app-line); border-radius: 9px; background: rgba(100, 214, 173, 0.02); }
+.earn-position > header, .earn-receipt-list header, .earn-week-list header { display: flex; align-items: flex-start; justify-content: space-between; gap: 15px; }
+.earn-position h3, .earn-receipt-list h3, .earn-week-list h3 { margin: 0 0 6px; color: #dbe7df; font-size: 15px; font-weight: 570; }
+.earn-position header span, .earn-position header strong, .earn-week-list header span { color: #90bda7; font-size: 11px; line-height: 1.7; }
+.earn-position header strong { flex-shrink: 0; font-weight: 500; }
+.earn-position dl, .earn-receipt-list dl, .earn-week-list dl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; margin: 22px 0; }
+.earn-receipt-list dl, .earn-week-list dl { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.earn-position dt, .earn-receipt-list dt, .earn-week-list dt { color: #8c9d91; font-size: 11px; }
+.earn-position dd, .earn-receipt-list dd, .earn-week-list dd { margin: 7px 0 0; color: #d0ded5; font-size: 13px; overflow-wrap: anywhere; }
+.earn-position-actions, .earn-pagination { display: flex; flex-wrap: wrap; gap: 10px; }
+.earn-pagination { justify-content: flex-end; margin-top: 18px; }
+.earn-receipt-list a, .earn-weeks > a { color: #99d2b8; font-size: 12px; }
+.earn-advanced { margin: 26px 0; border-top: 1px solid var(--app-line); }
+.earn-advanced > summary { padding: 22px 0; color: #c2d2c7; font-size: 15px; cursor: pointer; }
+.earn-advanced > summary:focus-visible, .earn-wallet button:focus-visible, .earn-connect button:focus-visible { outline: 2px solid #80bfa5; outline-offset: 4px; }
+.earn-advanced > .earn-weeks { margin: 20px 0; }
+
+@media (max-width: 900px) {
+  .earn-metrics { gap: 10px; }
+  .earn-metrics article { padding: 15px; }
+  .earn-position dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  .earn-connect, .earn-wallet > section, .earn-weeks { padding: 18px; }
+  .earn-section-header, .earn-position > header, .earn-receipt-list header, .earn-week-list header { align-items: flex-start; flex-direction: column; gap: 8px; }
+  .earn-metrics { grid-template-columns: 1fr; }
+  .earn-metrics strong { font-size: 26px; }
+  .earn-position, .earn-receipt-list article, .earn-week-list article { padding: 15px; }
+  .earn-position dl, .earn-receipt-list dl, .earn-week-list dl { grid-template-columns: 1fr; gap: 14px; }
+  .earn-position-actions { flex-direction: column; }
+  .earn-wallet p { overflow-wrap: anywhere; }
+}
+
 .revenue-reinvest-intro small {
   color: #80bfa5;
   font: 9px 'JetBrains Mono Variable', monospace;

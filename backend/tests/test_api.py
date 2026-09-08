@@ -181,6 +181,31 @@ def test_revenue_api_rejects_an_invalid_wallet(tmp_path: Path) -> None:
     assert response.status_code == 422
 
 
+def test_earn_wallet_pagination_is_passed_to_the_read_model(tmp_path: Path) -> None:
+    wallet = "0x3333333333333333333333333333333333333333"
+    app = create_app(Settings(database_path=tmp_path / "test.sqlite3", rpc_url="http://127.0.0.1:1"))
+    app.state.revenue = MagicMock()
+    app.state.revenue.read.return_value = {"wallet": {"earn": {"position_cursor": 50}}}
+    with TestClient(app) as client:
+        response = client.get(f"/api/v1/revenue?wallet={wallet}&position_cursor=50")
+        invalid = client.get(f"/api/v1/revenue?wallet={wallet}&position_cursor=-1")
+    assert response.status_code == 200
+    assert invalid.status_code == 422
+    app.state.revenue.read.assert_called_once_with(wallet, position_cursor=50)
+
+
+def test_earn_pending_wallet_returns_unknown_amounts_not_zeros(tmp_path: Path) -> None:
+    wallet = "0x3333333333333333333333333333333333333333"
+    app = create_app(Settings(database_path=tmp_path / "test.sqlite3", rpc_url="http://127.0.0.1:1"))
+    with TestClient(app) as client:
+        response = client.get(f"/api/v1/revenue?wallet={wallet}")
+    earn = response.json()["wallet"]["earn"]
+    assert earn["status"] == "activation_pending"
+    assert earn["claimed_weth_raw"] is None
+    assert earn["staked_muppets_raw"] is None
+    assert response.json()["earn_weeks"]["status"] == "activation_pending"
+
+
 def test_key_revenue_api_preserves_legacy_attribution_flag(tmp_path: Path) -> None:
     key = "0x4444444444444444444444444444444444444444"
     app = create_app(Settings(database_path=tmp_path / "test.sqlite3", rpc_url="http://127.0.0.1:1"))

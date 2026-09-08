@@ -600,10 +600,99 @@ export interface RevenueContractState {
   error?: string
 }
 
+export interface EarnPosition {
+  id: string
+  key: `0x${string}`
+  units: string
+  muppets_raw: string
+  bonded_at: number
+  matures_at: number
+  eligible_from: number
+  eligible_until: number
+  unlock_at: number
+  term_days: 30 | 90 | 180
+  withdrawn: boolean
+  claimable_global_weth_raw: string
+  claimable_key_weth_raw: string
+}
+
+export interface EarnReceipt {
+  kind: 'claimed' | 'reinvested'
+  position_id: string
+  key: `0x${string}` | null
+  global_weth_raw: string | null
+  key_weth_raw: string | null
+  claimed_weth_raw: string
+  reinvested_weth_raw: string
+  received_weth_raw: string
+  muppets_bought_raw: string | null
+  new_position_id: string | null
+  tx_hash: `0x${string}`
+  log_index: number
+  block_number: number
+  timestamp: number
+  url: string
+}
+
+export interface EarnWalletState {
+  status: 'available' | 'activation_pending' | 'unavailable'
+  reason: string
+  staked_muppets_raw: string | null
+  claimable_weth_raw: string | null
+  claimed_weth_raw: string | null
+  reinvested_weth_raw: string | null
+  received_weth_raw: string | null
+  accounting_status: 'contract_totals' | 'unavailable'
+  positions: EarnPosition[]
+  positions_status: 'available' | 'activation_pending' | 'unavailable'
+  positions_total: string | null
+  position_cursor: number
+  next_position_cursor: number | null
+  positions_truncated: boolean
+  receipts: EarnReceipt[]
+  receipt_status: 'available' | 'activation_pending' | 'unavailable'
+  receipt_range: { from_block: number; to_block: number; complete_from_deployment: boolean } | null
+  receipts_truncated: boolean
+  block_number: number | null
+}
+
+export interface EarnWeek {
+  epoch: number
+  starts_at: number
+  ends_at: number
+  received_wei: string
+  pons_wei: string
+  legacy_key_fees_wei: string
+  key_volume_wei: string
+  bond_rewards_wei: string
+  bond_rewards_delivered_wei: string
+  unallocated_bond_rewards_wei: string
+  buyback_wei: string
+  stock_reserve_wei: string
+  operations_wei: string
+  eligible_weight: string
+  finalized_at: number | null
+  source: 'global' | 'exact_key'
+  source_key: `0x${string}` | null
+}
+
+export interface EarnWeeksState {
+  status: 'available' | 'activation_pending' | 'unavailable' | 'legacy'
+  reason: string
+  accounting: 'router_receipt_week'
+  epoch_seconds: number
+  block_number: number | null
+  rows: EarnWeek[]
+  has_more: boolean
+  total_weeks: string | null
+  contract_url: string | null
+}
+
 export interface RevenueState {
   generated_at: string
   status: 'live' | 'activation_pending'
   status_detail: string
+  earn_weeks: EarnWeeksState
   reinvestment: {
     available: boolean
     reason: string
@@ -706,12 +795,13 @@ export interface RevenueState {
     position_count?: string
     block_number?: number
     error?: string
+    earn: EarnWalletState
   } | null
   boundaries: string[]
 }
 
-export function fetchRevenue(wallet?: string): Promise<RevenueState> {
-  const query = wallet ? `?wallet=${encodeURIComponent(wallet)}` : ''
+export function fetchRevenue(wallet?: string, positionCursor = 0): Promise<RevenueState> {
+  const query = wallet ? `?wallet=${encodeURIComponent(wallet)}&position_cursor=${positionCursor}` : ''
   return request(`/revenue${query}`, { cache: 'no-store' })
 }
 
@@ -721,6 +811,7 @@ export interface KeyRevenueState {
   key: `0x${string}`
   attribution: 'exact_key_v2' | 'legacy_global'
   detail: string
+  earn_weeks?: EarnWeeksState
   split: {
     agent_bond_weth: string
     muppets_buyback: string
