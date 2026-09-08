@@ -20604,7 +20604,7 @@ button.header-social-link {
 .revenue-agent-controls > article {
   display: grid;
   min-height: 67px;
-  grid-template-columns: minmax(130px, 1fr) repeat(3, 74px) minmax(130px, auto);
+  grid-template-columns: minmax(125px, 1fr) repeat(4, minmax(64px, 76px)) minmax(160px, auto);
   align-items: center;
   gap: 10px;
   padding: 10px 13px;
@@ -20641,8 +20641,31 @@ button.header-social-link {
 
 .revenue-agent-actions {
   display: flex;
+  align-items: flex-end;
   justify-content: flex-end;
   gap: 6px;
+}
+
+.revenue-agent-actions label {
+  display: grid;
+  gap: 5px;
+}
+
+.revenue-agent-actions label > span {
+  color: #637169;
+  font-family: 'JetBrains Mono Variable', monospace;
+  font-size: 7px;
+}
+
+.revenue-agent-actions select {
+  min-height: 32px;
+  padding: 0 25px 0 9px;
+  border: 1px solid var(--app-line);
+  border-radius: 7px;
+  background: #111713;
+  color: #aebbb3;
+  font-family: 'JetBrains Mono Variable', monospace;
+  font-size: 8px;
 }
 
 .revenue-agent-actions button {
@@ -20671,6 +20694,50 @@ button.header-social-link {
   padding: 18px 13px;
   color: #69766e;
   font-size: 9px;
+}
+
+.revenue-bond-positions {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 7px;
+  padding-top: 2px;
+}
+
+.revenue-bond-positions > div {
+  display: grid;
+  grid-template-columns: minmax(130px, 1.2fr) minmax(90px, 0.8fr) minmax(130px, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 1px solid rgba(100, 214, 173, 0.11);
+  border-radius: 8px;
+  background: rgba(100, 214, 173, 0.025);
+}
+
+.revenue-bond-positions > div > span {
+  display: grid;
+  gap: 4px;
+}
+
+.revenue-bond-positions > div > div {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.revenue-bond-positions button.secondary {
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--app-line);
+  border-radius: 7px;
+  background: transparent;
+  color: #87948c;
+  font-size: 8px;
+}
+
+.revenue-bond-positions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
 }
 
 .revenue-action-result {
@@ -20714,5 +20781,35 @@ button.header-social-link {
 
   .revenue-agent-actions {
     justify-content: flex-start;
+  }
+
+  .revenue-bond-positions {
+    grid-column: 1 / -1;
+  }
+
+  .revenue-bond-positions > div {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .revenue-bond-positions > div > div {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .revenue-agent-controls > article,
+  .revenue-bond-positions > div {
+    grid-template-columns: 1fr;
+  }
+
+  .revenue-agent-controls > article > div:first-child,
+  .revenue-agent-actions,
+  .revenue-bond-positions {
+    grid-column: 1;
+  }
+
+  .revenue-agent-actions {
+    align-items: stretch;
+    flex-direction: column;
   }
 }

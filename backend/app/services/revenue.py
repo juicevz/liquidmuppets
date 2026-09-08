@@ -198,7 +198,7 @@ BOND_ABI: list[dict[str, Any]] = [
     },
     {
         "type": "function",
-        "name": "pendingReward",
+        "name": "pendingTotalReward",
         "stateMutability": "view",
         "inputs": [{"type": "address"}],
         "outputs": [{"type": "uint256"}],
@@ -212,9 +212,30 @@ BOND_ABI: list[dict[str, Any]] = [
     },
     {
         "type": "function",
-        "name": "keyRewardPerUnitStored",
+        "name": "latestCompletedEpoch",
         "stateMutability": "view",
-        "inputs": [{"type": "address"}],
+        "inputs": [],
+        "outputs": [{"type": "uint40"}],
+    },
+    {
+        "type": "function",
+        "name": "totalRewardWeightAtEpoch",
+        "stateMutability": "view",
+        "inputs": [{"type": "uint40"}],
+        "outputs": [{"type": "uint256"}],
+    },
+    {
+        "type": "function",
+        "name": "totalKeyRewardWeightAtEpoch",
+        "stateMutability": "view",
+        "inputs": [{"type": "address"}, {"type": "uint40"}],
+        "outputs": [{"type": "uint256"}],
+    },
+    {
+        "type": "function",
+        "name": "keyRewardPerBaseUnitAtEpoch",
+        "stateMutability": "view",
+        "inputs": [{"type": "address"}, {"type": "uint40"}],
         "outputs": [{"type": "uint256"}],
     },
     {
@@ -236,6 +257,13 @@ BOND_ABI: list[dict[str, Any]] = [
         "name": "pendingKeyReward",
         "stateMutability": "view",
         "inputs": [{"type": "address"}, {"type": "address"}],
+        "outputs": [{"type": "uint256"}],
+    },
+    {
+        "type": "function",
+        "name": "accountPositionCount",
+        "stateMutability": "view",
+        "inputs": [{"type": "address"}],
         "outputs": [{"type": "uint256"}],
     },
 ]
@@ -310,16 +338,21 @@ BUYBACK_ABI: list[dict[str, Any]] = [
 EVENT_LABELS = {
     Web3.keccak(text="RevenueReceived(bytes32,address,uint256)").hex(): "revenue received",
     Web3.keccak(text="RevenueRouted(address,uint256,uint256,uint256,uint256)").hex(): "weekly revenue routed",
-    Web3.keccak(text="BondRewardsDelivered(uint256,uint256)").hex(): "WETH rewards delivered",
-    Web3.keccak(text="Bonded(address,address,uint256,uint256,uint256)").hex(): "Agent Bond created",
-    Web3.keccak(text="Unbonded(address,address,uint256,uint256)").hex(): "Agent Bond withdrawn",
-    Web3.keccak(text="RewardClaimed(address,uint256)").hex(): "WETH reward claimed",
+    Web3.keccak(text="BondRewardsDelivered(uint40,uint256,uint256)").hex(): "epoch WETH rewards delivered",
+    Web3.keccak(
+        text="Bonded(uint256,address,address,uint256,uint256,uint8,uint256,uint256,uint256,uint256,uint256)"
+    ).hex(): "Agent Bond position created",
+    Web3.keccak(text="Unbonded(uint256,address,address,uint256,uint256)").hex(): "Agent Bond position withdrawn",
+    Web3.keccak(text="PositionRewardsClaimed(uint256,address,address,uint256,uint256)").hex(): (
+        "position WETH claimed"
+    ),
     Web3.keccak(text="KeyRevenueRecorded(address,address,uint256,uint256)").hex(): "Key fee recorded",
     Web3.keccak(text="KeyRevenueRouted(address,address,uint256,uint256,uint256,uint256,uint256)").hex(): (
         "Key revenue routed"
     ),
-    Web3.keccak(text="KeyBondRewardsDelivered(address,uint256,uint256)").hex(): "Key WETH rewards delivered",
-    Web3.keccak(text="KeyRewardClaimed(address,address,uint256)").hex(): "Key WETH reward claimed",
+    Web3.keccak(text="KeyBondRewardsDelivered(address,uint40,uint256,uint256)").hex(): (
+        "Key epoch WETH delivered"
+    ),
     Web3.keccak(text="KeyFunded(address,uint256,uint256)").hex(): "Key buyback funded",
     Web3.keccak(text="KeyBuybackExecuted(address,address,uint256,uint256,uint256)").hex(): "MUPPETS buyback executed",
 }
@@ -354,7 +387,13 @@ class RevenueService:
                 ),
                 "split": None,
                 "market": {"volume_raw": None, "fee_revenue_raw": None, "routed_raw": None},
-                "bond": {"units": None, "cumulative_weth_per_unit_raw": None, "weth_delivered_raw": None},
+                "bond": {
+                    "units": None,
+                    "eligible_weight_bps": None,
+                    "reward_epoch": None,
+                    "weth_per_1x_unit_raw": None,
+                    "weth_delivered_raw": None,
+                },
                 "buyback": {"funded_raw": None, "pending_raw": None, "spent_raw": None, "muppets_bought_raw": None},
                 "tracking_started_at": None,
                 "receipt_status": "legacy_market_has_no_key_attribution",
@@ -376,9 +415,11 @@ class RevenueService:
             bond = self.web3.eth.contract(address=checksummed[1], abi=BOND_ABI)
             buyback = self.web3.eth.contract(address=checksummed[2], abi=BUYBACK_ABI)
             revenue = router.functions.keyRevenueState(checksum_key).call(block_identifier=block)
-            units, accumulator, delivered = (
+            reward_epoch = bond.functions.latestCompletedEpoch().call(block_identifier=block)
+            units, eligible_weight, weth_per_unit, delivered = (
                 bond.functions.totalRewardUnitsByKey(checksum_key).call(block_identifier=block),
-                bond.functions.keyRewardPerUnitStored(checksum_key).call(block_identifier=block),
+                bond.functions.totalKeyRewardWeightAtEpoch(checksum_key, reward_epoch).call(block_identifier=block),
+                bond.functions.keyRewardPerBaseUnitAtEpoch(checksum_key, reward_epoch).call(block_identifier=block),
                 bond.functions.totalKeyRewardsNotified(checksum_key).call(block_identifier=block),
             )
             funded, pending, spent, purchased, last_buyback = (
@@ -419,7 +460,9 @@ class RevenueService:
                 },
                 "bond": {
                     "units": str(int(units)),
-                    "cumulative_weth_per_unit_raw": str(int(accumulator) // 10**27),
+                    "eligible_weight_bps": str(int(eligible_weight)),
+                    "reward_epoch": int(reward_epoch),
+                    "weth_per_1x_unit_raw": str(int(weth_per_unit)),
                     "weth_delivered_raw": str(int(delivered)),
                     "pending_native_raw": str(int(revenue[8])),
                 },
@@ -505,6 +548,13 @@ class RevenueService:
                     "muppets": str(self.settings.muppets_token_minimum),
                     "bound_agent_keys": "1",
                     "lock_days": 30,
+                    "maturation_days": 7,
+                    "epoch_days": 7,
+                    "terms": [
+                        {"days": 30, "weight": "1x"},
+                        {"days": 90, "weight": "1.25x"},
+                        {"days": 180, "weight": "1.5x"},
+                    ],
                     "formula": "min(floor(bonded MUPPETS / 15,000), committed bound Agent Keys)",
                     "creator_slots": "Bonded MUPPETS continue to count toward Creator Slots in FactoryV2.",
                 },
@@ -550,6 +600,10 @@ class RevenueService:
                 "boundaries": [
                     "Agent Keys remain separate from vault shares and do not own vault assets.",
                     "Bond rewards come only from recorded revenue. They are not token emissions.",
+                    (
+                        "A position matures for seven days and earns only for full completed epochs. "
+                        "A late bond cannot claim an earlier epoch."
+                    ),
                     "Only V2 Key-market fills can be attributed to one Key. Legacy market fees remain global.",
                     (
                         "A limited keeper submits a quoted minimum output for each bounded buyback. "
@@ -628,11 +682,27 @@ class RevenueService:
         )
 
     def _read_bond(self) -> dict[str, object]:
-        return self._read_contract_summary(
+        state = self._read_contract_summary(
             self.settings.agent_bond_address,
             BOND_ABI,
             ["paused", "totalRewardUnits", "totalBondedMuppets", "totalRewardsNotified", "totalRewardsClaimed"],
         )
+        if not state.get("deployed"):
+            return state
+        try:
+            address = Web3.to_checksum_address(self.settings.agent_bond_address)
+            block_value = state.get("block_number")
+            if not isinstance(block_value, int):
+                raise ValueError("missing bond read block")
+            block = block_value
+            contract = self.web3.eth.contract(address=address, abi=BOND_ABI)
+            epoch = contract.functions.latestCompletedEpoch().call(block_identifier=block)
+            weight = contract.functions.totalRewardWeightAtEpoch(epoch).call(block_identifier=block)
+            state["latest_completed_epoch"] = int(epoch)
+            state["total_reward_weight_bps"] = str(int(weight))
+            return state
+        except Exception as error:
+            return {**state, "epoch_error": type(error).__name__}
 
     def _read_buyback(self) -> dict[str, object]:
         return self._read_contract_summary(
@@ -681,10 +751,11 @@ class RevenueService:
             account = Web3.to_checksum_address(wallet)
             contract = self.web3.eth.contract(address=address, abi=BOND_ABI)
             block = self.web3.eth.block_number
-            bonded, units, pending = (
+            bonded, units, pending, position_count = (
                 contract.functions.bondedBalance(account).call(block_identifier=block),
                 contract.functions.rewardUnits(account).call(block_identifier=block),
-                contract.functions.pendingReward(account).call(block_identifier=block),
+                contract.functions.pendingTotalReward(account).call(block_identifier=block),
+                contract.functions.accountPositionCount(account).call(block_identifier=block),
             )
             return {
                 "address": account,
@@ -692,6 +763,7 @@ class RevenueService:
                 "bonded_muppets_raw": str(int(bonded)),
                 "reward_units": str(int(units)),
                 "pending_weth_raw": str(int(pending)),
+                "position_count": str(int(position_count)),
                 "block_number": block,
             }
         except Exception as error:
@@ -713,7 +785,13 @@ class RevenueService:
                 "operations": "10%",
             },
             "market": {"volume_raw": None, "fee_revenue_raw": None, "routed_raw": None},
-            "bond": {"units": None, "cumulative_weth_per_unit_raw": None, "weth_delivered_raw": None},
+            "bond": {
+                "units": None,
+                "eligible_weight_bps": None,
+                "reward_epoch": None,
+                "weth_per_1x_unit_raw": None,
+                "weth_delivered_raw": None,
+            },
             "buyback": {"funded_raw": None, "pending_raw": None, "spent_raw": None, "muppets_bought_raw": None},
             "tracking_started_at": None,
             "receipt_status": receipt_status,

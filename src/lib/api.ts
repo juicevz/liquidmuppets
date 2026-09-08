@@ -592,6 +592,8 @@ export interface RevenueContractState {
   pending_bond_rewards_native?: string
   last_route_at?: string
   total_reward_units?: string
+  total_reward_weight_bps?: string
+  latest_completed_epoch?: number
   total_bonded_muppets?: string
   total_rewards_notified?: string
   total_rewards_claimed?: string
@@ -621,6 +623,9 @@ export interface RevenueState {
     muppets: string
     bound_agent_keys: string
     lock_days: number
+    maturation_days: number
+    epoch_days: number
+    terms: Array<{ days: number; weight: string }>
     formula: string
     creator_slots: string
   }
@@ -688,6 +693,7 @@ export interface RevenueState {
     bonded_muppets_raw?: string
     reward_units?: string
     pending_weth_raw?: string
+    position_count?: string
     block_number?: number
     error?: string
   } | null
@@ -719,7 +725,9 @@ export interface KeyRevenueState {
   }
   bond: {
     units: string | null
-    cumulative_weth_per_unit_raw: string | null
+    eligible_weight_bps: string | null
+    reward_epoch: number | null
+    weth_per_1x_unit_raw: string | null
     weth_delivered_raw: string | null
     pending_native_raw?: string
   }

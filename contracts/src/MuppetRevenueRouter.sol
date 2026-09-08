@@ -13,10 +13,11 @@ interface IWrappedRevenueToken is IERC20 {
 
 interface IMuppetAgentBondRewards {
     function rewardNotifier() external view returns (address);
-    function totalRewardUnits() external view returns (uint256);
-    function totalRewardUnitsByKey(address key) external view returns (uint256);
-    function notifyReward(uint256 amount) external;
-    function notifyKeyReward(address key, uint256 amount) external;
+    function latestCompletedEpoch() external view returns (uint40);
+    function totalRewardWeightAtEpoch(uint40 epoch) external view returns (uint256);
+    function totalKeyRewardWeightAtEpoch(address key, uint40 epoch) external view returns (uint256);
+    function notifyReward(uint40 epoch, uint256 amount) external;
+    function notifyKeyReward(address key, uint40 epoch, uint256 amount) external;
 }
 
 interface IMuppetBuybackVaultFunding {
@@ -100,8 +101,8 @@ contract MuppetRevenueRouter is Ownable, Pausable, ReentrancyGuard {
     );
     event BondRewardsQueued(uint256 amount, uint256 pendingTotal);
     event KeyBondRewardsQueued(address indexed key, uint256 amount, uint256 pendingTotal);
-    event BondRewardsDelivered(uint256 amount, uint256 totalUnits);
-    event KeyBondRewardsDelivered(address indexed key, uint256 amount, uint256 totalUnits);
+    event BondRewardsDelivered(uint40 indexed epoch, uint256 amount, uint256 totalWeight);
+    event KeyBondRewardsDelivered(address indexed key, uint40 indexed epoch, uint256 amount, uint256 totalWeight);
     event FundingWithdrawn(address indexed receiver, uint256 amount);
     event TokenRescued(address indexed token, address indexed receiver, uint256 amount);
 
@@ -260,14 +261,15 @@ contract MuppetRevenueRouter is Ownable, Pausable, ReentrancyGuard {
         totalOperationsRouted += operations;
         lastRouteAt = uint40(block.timestamp);
 
-        uint256 units = AGENT_BOND.totalRewardUnits();
-        if (units == 0) {
+        uint40 epoch = AGENT_BOND.latestCompletedEpoch();
+        uint256 weight = AGENT_BOND.totalRewardWeightAtEpoch(epoch);
+        if (weight == 0) {
             pendingBondRewardsNative += bondRewards;
             emit BondRewardsQueued(bondRewards, pendingBondRewardsNative);
         } else {
             uint256 rewardAmount = bondRewards + pendingBondRewardsNative;
             pendingBondRewardsNative = 0;
-            _deliverBondRewards(rewardAmount, units);
+            _deliverBondRewards(epoch, rewardAmount, weight);
         }
 
         _pay(STOCK_RESERVE, stockReserve);
@@ -306,14 +308,15 @@ contract MuppetRevenueRouter is Ownable, Pausable, ReentrancyGuard {
         totalStockReserveRouted += stockReserve;
         totalOperationsRouted += operations;
 
-        uint256 units = AGENT_BOND.totalRewardUnitsByKey(key);
-        if (units == 0) {
+        uint40 epoch = AGENT_BOND.latestCompletedEpoch();
+        uint256 weight = AGENT_BOND.totalKeyRewardWeightAtEpoch(key, epoch);
+        if (weight == 0) {
             account.pendingBondRewardsNative += bondRewards;
             emit KeyBondRewardsQueued(key, bondRewards, account.pendingBondRewardsNative);
         } else {
             uint256 rewardAmount = bondRewards + account.pendingBondRewardsNative;
             account.pendingBondRewardsNative = 0;
-            _deliverKeyBondRewards(key, rewardAmount, units, account);
+            _deliverKeyBondRewards(key, epoch, rewardAmount, weight, account);
         }
 
         if (buyback != 0) BUYBACK_VAULT.fundKey{value: buyback}(key);
@@ -323,22 +326,24 @@ contract MuppetRevenueRouter is Ownable, Pausable, ReentrancyGuard {
     }
 
     function releasePendingBondRewards() external nonReentrant whenNotPaused returns (uint256 amount) {
-        uint256 units = AGENT_BOND.totalRewardUnits();
-        if (units == 0) revert NoRewardUnits();
+        uint40 epoch = AGENT_BOND.latestCompletedEpoch();
+        uint256 weight = AGENT_BOND.totalRewardWeightAtEpoch(epoch);
+        if (weight == 0) revert NoRewardUnits();
         amount = pendingBondRewardsNative;
         if (amount == 0) revert NoRevenue();
         pendingBondRewardsNative = 0;
-        _deliverBondRewards(amount, units);
+        _deliverBondRewards(epoch, amount, weight);
     }
 
     function releasePendingKeyBondRewards(address key) external nonReentrant whenNotPaused returns (uint256 amount) {
-        uint256 units = AGENT_BOND.totalRewardUnitsByKey(key);
-        if (units == 0) revert NoRewardUnits();
+        uint40 epoch = AGENT_BOND.latestCompletedEpoch();
+        uint256 weight = AGENT_BOND.totalKeyRewardWeightAtEpoch(key, epoch);
+        if (weight == 0) revert NoRewardUnits();
         KeyRevenueAccount storage account = keyRevenueAccounts[key];
         amount = account.pendingBondRewardsNative;
         if (amount == 0) revert NoRevenue();
         account.pendingBondRewardsNative = 0;
-        _deliverKeyBondRewards(key, amount, units, account);
+        _deliverKeyBondRewards(key, epoch, amount, weight, account);
     }
 
     function withdrawFunding(address payable receiver, uint256 amount) external onlyOwner nonReentrant whenPaused {
@@ -355,27 +360,31 @@ contract MuppetRevenueRouter is Ownable, Pausable, ReentrancyGuard {
         emit TokenRescued(address(token), receiver, amount);
     }
 
-    function _deliverBondRewards(uint256 amount, uint256 units) private {
+    function _deliverBondRewards(uint40 epoch, uint256 amount, uint256 weight) private {
         if (amount == 0) return;
         WETH.deposit{value: amount}();
         IERC20(address(WETH)).forceApprove(address(AGENT_BOND), amount);
-        AGENT_BOND.notifyReward(amount);
+        AGENT_BOND.notifyReward(epoch, amount);
         IERC20(address(WETH)).forceApprove(address(AGENT_BOND), 0);
         totalBondRewardsDelivered += amount;
-        emit BondRewardsDelivered(amount, units);
+        emit BondRewardsDelivered(epoch, amount, weight);
     }
 
-    function _deliverKeyBondRewards(address key, uint256 amount, uint256 units, KeyRevenueAccount storage account)
-        private
-    {
+    function _deliverKeyBondRewards(
+        address key,
+        uint40 epoch,
+        uint256 amount,
+        uint256 weight,
+        KeyRevenueAccount storage account
+    ) private {
         if (amount == 0) return;
         WETH.deposit{value: amount}();
         IERC20(address(WETH)).forceApprove(address(AGENT_BOND), amount);
-        AGENT_BOND.notifyKeyReward(key, amount);
+        AGENT_BOND.notifyKeyReward(key, epoch, amount);
         IERC20(address(WETH)).forceApprove(address(AGENT_BOND), 0);
         account.totalBondRewardsDelivered += amount;
         totalBondRewardsDelivered += amount;
-        emit KeyBondRewardsDelivered(key, amount, units);
+        emit KeyBondRewardsDelivered(key, epoch, amount, weight);
     }
 
     function _pay(address payable receiver, uint256 amount) private {

@@ -656,6 +656,8 @@ results.revenuePonsObserved = await page.getByText(/block [\d,]+/i).count() > 0
 results.revenueBuybackOff = await page.getByText('off', { exact: true }).count() === 1
 results.revenueNoReceipt = await page.getByText('No revenue receipt yet.', { exact: true }).count() === 1
 results.revenueNoInventedHistory = await page.getByText(/does not backfill a pretend reward history or APY/i).count() === 1
+results.revenueEpochMaturation = await page.getByText(/matures for seven days/i).count() > 0
+results.revenueThreeTerms = await page.getByText(/30 days at 1x, 90 days at 1.25x, or 180 days at 1.5x/i).count() === 1
 results.revenueEndpoint = await page.evaluate(async () => {
   const response = await fetch('/api/v1/revenue', { cache: 'no-store' })
   const body = await response.json()
@@ -666,6 +668,10 @@ results.revenueEndpoint = await page.evaluate(async () => {
     && Array.isArray(body.target_fee_route)
     && body.target_fee_route.length === 5
     && body.reward_unit?.muppets === '15000'
+    && body.reward_unit?.maturation_days === 7
+    && body.reward_unit?.epoch_days === 7
+    && Array.isArray(body.reward_unit?.terms)
+    && body.reward_unit.terms.map((term) => `${term.days}:${term.weight}`).join(',') === '30:1x,90:1.25x,180:1.5x'
     && body.router_split?.agent_bonds === '50%'
     && body.router_split?.stock_reserve === '30%'
     && body.router_split?.operations === '20%'
@@ -694,6 +700,8 @@ results.docsSevenPets = await page.getByRole('heading', { name: 'Seven pets, thr
 results.docsFeeReserve = await page.getByRole('heading', { name: 'Marketplace fee reserve' }).count() === 1
 results.docsRevenue = await page.getByRole('heading', { name: 'Revenue Engine and Agent Bonds' }).count() === 1
 results.docsRevenueBoundary = await page.getByText(/not yet deployed on mainnet/i).count() === 1
+results.docsBondEpochs = await page.getByText(/positions mature for seven days and earn only for full weekly epochs/i).count() === 1
+results.docsFactorySizeBoundary = await page.getByText(/exceeds the EIP-170 runtime-size limit/i).count() === 1
 results.docsPerformance = await page.getByRole('heading', { name: 'Public Muppet performance' }).count() === 1
 results.docsPerformanceMarketplace = await page.getByText(/select any two Muppets to compare/i).count() === 1
 results.docsCreatorProfiles = await page.getByText(/Every creator wallet has a shareable/i).count() === 1
@@ -1083,6 +1091,8 @@ const failed =
   || !results.revenueBuybackOff
   || !results.revenueNoReceipt
   || !results.revenueNoInventedHistory
+  || !results.revenueEpochMaturation
+  || !results.revenueThreeTerms
   || !results.revenueEndpoint
   || results.revenueOverflow
   || results.docsTitle !== 'Docs | LIQUIDMUPPETS'
@@ -1095,6 +1105,8 @@ const failed =
   || !results.docsFeeReserve
   || !results.docsRevenue
   || !results.docsRevenueBoundary
+  || !results.docsBondEpochs
+  || !results.docsFactorySizeBoundary
   || !results.docsPerformance
   || !results.docsPerformanceMarketplace
   || !results.docsCreatorProfiles

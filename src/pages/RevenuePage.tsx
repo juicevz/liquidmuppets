@@ -8,10 +8,10 @@ import { getInjectedProvider } from '../lib/protocol'
 import {
   bindKeys,
   bondAgentKeyUnit,
-  claimAgentBondKeyReward,
-  claimAgentBondReward,
+  claimAgentBondPositionRewards,
   readAgentBondKeyPosition,
-  unbondAgentKeyUnit,
+  unbondAgentPosition,
+  type AgentBondTerm,
   type AgentBondKeyPosition,
   type ChainAgent,
 } from '../lib/protocol'
@@ -123,7 +123,7 @@ export function RevenuePage({ walletAddress, onConnect }: RevenuePageProps) {
         <div>
           <span className="revenue-kicker"><i aria-hidden="true" />public revenue record</span>
           <h1>Revenue Engine.</h1>
-          <p>Bond 15,000 $MUPPETS with one permanently bound Agent Key to create one reward unit. Verified creator and Key-market revenue is routed weekly. Rewards settle in WETH.</p>
+          <p>Bond 15,000 $MUPPETS with one permanently bound Agent Key. Positions mature for seven days, then earn from real revenue only during full completed weekly epochs.</p>
         </div>
         <div className={`revenue-release-state ${isLive ? 'is-live' : 'is-pending'}`}>
           <small>{isLive ? 'mainnet state' : 'release state'}</small>
@@ -188,8 +188,8 @@ export function RevenuePage({ walletAddress, onConnect }: RevenuePageProps) {
           <header><small>one unit at a time</small><h2 id="revenue-bond-title">Agent Bond</h2></header>
           <ol>
             <li><span>01</span><div><strong>Bind one Agent Key</strong><p>Binding is permanent. The Key becomes non-transferable and remains separate from vault ownership.</p></div></li>
-            <li><span>02</span><div><strong>Bond 15,000 $MUPPETS</strong><p>The token lock lasts 30 days. Bonded tokens still count toward FactoryV2 Creator Slots.</p></div></li>
-            <li><span>03</span><div><strong>Claim recorded WETH</strong><p>Your units receive their pro-rata share when a weekly route contains real revenue. A zero-revenue week pays zero.</p></div></li>
+            <li><span>02</span><div><strong>Choose a fixed term</strong><p>Lock for 30 days at 1x, 90 days at 1.25x, or 180 days at 1.5x. Bonded tokens still count toward FactoryV2 Creator Slots.</p></div></li>
+            <li><span>03</span><div><strong>Complete epochs and claim</strong><p>Every position matures for seven days and earns only for full completed weekly epochs. A zero-revenue epoch pays zero.</p></div></li>
           </ol>
           <div className="revenue-wallet-card">
             {!walletAddress ? (
@@ -204,13 +204,7 @@ export function RevenuePage({ walletAddress, onConnect }: RevenuePageProps) {
                   <b><small>bonded</small>{formatTokenRaw(state.wallet.bonded_muppets_raw ?? '0')} $MUPPETS</b>
                   <b><small>claimable</small>{formatNative(BigInt(state.wallet.pending_weth_raw ?? '0'))} WETH</b>
                 </div>
-                <p>Each action is sent through your wallet. Binding is permanent. Bonded $MUPPETS unlock after 30 days.</p>
-                {BigInt(state.wallet.pending_weth_raw ?? '0') > 0n && (
-                  <button type="button" disabled={Boolean(action)} onClick={() => void runAction('claim', async () => {
-                    const { config, provider, account } = actionContext()
-                    return [await claimAgentBondReward(config, provider, account)]
-                  })}>{action === 'claim' ? 'Waiting for wallet' : 'Claim WETH'}</button>
-                )}
+                <p>Binding is permanent. Every bond waits seven days, then earns only during full completed epochs. Claim and withdrawal actions stay attached to each position below.</p>
               </>
             )}
           </div>
@@ -230,17 +224,17 @@ export function RevenuePage({ walletAddress, onConnect }: RevenuePageProps) {
                       return [await bindKeys(config, provider, account, agent, 1)]
                     })
                   }}
-                  onBond={() => void runAction(`bond-${agent.key.address}`, async () => {
+                  onBond={(term) => void runAction(`bond-${agent.key.address}`, async () => {
                     const { config, provider, account } = actionContext()
-                    return bondAgentKeyUnit(config, provider, account, agent.key.address)
+                    return bondAgentKeyUnit(config, provider, account, agent.key.address, term)
                   })}
-                  onUnbond={() => void runAction(`unbond-${agent.key.address}`, async () => {
+                  onUnbond={(positionId) => void runAction(`unbond-${positionId}`, async () => {
                     const { config, provider, account } = actionContext()
-                    return [await unbondAgentKeyUnit(config, provider, account, agent.key.address)]
+                    return [await unbondAgentPosition(config, provider, account, positionId)]
                   })}
-                  onClaimKey={() => void runAction(`claim-key-${agent.key.address}`, async () => {
+                  onClaim={(positionId) => void runAction(`claim-${positionId}`, async () => {
                     const { config, provider, account } = actionContext()
-                    return [await claimAgentBondKeyReward(config, provider, account, agent.key.address)]
+                    return [await claimAgentBondPositionRewards(config, provider, account, positionId)]
                   })}
                   key={agent.key.address}
                 />
@@ -307,45 +301,85 @@ function RevenueAgentControl({
   onBind,
   onBond,
   onUnbond,
-  onClaimKey,
+  onClaim,
 }: {
   agent: ChainAgent
   position?: AgentBondKeyPosition
   busy: boolean
   action: string
   onBind: () => void
-  onBond: () => void
-  onUnbond: () => void
-  onClaimKey: () => void
+  onBond: (term: AgentBondTerm) => void
+  onUnbond: (positionId: bigint) => void
+  onClaim: (positionId: bigint) => void
 }) {
   const actionId = agent.key.address
-  const unlockReady = Boolean(position?.committedUnits && position.lockedUntil <= Math.floor(Date.now() / 1_000))
+  const [term, setTerm] = useState<AgentBondTerm>(0)
+  const now = Math.floor(Date.now() / 1_000)
   return (
     <article>
       <div><strong>{agent.name}</strong><small>${agent.key.symbol} · {shortenAddress(agent.key.address)}</small></div>
       <span><small>transferable</small><b>{agent.key.walletBalance.toString()}</b></span>
       <span><small>bound free</small><b>{position?.availableBoundKeys.toString() ?? '…'}</b></span>
-      <span><small>units</small><b>{position?.committedUnits.toString() ?? '…'}</b></span>
-      <span><small>Key WETH</small><b>{position ? formatNative(position.pendingKeyReward) : '…'}</b></span>
+      <span><small>committed units</small><b>{position?.committedUnits.toString() ?? '…'}</b></span>
+      <span><small>claimable WETH</small><b>{position ? formatNative(position.pendingGlobalReward + position.pendingKeyReward) : '…'}</b></span>
       <div className="revenue-agent-actions">
         {(position?.availableBoundKeys ?? 0n) > 0n ? (
-          <button type="button" disabled={busy} onClick={onBond}>{action === `bond-${actionId}` ? 'Waiting' : 'Bond 15,000'}</button>
+          <>
+            <label>
+              <span>bond term</span>
+              <select value={term} disabled={busy} onChange={(event) => setTerm(Number(event.target.value) as AgentBondTerm)}>
+                <option value={0}>30 days · 1x</option>
+                <option value={1}>90 days · 1.25x</option>
+                <option value={2}>180 days · 1.5x</option>
+              </select>
+            </label>
+            <button type="button" disabled={busy} onClick={() => {
+              if (!window.confirm(`Lock 15,000 $MUPPETS for ${termLabel(term)} with no early exit?`)) return
+              onBond(term)
+            }}>{action === `bond-${actionId}` ? 'Waiting' : 'Bond 15,000'}</button>
+          </>
         ) : agent.key.walletBalance > 0n ? (
           <button type="button" disabled={busy} onClick={onBind}>{action === `bind-${actionId}` ? 'Waiting' : 'Bind 1 Key'}</button>
         ) : null}
-        {(position?.committedUnits ?? 0n) > 0n && (
-          <button className="secondary" type="button" disabled={busy || !unlockReady} onClick={onUnbond} title={unlockReady ? 'Return 15,000 MUPPETS' : `Unlocks ${formatUtc(new Date((position?.lockedUntil ?? 0) * 1_000).toISOString())}`}>
-            {action === `unbond-${actionId}` ? 'Waiting' : unlockReady ? 'Unbond 1' : `Locked until ${shortDate(position?.lockedUntil ?? 0)}`}
-          </button>
-        )}
-        {(position?.pendingKeyReward ?? 0n) > 0n && (
-          <button className="secondary" type="button" disabled={busy} onClick={onClaimKey}>
-            {action === `claim-key-${actionId}` ? 'Waiting' : 'Claim Key WETH'}
-          </button>
-        )}
       </div>
+      {(position?.positions.length ?? 0) > 0 && (
+        <div className="revenue-bond-positions">
+          {position!.positions.map((bondPosition) => {
+            const claimable = bondPosition.pendingGlobalReward + bondPosition.pendingKeyReward
+            const unlockReady = !bondPosition.withdrawn && bondPosition.unlockAt <= now
+            const state = bondPosition.withdrawn
+              ? 'withdrawn'
+              : now < bondPosition.maturesAt
+                ? `matures ${shortDate(bondPosition.maturesAt)}`
+                : now < bondPosition.unlockAt
+                  ? 'epoch eligible'
+                  : 'unlocked'
+            return (
+              <div key={bondPosition.id.toString()}>
+                <span><small>position #{bondPosition.id.toString()}</small><b>{termLabel(bondPosition.term)} · {formatWeight(bondPosition.multiplierBps)}</b></span>
+                <span><small>state</small><b>{state}</b></span>
+                <span><small>claimable</small><b>{formatNative(claimable)} WETH</b></span>
+                <div>
+                  {claimable > 0n && <button className="secondary" type="button" disabled={busy} onClick={() => onClaim(bondPosition.id)}>{action === `claim-${bondPosition.id}` ? 'Waiting' : 'Claim WETH'}</button>}
+                  {!bondPosition.withdrawn && <button className="secondary" type="button" disabled={busy || !unlockReady} onClick={() => onUnbond(bondPosition.id)} title={unlockReady ? 'Return bonded MUPPETS' : `Unlocks ${formatUtc(new Date(bondPosition.unlockAt * 1_000).toISOString())}`}>{action === `unbond-${bondPosition.id}` ? 'Waiting' : unlockReady ? 'Unbond' : `Until ${shortDate(bondPosition.unlockAt)}`}</button>}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </article>
   )
+}
+
+function termLabel(term: AgentBondTerm): string {
+  if (term === 1) return '90 days'
+  if (term === 2) return '180 days'
+  return '30 days'
+}
+
+function formatWeight(multiplierBps: number): string {
+  return `${(multiplierBps / 10_000).toFixed(multiplierBps % 10_000 === 0 ? 0 : 2)}x`
 }
 
 function contractLink(explorer: string, address: string | null, label: string) {

@@ -1,0 +1,18 @@
+LIQUIDMUPPETS
+
+per-Muppet revenue markets + Agent Bond epochs are public.
+
+Each V2 Key has its own revenue lane. Bonds mature 7d, then earn full weekly epochs: 30d 1x, 90d 1.25x, 180d 1.5x. Real fees only.
+
+Activation still waits for Safe review.
+https://liquidmuppets.io/app/revenue
+
+
+FOUNDER
+
+big liquidmuppets update pushed.
+
+revenue can now be tracked per Muppet Key. bonds mature 7d, then count only full epochs: 30d 1x, 90d 1.25x, 180d 1.5x. same real fee pot, no emissions.
+
+mainnet waits for Safe review.
+https://github.com/juicevz/liquidmuppets

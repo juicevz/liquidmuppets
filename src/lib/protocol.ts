@@ -74,12 +74,19 @@ const keyAbi = [
 const agentBondAbi = [
   { type: 'function', name: 'unitsByKey', stateMutability: 'view', inputs: [{ type: 'address' }, { type: 'address' }], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'availableBoundKeys', stateMutability: 'view', inputs: [{ type: 'address' }, { type: 'address' }], outputs: [{ type: 'uint256' }] },
-  { type: 'function', name: 'lockedUntil', stateMutability: 'view', inputs: [{ type: 'address' }, { type: 'address' }], outputs: [{ type: 'uint40' }] },
-  { type: 'function', name: 'bond', stateMutability: 'nonpayable', inputs: [{ type: 'address' }, { type: 'uint256' }], outputs: [] },
-  { type: 'function', name: 'unbond', stateMutability: 'nonpayable', inputs: [{ type: 'address' }, { type: 'uint256' }], outputs: [] },
-  { type: 'function', name: 'claimReward', stateMutability: 'nonpayable', inputs: [], outputs: [{ type: 'uint256' }] },
-  { type: 'function', name: 'pendingKeyReward', stateMutability: 'view', inputs: [{ type: 'address' }, { type: 'address' }], outputs: [{ type: 'uint256' }] },
-  { type: 'function', name: 'claimKeyReward', stateMutability: 'nonpayable', inputs: [{ type: 'address' }], outputs: [{ type: 'uint256' }] },
+  { type: 'function', name: 'keyPositionCount', stateMutability: 'view', inputs: [{ type: 'address' }, { type: 'address' }], outputs: [{ type: 'uint256' }] },
+  { type: 'function', name: 'keyPositionAt', stateMutability: 'view', inputs: [{ type: 'address' }, { type: 'address' }, { type: 'uint256' }], outputs: [{ type: 'uint256' }] },
+  { type: 'function', name: 'getPosition', stateMutability: 'view', inputs: [{ type: 'uint256' }], outputs: [{ type: 'tuple', components: [
+    { name: 'account', type: 'address' }, { name: 'key', type: 'address' }, { name: 'units', type: 'uint128' },
+    { name: 'rewardWeight', type: 'uint128' }, { name: 'bondedAt', type: 'uint40' }, { name: 'maturesAt', type: 'uint40' },
+    { name: 'unlockAt', type: 'uint40' }, { name: 'firstEligibleEpoch', type: 'uint40' },
+    { name: 'lastEligibleEpochExclusive', type: 'uint40' }, { name: 'multiplierBps', type: 'uint16' },
+    { name: 'term', type: 'uint8' }, { name: 'withdrawn', type: 'bool' },
+  ] }] },
+  { type: 'function', name: 'pendingPositionRewards', stateMutability: 'view', inputs: [{ type: 'uint256' }], outputs: [{ name: 'globalWeth', type: 'uint256' }, { name: 'keyWeth', type: 'uint256' }] },
+  { type: 'function', name: 'bondWithTerm', stateMutability: 'nonpayable', inputs: [{ type: 'address' }, { type: 'uint256' }, { type: 'uint8' }], outputs: [{ type: 'uint256' }] },
+  { type: 'function', name: 'unbondPosition', stateMutability: 'nonpayable', inputs: [{ type: 'uint256' }], outputs: [] },
+  { type: 'function', name: 'claimPositionRewards', stateMutability: 'nonpayable', inputs: [{ type: 'uint256' }], outputs: [{ type: 'uint256' }, { type: 'uint256' }] },
 ] as const
 
 const vaultAbi = [
@@ -761,7 +768,26 @@ export async function bindKeys(config: ProtocolConfig, provider: WalletProvider,
 export interface AgentBondKeyPosition {
   committedUnits: bigint
   availableBoundKeys: bigint
-  lockedUntil: number
+  pendingGlobalReward: bigint
+  pendingKeyReward: bigint
+  positions: AgentBondPosition[]
+}
+
+export type AgentBondTerm = 0 | 1 | 2
+
+export interface AgentBondPosition {
+  id: bigint
+  units: bigint
+  rewardWeight: bigint
+  bondedAt: number
+  maturesAt: number
+  unlockAt: number
+  firstEligibleEpoch: number
+  lastEligibleEpochExclusive: number
+  multiplierBps: number
+  term: AgentBondTerm
+  withdrawn: boolean
+  pendingGlobalReward: bigint
   pendingKeyReward: bigint
 }
 
@@ -772,13 +798,42 @@ export async function readAgentBondKeyPosition(
 ): Promise<AgentBondKeyPosition> {
   if (!config.agentBond) throw new Error('Agent Bond is not configured.')
   const client = createProtocolClient(config, { fresh: true })
-  const [committedUnits, availableBoundKeys, lockedUntil, pendingKeyReward] = await Promise.all([
+  const [committedUnits, availableBoundKeys, positionCount] = await Promise.all([
     client.readContract({ address: config.agentBond, abi: agentBondAbi, functionName: 'unitsByKey', args: [account, key] }),
     client.readContract({ address: config.agentBond, abi: agentBondAbi, functionName: 'availableBoundKeys', args: [account, key] }),
-    client.readContract({ address: config.agentBond, abi: agentBondAbi, functionName: 'lockedUntil', args: [account, key] }),
-    client.readContract({ address: config.agentBond, abi: agentBondAbi, functionName: 'pendingKeyReward', args: [account, key] }),
+    client.readContract({ address: config.agentBond, abi: agentBondAbi, functionName: 'keyPositionCount', args: [account, key] }),
   ])
-  return { committedUnits, availableBoundKeys, lockedUntil: Number(lockedUntil), pendingKeyReward }
+  const positionIds = await Promise.all(Array.from({ length: Number(positionCount) }, (_, index) => (
+    client.readContract({ address: config.agentBond!, abi: agentBondAbi, functionName: 'keyPositionAt', args: [account, key, BigInt(index)] })
+  )))
+  const positions = await Promise.all(positionIds.map(async (id) => {
+    const [position, pending] = await Promise.all([
+      client.readContract({ address: config.agentBond!, abi: agentBondAbi, functionName: 'getPosition', args: [id] }),
+      client.readContract({ address: config.agentBond!, abi: agentBondAbi, functionName: 'pendingPositionRewards', args: [id] }),
+    ])
+    return {
+      id,
+      units: position.units,
+      rewardWeight: position.rewardWeight,
+      bondedAt: Number(position.bondedAt),
+      maturesAt: Number(position.maturesAt),
+      unlockAt: Number(position.unlockAt),
+      firstEligibleEpoch: Number(position.firstEligibleEpoch),
+      lastEligibleEpochExclusive: Number(position.lastEligibleEpochExclusive),
+      multiplierBps: Number(position.multiplierBps),
+      term: Number(position.term) as AgentBondTerm,
+      withdrawn: position.withdrawn,
+      pendingGlobalReward: pending[0],
+      pendingKeyReward: pending[1],
+    }
+  }))
+  return {
+    committedUnits,
+    availableBoundKeys,
+    positions,
+    pendingGlobalReward: positions.reduce((total, position) => total + position.pendingGlobalReward, 0n),
+    pendingKeyReward: positions.reduce((total, position) => total + position.pendingKeyReward, 0n),
+  }
 }
 
 export async function bondAgentKeyUnit(
@@ -786,6 +841,7 @@ export async function bondAgentKeyUnit(
   provider: WalletProvider,
   account: Address,
   key: Address,
+  term: AgentBondTerm,
 ): Promise<Hash[]> {
   if (!config.agentBond || !config.accessGate.tokenAddress) throw new Error('Agent Bond is not configured.')
   const client = createProtocolClient(config)
@@ -794,46 +850,34 @@ export async function bondAgentKeyUnit(
     abi: erc20Abi, functionName: 'approve', args: [config.agentBond, amount],
   }))
   const bondReceipt = await sendAndWait(provider, client, account, config.agentBond, encodeFunctionData({
-    abi: agentBondAbi, functionName: 'bond', args: [key, 1n],
+    abi: agentBondAbi, functionName: 'bondWithTerm', args: [key, 1n, term],
   }))
   return [approval.transactionHash, bondReceipt.transactionHash]
 }
 
-export async function unbondAgentKeyUnit(
+export async function unbondAgentPosition(
   config: ProtocolConfig,
   provider: WalletProvider,
   account: Address,
-  key: Address,
+  positionId: bigint,
 ): Promise<Hash> {
   if (!config.agentBond) throw new Error('Agent Bond is not configured.')
   const client = createProtocolClient(config)
   return (await sendAndWait(provider, client, account, config.agentBond, encodeFunctionData({
-    abi: agentBondAbi, functionName: 'unbond', args: [key, 1n],
+    abi: agentBondAbi, functionName: 'unbondPosition', args: [positionId],
   }))).transactionHash
 }
 
-export async function claimAgentBondReward(
+export async function claimAgentBondPositionRewards(
   config: ProtocolConfig,
   provider: WalletProvider,
   account: Address,
+  positionId: bigint,
 ): Promise<Hash> {
   if (!config.agentBond) throw new Error('Agent Bond is not configured.')
   const client = createProtocolClient(config)
   return (await sendAndWait(provider, client, account, config.agentBond, encodeFunctionData({
-    abi: agentBondAbi, functionName: 'claimReward', args: [],
-  }))).transactionHash
-}
-
-export async function claimAgentBondKeyReward(
-  config: ProtocolConfig,
-  provider: WalletProvider,
-  account: Address,
-  key: Address,
-): Promise<Hash> {
-  if (!config.agentBond) throw new Error('Agent Bond is not configured.')
-  const client = createProtocolClient(config)
-  return (await sendAndWait(provider, client, account, config.agentBond, encodeFunctionData({
-    abi: agentBondAbi, functionName: 'claimKeyReward', args: [key],
+    abi: agentBondAbi, functionName: 'claimPositionRewards', args: [positionId],
   }))).transactionHash
 }
 

@@ -355,8 +355,8 @@ function AgentKeySection({
             <div className="key-revenue-metrics">
               <Metric label="market volume" value={formatOptionalNative(revenue.market.volume_raw)} />
               <Metric label="fees recorded" value={formatOptionalNative(revenue.market.fee_revenue_raw)} />
-              <Metric label="bonded units" value={revenue.bond.units ?? 'starts at deployment'} />
-              <Metric label="WETH / unit" value={formatOptionalToken(revenue.bond.cumulative_weth_per_unit_raw, 'WETH')} />
+              <Metric label="committed units" value={revenue.bond.units ?? 'starts at deployment'} />
+              <Metric label="latest epoch WETH / 1x" value={formatOptionalToken(revenue.bond.weth_per_1x_unit_raw, 'WETH')} />
               <Metric label="$MUPPETS bought" value={formatOptionalToken(revenue.buyback.muppets_bought_raw, '$MUPPETS')} />
               <Metric label="receipts" value={revenue.receipts.length.toString()} />
             </div>
@@ -368,6 +368,7 @@ function AgentKeySection({
             </div>
             <div className="key-revenue-foot">
               <span>{revenue.tracking_started_at ? `since ${formatUtc(revenue.tracking_started_at)}` : 'tracking starts at V2 deployment'}</span>
+              <span>{revenue.bond.reward_epoch === null ? 'epoch record starts at activation' : `latest completed epoch ${revenue.bond.reward_epoch}`}</span>
               <span>buyback lots vest for five years</span>
             </div>
             {revenue.receipts.length > 0 && (

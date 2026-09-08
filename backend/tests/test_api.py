@@ -151,6 +151,23 @@ def test_revenue_api_keeps_activation_and_wallet_state_explicit(tmp_path: Path) 
     app.state.revenue.read.assert_called_once_with(wallet)
 
 
+def test_revenue_api_publishes_completed_epoch_bond_terms(tmp_path: Path) -> None:
+    app = create_app(Settings(database_path=tmp_path / "test.sqlite3", rpc_url="http://127.0.0.1:1"))
+
+    with TestClient(app) as client:
+        response = client.get("/api/v1/revenue")
+
+    assert response.status_code == 200
+    reward_unit = response.json()["reward_unit"]
+    assert reward_unit["maturation_days"] == 7
+    assert reward_unit["epoch_days"] == 7
+    assert reward_unit["terms"] == [
+        {"days": 30, "weight": "1x"},
+        {"days": 90, "weight": "1.25x"},
+        {"days": 180, "weight": "1.5x"},
+    ]
+
+
 def test_revenue_api_rejects_an_invalid_wallet(tmp_path: Path) -> None:
     app = create_app(Settings(database_path=tmp_path / "test.sqlite3", rpc_url="http://127.0.0.1:1"))
     with TestClient(app) as client:
