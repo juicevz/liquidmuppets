@@ -166,6 +166,12 @@ def test_revenue_api_publishes_completed_epoch_bond_terms(tmp_path: Path) -> Non
         {"days": 90, "weight": "1.25x"},
         {"days": 180, "weight": "1.5x"},
     ]
+    reinvestment = response.json()["reinvestment"]
+    assert reinvestment["available"] is False
+    assert reinvestment["capability"] == "claim_buy_and_bond"
+    assert reinvestment["version"] == 1
+    assert reinvestment["maximum_deadline_seconds"] == 300
+    assert reinvestment["minimum_muppets_raw"] == "15000000000000000000000"
 
 
 def test_revenue_api_rejects_an_invalid_wallet(tmp_path: Path) -> None:

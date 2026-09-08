@@ -24,6 +24,7 @@ export const publicRoadmap: RoadmapPhase[] = [
       'Three live task routes and a 26-route Stock Token reserve',
       'Public Revenue Engine and per-Muppet exact-Key revenue views',
       'Tested exact-Key revenue and completed-epoch Agent Bond package with 30, 90 and 180 day terms',
+      'Optional claim-or-reinvest flow with atomic reward-funded buys and new bonds; activation pending',
     ],
   },
   {

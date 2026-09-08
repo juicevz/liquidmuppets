@@ -16,6 +16,18 @@ interface IAgentKeyRegistry {
     function approvedKeys(address key) external view returns (bool);
 }
 
+interface IMuppetRewardBuyExecutor {
+    function MUPPETS() external view returns (IERC20);
+    function executeBuy(uint256 minimumOutput, uint256 deadline, address recipient)
+        external
+        payable
+        returns (uint256 amountOut);
+}
+
+interface IWrappedBondReward {
+    function withdraw(uint256 amount) external;
+}
+
 /// @notice Locks MUPPETS against permanently bound Agent Keys and distributes recorded WETH by completed epoch.
 /// @dev A position earns only in full epochs after maturation and before its immutable unlock time.
 contract MuppetAgentBond is Ownable, Pausable, ReentrancyGuard {
@@ -25,6 +37,8 @@ contract MuppetAgentBond is Ownable, Pausable, ReentrancyGuard {
     uint16 public constant BPS = 10_000;
     uint40 public constant EPOCH_DURATION = 7 days;
     uint40 public constant MATURATION_DURATION = 7 days;
+    uint256 public constant REINVESTMENT_VERSION = 1;
+    uint256 public constant MAX_REINVESTMENT_DEADLINE_WINDOW = 5 minutes;
 
     enum BondTerm {
         THIRTY_DAYS,
@@ -49,6 +63,7 @@ contract MuppetAgentBond is Ownable, Pausable, ReentrancyGuard {
 
     IERC20 public immutable MUPPETS;
     IERC20 public immutable WETH;
+    IMuppetRewardBuyExecutor public immutable REWARD_BUY_EXECUTOR;
     uint256 public immutable UNIT_SIZE;
     uint40 public immutable LOCK_DURATION;
 
@@ -111,6 +126,16 @@ contract MuppetAgentBond is Ownable, Pausable, ReentrancyGuard {
     event PositionRewardsClaimed(
         uint256 indexed positionId, address indexed account, address indexed key, uint256 globalWeth, uint256 keyWeth
     );
+    event PositionRewardsReinvested(
+        uint256 indexed positionId,
+        uint256 indexed newPositionId,
+        address indexed account,
+        uint256 wethSpent,
+        uint256 muppetsBought,
+        uint256 muppetsBonded,
+        uint256 wethReturned,
+        uint256 muppetsReturned
+    );
 
     error AddressZero();
     error ContractGovernanceRequired();
@@ -127,21 +152,39 @@ contract MuppetAgentBond is Ownable, Pausable, ReentrancyGuard {
     error NotRewardNotifier();
     error OwnershipRenunciationDisabled();
     error UnsafeActivation();
+    error DeadlineInvalid();
+    error InvalidBuyExecutor();
+    error InsufficientBoughtMuppets(uint256 bought, uint256 required);
+    error RewardSpendExceeded(uint256 available, uint256 requested);
+    error UnexpectedNativeTransfer();
 
-    constructor(address initialOwner, IERC20 muppets, IERC20 weth, uint256 unitSize, uint40 lockDuration)
-        Ownable(initialOwner)
-    {
+    constructor(
+        address initialOwner,
+        IERC20 muppets,
+        IERC20 weth,
+        uint256 unitSize,
+        uint40 lockDuration,
+        IMuppetRewardBuyExecutor rewardBuyExecutor
+    ) Ownable(initialOwner) {
         if (address(muppets) == address(0) || address(weth) == address(0)) revert AddressZero();
         if (address(muppets).code.length == 0 || address(weth).code.length == 0) revert AddressZero();
         if (unitSize == 0 || lockDuration != 30 days) revert InvalidAmount();
         if (IERC20Metadata(address(muppets)).decimals() != 18 || IERC20Metadata(address(weth)).decimals() != 18) {
             revert InvalidAmount();
         }
+        if (address(rewardBuyExecutor).code.length == 0 || address(rewardBuyExecutor.MUPPETS()) != address(muppets)) {
+            revert InvalidBuyExecutor();
+        }
         MUPPETS = muppets;
         WETH = weth;
+        REWARD_BUY_EXECUTOR = rewardBuyExecutor;
         UNIT_SIZE = unitSize;
         LOCK_DURATION = lockDuration;
         _pause();
+    }
+
+    receive() external payable {
+        if (msg.sender != address(WETH)) revert UnexpectedNativeTransfer();
     }
 
     modifier onlyRewardNotifier() {
@@ -186,7 +229,7 @@ contract MuppetAgentBond is Ownable, Pausable, ReentrancyGuard {
 
     /// @notice Creates a default 30-day position. It matures for seven days before any epoch eligibility.
     function bond(address key, uint256 units) external nonReentrant whenNotPaused returns (uint256 positionId) {
-        return _bond(msg.sender, key, units, BondTerm.THIRTY_DAYS);
+        return _bond(msg.sender, key, units, BondTerm.THIRTY_DAYS, false);
     }
 
     function bondWithTerm(address key, uint256 units, BondTerm term)
@@ -195,7 +238,7 @@ contract MuppetAgentBond is Ownable, Pausable, ReentrancyGuard {
         whenNotPaused
         returns (uint256 positionId)
     {
-        return _bond(msg.sender, key, units, term);
+        return _bond(msg.sender, key, units, term, false);
     }
 
     /// @notice Returns all MUPPETS in one matured position. Historical epoch rewards remain claimable.
@@ -264,6 +307,65 @@ contract MuppetAgentBond is Ownable, Pausable, ReentrancyGuard {
         nonReentrant
         returns (uint256 globalWeth, uint256 keyWeth)
     {
+        (globalWeth, keyWeth) = _claimPositionRewards(positionId);
+        WETH.safeTransfer(msg.sender, globalWeth + keyWeth);
+    }
+
+    /// @notice Claims a position and spends only the selected portion of those rewards on a fresh bond.
+    /// @dev No wallet allowance is needed. Failure rolls back the claim, swap and new lock together.
+    function claimBuyAndBond(
+        uint256 positionId,
+        uint256 wethToSpend,
+        address key,
+        uint256 units,
+        BondTerm term,
+        uint256 minimumOutput,
+        uint256 deadline
+    )
+        external
+        nonReentrant
+        whenNotPaused
+        returns (uint256 newPositionId, uint256 muppetsBought, uint256 globalClaimed, uint256 keyClaimed)
+    {
+        if (wethToSpend == 0 || units == 0 || units > type(uint128).max) {
+            revert InvalidAmount();
+        }
+        uint256 muppetsToBond = units * UNIT_SIZE;
+        if (minimumOutput < muppetsToBond) revert InsufficientBoughtMuppets(minimumOutput, muppetsToBond);
+        if (deadline < block.timestamp || deadline > block.timestamp + MAX_REINVESTMENT_DEADLINE_WINDOW) {
+            revert DeadlineInvalid();
+        }
+        (globalClaimed, keyClaimed) = _claimPositionRewards(positionId);
+        uint256 claimed = globalClaimed + keyClaimed;
+        if (wethToSpend > claimed) revert RewardSpendExceeded(claimed, wethToSpend);
+
+        uint256 nativeBalanceBefore = address(this).balance;
+        uint256 muppetsBalanceBefore = MUPPETS.balanceOf(address(this));
+        IWrappedBondReward(address(WETH)).withdraw(wethToSpend);
+        REWARD_BUY_EXECUTOR.executeBuy{value: wethToSpend}(minimumOutput, deadline, address(this));
+        if (address(this).balance != nativeBalanceBefore) revert UnexpectedNativeTransfer();
+        muppetsBought = MUPPETS.balanceOf(address(this)) - muppetsBalanceBefore;
+        if (muppetsBought < minimumOutput) revert InsufficientBoughtMuppets(muppetsBought, minimumOutput);
+
+        // This path never pulls wallet tokens: the measured purchase funds the entire fresh position.
+        newPositionId = _bond(msg.sender, key, units, term, true);
+        uint256 muppetsReturned = muppetsBought - muppetsToBond;
+        uint256 wethReturned = claimed - wethToSpend;
+        if (muppetsReturned != 0) MUPPETS.safeTransfer(msg.sender, muppetsReturned);
+        if (wethReturned != 0) WETH.safeTransfer(msg.sender, wethReturned);
+        emit PositionRewardsReinvested(
+            positionId,
+            newPositionId,
+            msg.sender,
+            wethToSpend,
+            muppetsBought,
+            muppetsToBond,
+            wethReturned,
+            muppetsReturned
+        );
+    }
+
+    function _claimPositionRewards(uint256 positionId) private returns (uint256 globalWeth, uint256 keyWeth) {
         BondPosition storage position = positions[positionId];
         if (position.account == address(0)) revert InvalidPosition();
         if (position.account != msg.sender) revert NotPositionOwner();
@@ -276,7 +378,6 @@ contract MuppetAgentBond is Ownable, Pausable, ReentrancyGuard {
         totalGlobalRewardsClaimed += globalWeth;
         totalKeyRewardsClaimed[position.key] += keyWeth;
         totalRewardsClaimed += amount;
-        WETH.safeTransfer(msg.sender, amount);
         emit PositionRewardsClaimed(positionId, msg.sender, position.key, globalWeth, keyWeth);
     }
 
@@ -391,7 +492,10 @@ contract MuppetAgentBond is Ownable, Pausable, ReentrancyGuard {
         return registryList[index];
     }
 
-    function _bond(address account, address key, uint256 units, BondTerm term) private returns (uint256 positionId) {
+    function _bond(address account, address key, uint256 units, BondTerm term, bool fromMeasuredPurchase)
+        private
+        returns (uint256 positionId)
+    {
         if (units == 0 || units > type(uint128).max) revert InvalidAmount();
         if (!_approvedAgentKey(key)) revert InvalidAgentKey();
 
@@ -411,9 +515,11 @@ contract MuppetAgentBond is Ownable, Pausable, ReentrancyGuard {
         if (rewardWeight > type(uint128).max) revert InvalidAmount();
 
         uint256 amount = units * UNIT_SIZE;
-        uint256 balanceBefore = MUPPETS.balanceOf(address(this));
-        MUPPETS.safeTransferFrom(account, address(this), amount);
-        if (MUPPETS.balanceOf(address(this)) - balanceBefore != amount) revert ExactTransferRequired();
+        if (!fromMeasuredPurchase) {
+            uint256 balanceBefore = MUPPETS.balanceOf(address(this));
+            MUPPETS.safeTransferFrom(account, address(this), amount);
+            if (MUPPETS.balanceOf(address(this)) - balanceBefore != amount) revert ExactTransferRequired();
+        }
 
         positionId = nextPositionId++;
         positions[positionId] = BondPosition({

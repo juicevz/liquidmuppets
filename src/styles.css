@@ -20758,6 +20758,64 @@ button.header-social-link {
   color: #cb8b7c;
 }
 
+.revenue-reinvest-intro {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 24px;
+  margin: 20px 0;
+  padding: 24px;
+  border: 1px solid var(--app-line);
+  border-radius: 12px;
+  background: rgba(100, 214, 173, 0.025);
+}
+
+.revenue-reinvest-intro small {
+  color: #80bfa5;
+  font: 9px 'JetBrains Mono Variable', monospace;
+}
+
+.revenue-reinvest-intro h2 {
+  margin: 8px 0 12px;
+  color: #e7eee9;
+  font-size: clamp(20px, 2.3vw, 30px);
+}
+
+.revenue-reinvest-intro strong { color: #c4d3c9; font-size: 13px; }
+.revenue-reinvest-intro p { color: #8f9e95; font-size: 12px; line-height: 1.65; }
+.revenue-reinvest-intro button { padding: 10px 14px; border: 1px solid var(--app-line); border-radius: 8px; color: #87948c; background: transparent; cursor: not-allowed; }
+
+.reward-reinvestment {
+  grid-column: 1 / -1;
+  min-width: 0;
+  padding: 18px;
+  border-top: 1px solid var(--app-line);
+}
+
+.reward-reinvestment h3 { margin: 0 0 8px; color: #e7eee9; font-size: 16px; }
+.reward-reinvestment p { color: #a0ada5; font-size: 12px; line-height: 1.65; overflow-wrap: anywhere; }
+.reinvest-fields { display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: 12px; margin-top: 18px; }
+.reinvest-fields label { display: grid; gap: 8px; color: #b6c6bb; font-size: 12px; }
+.reinvest-fields input, .reinvest-fields select { min-width: 0; width: 100%; min-height: 42px; padding: 10px; border: 1px solid var(--app-line); border-radius: 7px; background: #111713; color: #e7eee9; font: inherit; }
+.reward-reinvestment input:focus-visible, .reward-reinvestment select:focus-visible, .reward-reinvestment button:focus-visible { outline: 2px solid #80bfa5; outline-offset: 3px; }
+.reward-reinvestment button.secondary { min-height: 40px; font-size: 12px; padding: 8px 14px; }
+.reinvest-quote { margin-top: 18px; }
+.reinvest-quote dl { display: grid; gap: 12px; }
+.reinvest-quote dl > div { display: flex; justify-content: space-between; gap: 16px; color: #b6c6bb; font-size: 12px; }
+.reinvest-quote dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+.reinvest-consent { display: flex; align-items: flex-start; gap: 10px; margin: 18px 0; color: #c4d3c9; font-size: 12px; line-height: 1.65; }
+.reinvest-consent input { flex: 0 0 auto; margin-top: 4px; accent-color: #80bfa5; }
+.reward-reinvestment .reinvest-error { color: #e2a392; }
+.reinvest-receipt { margin-top: 16px; }
+.reinvest-receipt a { display: block; margin-bottom: 10px; color: #80bfa5; font-size: 12px; }
+
+@media (max-width: 720px) {
+  .revenue-reinvest-intro { grid-template-columns: 1fr; gap: 14px; padding: 18px; }
+  .reinvest-fields { grid-template-columns: 1fr; }
+  .reward-reinvestment { padding: 14px 0; }
+  .reinvest-quote dl > div { display: grid; gap: 5px; }
+  .reinvest-quote dd { text-align: left; }
+}
+
 .revenue-action-result a {
   display: inline-flex;
   align-items: center;

@@ -604,6 +604,16 @@ export interface RevenueState {
   generated_at: string
   status: 'live' | 'activation_pending'
   status_detail: string
+  reinvestment: {
+    available: boolean
+    reason: string
+    executor: `0x${string}` | null
+    minimum_muppets_raw: string
+    maximum_deadline_seconds: 300
+    capability: 'claim_buy_and_bond'
+    version: 1
+    block_number?: number
+  }
   network: { chain_id: number; chain_name: string; explorer_url: string }
   contracts: {
     muppets: `0x${string}` | null

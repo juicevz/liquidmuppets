@@ -17,7 +17,7 @@ import {
 import {KeyMarketplace} from "../src/KeyMarketplace.sol";
 import {IKeyRevenueReceiver, KeyMarketplaceV2} from "../src/KeyMarketplaceV2.sol";
 import {FeeRwaReserve} from "../src/FeeRwaReserve.sol";
-import {MuppetAgentBond} from "../src/MuppetAgentBond.sol";
+import {IMuppetRewardBuyExecutor, MuppetAgentBond} from "../src/MuppetAgentBond.sol";
 import {
     IMuppetAgentBondRewards,
     IMuppetBuybackVaultFunding,
@@ -79,10 +79,16 @@ contract DeployFactoryV2 is Script {
 
         uint256 deploymentBlock = block.number;
         vm.startBroadcast(deployerKey);
-        MuppetAgentBond agentBond =
-            new MuppetAgentBond(deployer, MUPPETS, WETH, MINIMUM_ACCESS_BALANCE, AGENT_BOND_LOCK);
         PonsV4MuppetsBuybackExecutor buybackExecutor =
             new PonsV4MuppetsBuybackExecutor(MUPPETS, IUniversalRouter(UNIVERSAL_ROUTER), PONS_HOOK, 200);
+        MuppetAgentBond agentBond = new MuppetAgentBond(
+            deployer,
+            MUPPETS,
+            WETH,
+            MINIMUM_ACCESS_BALANCE,
+            AGENT_BOND_LOCK,
+            IMuppetRewardBuyExecutor(address(buybackExecutor))
+        );
         MuppetBuybackVault buybackVault = new MuppetBuybackVault(
             deployer, IMuppetsBuybackExecutor(address(buybackExecutor)), safe, MAX_BUYBACK_WEI, BUYBACK_COOLDOWN
         );

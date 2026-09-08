@@ -658,6 +658,8 @@ results.revenueNoReceipt = await page.getByText('No revenue receipt yet.', { exa
 results.revenueNoInventedHistory = await page.getByText(/does not backfill a pretend reward history or APY/i).count() === 1
 results.revenueEpochMaturation = await page.getByText(/matures for seven days/i).count() > 0
 results.revenueThreeTerms = await page.getByText(/30 days at 1x, 90 days at 1.25x, or 180 days at 1.5x/i).count() === 1
+results.revenueReinvestmentPending = await page.getByRole('heading', { name: 'Claim WETH or buy more and stake.' }).count() === 1
+  && await page.getByRole('button', { name: 'Buy more and stake · pending', exact: true }).isDisabled()
 results.revenueEndpoint = await page.evaluate(async () => {
   const response = await fetch('/api/v1/revenue', { cache: 'no-store' })
   const body = await response.json()
@@ -668,6 +670,10 @@ results.revenueEndpoint = await page.evaluate(async () => {
     && Array.isArray(body.target_fee_route)
     && body.target_fee_route.length === 5
     && body.reward_unit?.muppets === '15000'
+    && body.reinvestment?.available === false
+    && body.reinvestment?.capability === 'claim_buy_and_bond'
+    && body.reinvestment?.version === 1
+    && body.reinvestment?.maximum_deadline_seconds === 300
     && body.reward_unit?.maturation_days === 7
     && body.reward_unit?.epoch_days === 7
     && Array.isArray(body.reward_unit?.terms)
@@ -1093,6 +1099,7 @@ const failed =
   || !results.revenueNoInventedHistory
   || !results.revenueEpochMaturation
   || !results.revenueThreeTerms
+  || !results.revenueReinvestmentPending
   || !results.revenueEndpoint
   || results.revenueOverflow
   || results.docsTitle !== 'Docs | LIQUIDMUPPETS'

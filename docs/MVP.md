@@ -192,6 +192,18 @@ The buyback executor uses the graduated `$MUPPETS` Pons Uniswap v4 pool. It requ
 
 Direct transfers, treasury top-ups and seeded funds are labeled funding and never enter the reported revenue total. If no eligible weight exists for the completed epoch, its share stays queued in native ETH. If an epoch has no recorded revenue, no reward distribution can execute. Global and exact-Key WETH stay in separate epoch ledgers. Claims and withdrawals are position-scoped, and the longest term spans at most 25 eligible weekly epochs. The contracts create no token emissions and the interface does not calculate an APY.
 
+### Claim or buy more and stake
+
+The public Revenue Engine includes an optional reward-reinvestment flow. Its UI, API capability checks and contract implementation are published; transactions remain disabled until verified deployment and activation. This update does not introduce no-Key staking, activate the Revenue Engine, change any fee split, or spend live dev-wallet funds for testing.
+
+`claimBuyAndBond(positionId, wethToSpend, key, units, term, minimumOutput, deadline)` is one atomic, caller-owned transaction. It claims that position's currently payable global and exact-Key rewards, unwraps only the selected reward WETH, buys MUPPETS through the immutable Pons executor, and opens a fresh standard Agent Bond. The UI creates one unit at a time: 15,000 purchased MUPPETS and one unused, permanently bound Key. Existing wallet holdings and other positions' principal cannot fund the purchase or fill a shortfall. Purchased surplus and the unspent portion of the claimed WETH return to the caller. The old position's unlock is unchanged.
+
+The wallet first receives a fresh simulated quote showing input WETH, expected and minimum MUPPETS, fixed lock, WETH remainder and estimated gas in native ETH. Quotes expire in 120 seconds. Slippage defaults to 1% and is capped at 3% in the client; minimum output must also cover the complete bond amount. The contract checks the minimum output and a deadline no more than five minutes away. Account, chain, executor, contract capability, rewards and free bound-Key capacity are rechecked before signing. The app never signs automatically, binds an extra Key, requests unlimited approvals or reinvests future rewards without a new user action.
+
+If any claim, swap or bond step fails, the transaction rolls back in full. Network gas can still be charged. The app retains a submitted transaction hash in this browser until its receipt can be checked; an unknown confirmation does not authorize another purchase. If available rewards cannot buy 15,000 MUPPETS, or the wallet has no free bound Key, the user can claim WETH normally. Ordinary claim and matured withdrawal functions remain independent of reinvestment and callable while the bond is paused.
+
+`GET /api/v1/revenue` adds `reinvestment`: availability and reason, executor, minimum MUPPETS in raw units, maximum deadline window, capability version and observed block when available. Capability checks fail closed for pending, legacy, paused, mismatched or unavailable contracts. The backend does not custody assets, generate signatures or submit purchases. Holder reinvestment receipts are separate from the Safe's protocol-funded five-year buyback vesting.
+
 ## Public Muppet performance
 
 Each Muppet has a shareable page at `/app/muppet/{agentId}`. Public performance tracking begins with the first checkpoint recorded after this feature is deployed. The API records another checkpoint every five minutes and never invents a curve for blocks before that baseline.

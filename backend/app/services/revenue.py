@@ -355,7 +355,45 @@ EVENT_LABELS = {
     ),
     Web3.keccak(text="KeyFunded(address,uint256,uint256)").hex(): "Key buyback funded",
     Web3.keccak(text="KeyBuybackExecuted(address,address,uint256,uint256,uint256)").hex(): "MUPPETS buyback executed",
+    Web3.keccak(
+        text="PositionRewardsReinvested(uint256,uint256,address,uint256,uint256,uint256,uint256,uint256)"
+    ).hex(): "earned WETH reinvested into a new Agent Bond",
 }
+
+
+REINVESTMENT_BOND_ABI: list[dict[str, Any]] = [
+    {
+        "type": "function",
+        "name": name,
+        "stateMutability": "view",
+        "inputs": [],
+        "outputs": [{"type": output}],
+    }
+    for name, output in (
+        ("REINVESTMENT_VERSION", "uint256"),
+        ("REWARD_BUY_EXECUTOR", "address"),
+        ("MUPPETS", "address"),
+        ("WETH", "address"),
+        ("UNIT_SIZE", "uint256"),
+        ("paused", "bool"),
+    )
+]
+
+REINVESTMENT_EXECUTOR_ABI: list[dict[str, Any]] = [
+    {
+        "type": "function",
+        "name": name,
+        "stateMutability": "view",
+        "inputs": [],
+        "outputs": [{"type": output}],
+    }
+    for name, output in (
+        ("MUPPETS", "address"),
+        ("UNIVERSAL_ROUTER", "address"),
+        ("PONS_HOOK", "address"),
+        ("POOL_ID", "bytes32"),
+    )
+]
 
 
 class RevenueService:
@@ -586,6 +624,7 @@ class RevenueService:
                 "router": router,
                 "bond": bond,
                 "buyback": buyback,
+                "reinvestment": self._read_reinvestment(live=live),
                 "activation_checks": [
                     {"label": "Revenue Router deployed", "complete": bool(router.get("deployed"))},
                     {"label": "Agent Bond deployed", "complete": bool(bond.get("deployed"))},
@@ -614,6 +653,86 @@ class RevenueService:
                 ],
             }
             self._cache = (now + 15, result)
+            return result
+
+    def _read_reinvestment(self, *, live: bool) -> dict[str, object]:
+        """Expose an exact, read-only capability check; never infer support from an address."""
+        expected_unit = self.settings.muppets_token_minimum * 10**18
+        result: dict[str, object] = {
+            "available": False,
+            "reason": "Revenue activation is pending. Reinvestment is unavailable.",
+            "executor": self.settings.buyback_executor_address or None,
+            "minimum_muppets_raw": str(expected_unit),
+            "maximum_deadline_seconds": 300,
+            "capability": "claim_buy_and_bond",
+            "version": 1,
+        }
+        if not live:
+            return result
+
+        addresses = {
+            "bond": self.settings.agent_bond_address,
+            "executor": self.settings.buyback_executor_address,
+            "muppets": self.settings.muppets_token_address,
+            "weth": self.settings.weth_address,
+            "router": self.settings.universal_router_address,
+            "hook": self.settings.pons_fee_policy_address,
+        }
+        if not all(Web3.is_address(address) and int(address, 16) != 0 for address in addresses.values()):
+            result["reason"] = "The reward reinvestment route is not fully configured."
+            return result
+        try:
+            expected_pool = bytes.fromhex(self.settings.pons_pool_id.removeprefix("0x"))
+            if len(expected_pool) != 32:
+                result["reason"] = "The reward reinvestment pool is not configured."
+                return result
+            block = self.web3.eth.block_number
+            result["block_number"] = block
+            checked = {name: Web3.to_checksum_address(address) for name, address in addresses.items()}
+            if any(not self.web3.eth.get_code(address, block_identifier=block) for address in checked.values()):
+                result["reason"] = "A required reward reinvestment contract has not been deployed."
+                return result
+            bond = self.web3.eth.contract(address=checked["bond"], abi=REINVESTMENT_BOND_ABI)
+            executor = self.web3.eth.contract(address=checked["executor"], abi=REINVESTMENT_EXECUTOR_ABI)
+            version = bond.functions.REINVESTMENT_VERSION().call(block_identifier=block)
+            if int(version) != 1:
+                result["reason"] = "This Agent Bond does not support the current reward reinvestment flow."
+                return result
+            bond_values = {
+                "executor": bond.functions.REWARD_BUY_EXECUTOR().call(block_identifier=block),
+                "muppets": bond.functions.MUPPETS().call(block_identifier=block),
+                "weth": bond.functions.WETH().call(block_identifier=block),
+            }
+            executor_values = {
+                "muppets": executor.functions.MUPPETS().call(block_identifier=block),
+                "router": executor.functions.UNIVERSAL_ROUTER().call(block_identifier=block),
+                "hook": executor.functions.PONS_HOOK().call(block_identifier=block),
+            }
+            route_matches = all(
+                str(address).lower() == checked[name].lower()
+                for values in (bond_values, executor_values)
+                for name, address in values.items()
+            )
+            unit = bond.functions.UNIT_SIZE().call(block_identifier=block)
+            pool = executor.functions.POOL_ID().call(block_identifier=block)
+            paused = bond.functions.paused().call(block_identifier=block)
+            if not route_matches or int(unit) != expected_unit or bytes(pool) != expected_pool:
+                result["reason"] = "The deployed reward reinvestment route does not match this app's configuration."
+                return result
+            if paused is not False:
+                result["reason"] = "Reward reinvestment is paused. Ordinary reward claims remain separate."
+                return result
+            result["available"] = True
+            result["reason"] = (
+                "Claim earned WETH, buy MUPPETS and open a new Agent Bond in one wallet transaction. "
+                "Only the selected position's earned rewards can be spent."
+            )
+            return result
+        except Exception:
+            result["reason"] = (
+                "Reward reinvestment support could not be verified. "
+                "A legacy contract or an unavailable chain read keeps this action disabled."
+            )
             return result
 
     def _read_pons(self) -> dict[str, object]:

@@ -1,0 +1,19 @@
+LIQUIDMUPPETS
+
+new in the app: claim or reinvest.
+
+choose WETH, or use earned rewards to buy $MUPPETS and open a new bond. review the quote, minimum received and lock before signing.
+
+contracts tested. mainnet activation pending.
+
+https://github.com/juicevz/liquidmuppets
+
+FOUNDER
+
+added the option to put earned WETH back into $MUPPETS and a new bond.
+
+one transaction, with a quote and clear lock terms. original bonds stay unchanged.
+
+tested on a mainnet fork. activation is still pending.
+
+https://github.com/juicevz/liquidmuppets

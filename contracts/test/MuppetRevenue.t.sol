@@ -8,7 +8,7 @@ import {MockERC20} from "../src/mocks/MockERC20.sol";
 import {AgentKey} from "../src/AgentKey.sol";
 import {KeyMarketplace} from "../src/KeyMarketplace.sol";
 import {IKeyRevenueReceiver, KeyMarketplaceV2} from "../src/KeyMarketplaceV2.sol";
-import {MuppetAgentBond} from "../src/MuppetAgentBond.sol";
+import {IMuppetRewardBuyExecutor, MuppetAgentBond} from "../src/MuppetAgentBond.sol";
 import {
     IMuppetAgentBondRewards,
     IMuppetBuybackVaultFunding,
@@ -21,6 +21,24 @@ contract MockWrappedRevenueToken is ERC20 {
 
     function deposit() external payable {
         _mint(msg.sender, msg.value);
+    }
+
+    function withdraw(uint256 amount) external {
+        _burn(msg.sender, amount);
+        (bool ok,) = payable(msg.sender).call{value: amount}("");
+        require(ok, "unwrap failed");
+    }
+}
+
+contract MockRevenueRewardBuyExecutor {
+    IERC20 public immutable MUPPETS;
+
+    constructor(IERC20 muppets) {
+        MUPPETS = muppets;
+    }
+
+    function executeBuy(uint256, uint256, address) external payable returns (uint256) {
+        revert("unused in revenue routing tests");
     }
 }
 
@@ -93,7 +111,14 @@ contract MuppetRevenueTest is Test {
         key = new AgentKey("Frog Key", "FROG", holder, 100);
         market.registerKey(IERC20(address(key)));
 
-        bond = new MuppetAgentBond(address(this), muppets, weth, 15_000 ether, 30 days);
+        bond = new MuppetAgentBond(
+            address(this),
+            muppets,
+            weth,
+            15_000 ether,
+            30 days,
+            IMuppetRewardBuyExecutor(address(new MockRevenueRewardBuyExecutor(muppets)))
+        );
         buybackVault = new MockBuybackVault();
         router = new MuppetRevenueRouter(
             address(this),

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { formatEther, type Address, type Hash } from 'viem'
 import { Icon } from '../components/Icon'
-import { fetchRevenue, type RevenueState } from '../lib/api'
+import { RewardReinvestment } from '../components/RewardReinvestment'
+import { fetchRevenue, type ProtocolConfig, type RevenueState } from '../lib/api'
 import { shortenAddress } from '../lib/format'
 import { useProtocol } from '../hooks/useProtocol'
 import { getInjectedProvider } from '../lib/protocol'
@@ -30,7 +31,7 @@ export function RevenuePage({ walletAddress, onConnect }: RevenuePageProps) {
   const [action, setAction] = useState('')
   const [actionError, setActionError] = useState('')
   const [actionReceipts, setActionReceipts] = useState<Hash[]>([])
-  const protocol = useProtocol(walletAddress, state?.status === 'live' && Boolean(walletAddress))
+  const protocol = useProtocol(walletAddress, Boolean(walletAddress && state?.wallet?.available && state?.bond.deployed))
 
   useEffect(() => {
     let active = true
@@ -59,7 +60,7 @@ export function RevenuePage({ walletAddress, onConnect }: RevenuePageProps) {
   }, [walletAddress, refreshToken])
 
   useEffect(() => {
-    if (state?.status !== 'live' || !walletAddress || !protocol.config || !protocol.snapshot) {
+    if (!state?.wallet?.available || !state.bond.deployed || !walletAddress || !protocol.config || !protocol.snapshot) {
       setPositions({})
       return undefined
     }
@@ -75,7 +76,7 @@ export function RevenuePage({ walletAddress, onConnect }: RevenuePageProps) {
         if (active) setActionError(reason instanceof Error ? reason.message : 'Agent Bond positions are reconnecting.')
       })
     return () => { active = false }
-  }, [protocol.config, protocol.snapshot, state?.status, walletAddress])
+  }, [protocol.config, protocol.snapshot, state?.wallet?.available, state?.bond.deployed, walletAddress])
 
   if (loading && !state) {
     return <div className="app-page revenue-page revenue-state"><Icon name="clock" /><p>Reading the public revenue record.</p></div>
@@ -140,6 +141,11 @@ export function RevenuePage({ walletAddress, onConnect }: RevenuePageProps) {
         <span><small>reward units</small><strong>{formatInteger(rewardUnits)}</strong></span>
         <span><small>routed revenue</small><strong>{formatNative(totalRevenue)} ETH</strong></span>
         <span><small>WETH delivered</small><strong>{formatNative(totalRewards)} WETH</strong></span>
+      </section>
+
+      <section className="revenue-reinvest-intro" aria-labelledby="reward-choice-title">
+        <div><small>your rewards, your choice</small><h2 id="reward-choice-title">Claim WETH or buy more and stake.</h2><p>Keep your earned WETH, or choose an amount to buy $MUPPETS and open a new bond in one transaction. Review the quote, minimum received, gas and lock before signing.</p></div>
+        <div><strong>{state.reinvestment?.available ? 'Choose a position below' : 'Reinvestment activation pending'}</strong><p>Each new bond needs 15,000 purchased $MUPPETS and one unused, permanently bound Key. Leftovers return to your wallet. Existing bond locks stay unchanged.</p>{!state.reinvestment?.available && <button type="button" disabled>Buy more and stake · pending</button>}</div>
       </section>
 
       <section className="revenue-route" aria-labelledby="revenue-route-title">
@@ -208,7 +214,7 @@ export function RevenuePage({ walletAddress, onConnect }: RevenuePageProps) {
               </>
             )}
           </div>
-          {state.status === 'live' && walletAddress && state.wallet?.available && (
+          {walletAddress && state.wallet?.available && state.bond.deployed && (
             <div className="revenue-agent-controls">
               <header><span>eligible Agent Keys</span><small>one bound Key per unit</small></header>
               {walletAgents.map((agent) => (
@@ -217,6 +223,17 @@ export function RevenuePage({ walletAddress, onConnect }: RevenuePageProps) {
                   position={positions[agent.key.address.toLowerCase()]}
                   busy={Boolean(action)}
                   action={action}
+                  canBond={isLive && state.bond.paused === false}
+                  reinvestment={state.reinvestment}
+                  config={protocol.config}
+                  account={walletAddress as Address}
+                  onReinvestBusy={(isBusy) => setAction(isBusy ? `reinvest-${agent.key.address}` : '')}
+                  onReinvestConfirmed={(hash) => {
+                    setActionError('')
+                    setActionReceipts([hash])
+                    protocol.refresh()
+                    setRefreshToken((value) => value + 1)
+                  }}
                   onBind={() => {
                     if (!window.confirm('Binding one Agent Key is permanent. Continue?')) return
                     void runAction(`bind-${agent.key.address}`, async () => {
@@ -298,22 +315,35 @@ function RevenueAgentControl({
   position,
   busy,
   action,
+  canBond,
   onBind,
   onBond,
   onUnbond,
   onClaim,
+  reinvestment,
+  config,
+  account,
+  onReinvestBusy,
+  onReinvestConfirmed,
 }: {
   agent: ChainAgent
   position?: AgentBondKeyPosition
   busy: boolean
   action: string
+  canBond: boolean
   onBind: () => void
   onBond: (term: AgentBondTerm) => void
   onUnbond: (positionId: bigint) => void
   onClaim: (positionId: bigint) => void
+  reinvestment: RevenueState['reinvestment']
+  config: ProtocolConfig | null
+  account: Address
+  onReinvestBusy: (busy: boolean) => void
+  onReinvestConfirmed: (hash: Hash) => void
 }) {
   const actionId = agent.key.address
   const [term, setTerm] = useState<AgentBondTerm>(0)
+  const [reinvestPosition, setReinvestPosition] = useState<bigint | null>(null)
   const now = Math.floor(Date.now() / 1_000)
   return (
     <article>
@@ -327,19 +357,19 @@ function RevenueAgentControl({
           <>
             <label>
               <span>bond term</span>
-              <select value={term} disabled={busy} onChange={(event) => setTerm(Number(event.target.value) as AgentBondTerm)}>
+              <select value={term} disabled={busy || !canBond} onChange={(event) => setTerm(Number(event.target.value) as AgentBondTerm)}>
                 <option value={0}>30 days · 1x</option>
                 <option value={1}>90 days · 1.25x</option>
                 <option value={2}>180 days · 1.5x</option>
               </select>
             </label>
-            <button type="button" disabled={busy} onClick={() => {
+            <button type="button" disabled={busy || !canBond} onClick={() => {
               if (!window.confirm(`Lock 15,000 $MUPPETS for ${termLabel(term)} with no early exit?`)) return
               onBond(term)
             }}>{action === `bond-${actionId}` ? 'Waiting' : 'Bond 15,000'}</button>
           </>
         ) : agent.key.walletBalance > 0n ? (
-          <button type="button" disabled={busy} onClick={onBind}>{action === `bind-${actionId}` ? 'Waiting' : 'Bind 1 Key'}</button>
+          <button type="button" disabled={busy || !canBond} onClick={onBind}>{action === `bind-${actionId}` ? 'Waiting' : 'Bind 1 Key'}</button>
         ) : null}
       </div>
       {(position?.positions.length ?? 0) > 0 && (
@@ -352,7 +382,11 @@ function RevenueAgentControl({
               : now < bondPosition.maturesAt
                 ? `matures ${shortDate(bondPosition.maturesAt)}`
                 : now < bondPosition.unlockAt
-                  ? 'epoch eligible'
+                  ? now < bondPosition.firstEligibleEpoch * 7 * 86400
+                    ? 'waiting for first full week'
+                    : now >= bondPosition.lastEligibleEpochExclusive * 7 * 86400
+                      ? 'final eligible week complete'
+                      : 'epoch eligible'
                   : 'unlocked'
             return (
               <div key={bondPosition.id.toString()}>
@@ -361,8 +395,22 @@ function RevenueAgentControl({
                 <span><small>claimable</small><b>{formatNative(claimable)} WETH</b></span>
                 <div>
                   {claimable > 0n && <button className="secondary" type="button" disabled={busy} onClick={() => onClaim(bondPosition.id)}>{action === `claim-${bondPosition.id}` ? 'Waiting' : 'Claim WETH'}</button>}
+                  {claimable > 0n && <button className="secondary" type="button" disabled={busy} onClick={() => setReinvestPosition(reinvestPosition === bondPosition.id ? null : bondPosition.id)} aria-expanded={reinvestPosition === bondPosition.id}>Buy more and stake</button>}
                   {!bondPosition.withdrawn && <button className="secondary" type="button" disabled={busy || !unlockReady} onClick={() => onUnbond(bondPosition.id)} title={unlockReady ? 'Return bonded MUPPETS' : `Unlocks ${formatUtc(new Date(bondPosition.unlockAt * 1_000).toISOString())}`}>{action === `unbond-${bondPosition.id}` ? 'Waiting' : unlockReady ? 'Unbond' : `Until ${shortDate(bondPosition.unlockAt)}`}</button>}
                 </div>
+                {reinvestPosition === bondPosition.id && config && <RewardReinvestment
+                  key={`${account}-${bondPosition.id}`}
+                  config={config}
+                  account={account}
+                  metadata={reinvestment}
+                  positionId={bondPosition.id}
+                  agentKey={agent.key.address}
+                  claimable={claimable}
+                  availableBoundKeys={position!.availableBoundKeys}
+                  busy={busy}
+                  onBusy={onReinvestBusy}
+                  onConfirmed={onReinvestConfirmed}
+                />}
               </div>
             )
           })}
