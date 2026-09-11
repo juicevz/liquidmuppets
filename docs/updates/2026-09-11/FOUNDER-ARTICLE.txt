@@ -1,0 +1,37 @@
+title: a week of muppets
+
+a vault app gives you a balance fairly quickly. understanding what moved it usually takes longer. you end up looking through transactions, checking a pool and trying to remember whether the number went up because you deposited more money.
+
+most of the recent liquidmuppets work came from those moments. the app needed a shorter path into a Muppet, a clearer record of what happened afterwards and a sensible place to see rewards once the new contracts are activated.
+
+we've shipped the new pages and published the reward implementation. staking, reward payouts, reinvestment and buybacks are still awaiting mainnet activation.
+
+creating a Muppet is now three stages: pick a pet and name, choose one vault job, then launch and fund it. the pet is cosmetic. the job decides where the vault can put its assets and which limits apply. if you want to open an Agent Key market, that happens separately after launch.
+
+the distinction matters because a Key and a vault share do different things. the share represents deposited capital. the Key has its own market and can be permanently bound. buying one doesn't give you the right to withdraw someone else's vault.
+
+Creator Slots make the MUPPETS requirement easier to follow. every 15,000 held gives one slot. 30,000 gives two. the app shows how many you've used, what's available and the balance required for the next launch. tokens stay in your wallet. if your capacity drops, your existing vault access and Key markets remain available.
+
+that rule is enforced in the app and API today. the onchain version belongs to FactoryV2, which is still pending.
+
+the public side has grown too. a Muppet has its own performance page, the creator has a profile, and System Pulse records activity across the app. Proof Cards give launches, first deposits, keeper actions, range changes and Key fills a URL you can share. transactions have receipt links. a keeper hold carries the reason it waited, without pretending a transaction happened.
+
+routine holds get grouped by day. the muppets do spend a fair amount of time sitting still.
+
+watchlists and alerts live in your browser. Market Radar shows the available route evidence and what is missing from a candidate. a route under review stays under review in the interface. the current launch-reserve job still only stages WETH; it doesn't generate yield.
+
+the biggest addition this week is Earn. it puts the wallet's bonds, claimable WETH, unlock dates and reward history together. the implementation keeps lifetime claimed rewards separate from the amount actually received in your wallet and the amount used to reinvest. adding money to a vault never counts as earnings. if a read fails, the amount stays unavailable.
+
+underneath that page, the revenue contracts now remember the week each fee reached the router. if distribution happens late, the money still belongs to the positions eligible for its original receipt week. a later bond cannot collect that older week's rewards. fees from the V2 Key marketplace also retain the exact Muppet Key they came from; legacy fees stay in the global accounting.
+
+once activated, one bond unit needs 15,000 MUPPETS and one unused, permanently bound Agent Key. positions have a fixed 30, 90 or 180 day term, weighted at 1x, 1.25x and 1.5x. they mature for seven days, then count only for full eligible weeks before unlock. those weights divide the revenue available. they don't make more revenue appear.
+
+we also built the option to use earned WETH to buy MUPPETS and open a fresh bond. you choose how much of one position's claimable rewards to spend, review the quote and lock, and sign one transaction. the new bond needs its own unused bound Key. your original bond keeps its unlock date, and the unspent rewards and purchased surplus return to you. if the purchase or bond fails, the transaction rolls back; gas can still be charged.
+
+there are concrete things left before activation. FactoryV2 needs its deployment size reduced. the contracts still need independent review, verified deployment, Safe ownership and the fee routes configured. one rule also deserves explicit review: if a receipt week has no eligible positions, its reward share stays permanently unallocated to that week, with no recovery route in the current contract.
+
+Earn is public now and shows the activation state. the existing mainnet beta remains available for launching, funding and following Muppets.
+
+https://liquidmuppets.io/app/earn
+
+https://github.com/juicevz/liquidmuppets

@@ -1,0 +1,31 @@
+title: liquidmuppets update: creation, public records and Earn
+
+the latest liquidmuppets releases simplify Muppet creation, make activity easier to inspect and introduce a wallet rewards page. the revenue implementation now tracks fees by receipt week and by Muppet Key, with an optional flow for reinvesting earned WETH.
+
+the app pages are public. Agent Bond staking, reward payouts, reinvestment and the new buyback routes remain inactive pending verified mainnet deployment and configuration.
+
+creating a Muppet now has three stages: choose a cosmetic pet and name, choose one vault job, then launch and fund the vault. an Agent Key listing is optional after launch. the current jobs cover USDG stable yield, a WETH range strategy and an isolated WETH launch reserve. the reserve stages funds and currently produces no yield.
+
+Creator Slots show the capacity available to each wallet. every 15,000 MUPPETS held unlocks one slot, supporting one Muppet launch and one featured placement. the app displays used slots, available capacity and the next launch threshold. tokens remain liquid. a balance drop restricts additional launches and excess featured placement while preserving existing vault access and Key markets. the current enforcement sits in the app and API; FactoryV2 onchain enforcement is pending.
+
+public performance pages and creator profiles expose vault records, while System Pulse brings decoded receipts and keeper decisions into one feed. automatic Proof Cards provide durable URLs for launches, first deposits, keeper actions, range changes, tracked performance milestones, Key fills and reserve purchases. a transaction links to its receipt. a hold or performance checkpoint is identified as having no transaction. repeated keeper holds are grouped into daily summaries.
+
+watchlists and alerts are stored in the browser. Market Radar shows route health, available capacity and missing evidence, with review candidates kept separate from launchable jobs.
+
+Earn is available at /app/earn. its wallet view is built around bonded MUPPETS, claimable WETH, lifetime rewards claimed, unlock dates and confirmed reward history. the accounting distinguishes WETH received in the wallet from rewards spent on reinvestment. lifetime values come from contract counters independently of the recent receipt list. deposits and external funding are excluded from earnings, and unavailable reads are displayed as unavailable.
+
+the pending Revenue Router records fees in the week they arrive. only completed weeks can settle, and a delayed settlement retains the original week's eligible positions. V2 marketplace fees also retain the exact Agent Key involved in the trade. legacy Key fees remain in the global accounting because the old transfer does not identify a Key.
+
+after activation, Pons creator revenue and legacy Key fees use a 50% WETH rewards, 30% Stock Token reserve and 20% operations split. V2 Key fees use 50% exact-Key WETH rewards, 25% MUPPETS buybacks, 15% Stock Token reserve and 10% operations. these percentages apply to the revenue entering each lane. purchased protocol buyback lots vest to the Safe over five years.
+
+one Agent Bond unit requires 15,000 MUPPETS and one unused, permanently bound Agent Key. the fixed terms are 30 days at 1x weight, 90 days at 1.25x and 180 days at 1.5x. positions mature for seven days and then count only for full eligible weeks before unlock. longer terms change distribution weight within the available revenue. the implementation creates no token emissions or projected APY. the MUPPETS unlock after the selected term; the Key remains permanently bound.
+
+optional reinvestment lets a holder claim one position's payable rewards, spend a chosen portion on MUPPETS and open a new bond in one transaction. the interface reviews the quote, minimum received, gas estimate and fixed lock before signing. the new bond requires another unused bound Key. the original position keeps its unlock date. unspent reward WETH and excess purchased tokens return to the holder, and a failed purchase or bond reverts the transaction. network gas can still be charged.
+
+the remaining activation work includes reducing FactoryV2's deployment size, independent contract review, source verification, Safe ownership and fee-route configuration. the current empty-week policy also requires review: a reward share with no eligible positions remains permanently unallocated to its original week, with no recovery route. the public Earn page reports the activation state, and the existing mainnet beta remains available.
+
+https://liquidmuppets.io/app/earn
+
+https://liquidmuppets.io/docs
+
+https://github.com/juicevz/liquidmuppets

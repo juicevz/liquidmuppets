@@ -8,6 +8,8 @@ Public interface: [https://liquidmuppets.io](https://liquidmuppets.io)
 
 Full product explainer: [https://liquidmuppets.io/about](https://liquidmuppets.io/about)
 
+Latest build update and founder/official content: [11 September 2026](docs/updates/2026-09-11/README.md).
+
 X: [@AMBF](https://x.com/AMBF)
 
 Current status: controlled mainnet beta. Existing Muppets can be funded, allocated, traded and redeemed. Creator Slots are live in the app and API. The live V1 launch path is app and API enforced. FactoryV2, the exact-Key marketplace, Revenue Router, Agent Bond, buyback executor and five-year vesting vault are implemented and tested in this repository but have not been broadcast to mainnet. The public pages report that activation boundary and do not report rewards or buybacks as live.

@@ -1,0 +1,118 @@
+LIQUIDMUPPETS OFFICIAL UPDATE
+11 september 2026
+
+Copy the text below each label. Thread numbers are part of the posts.
+
+[RECOMMENDED UPDATE]
+
+liquidmuppets build update.
+
+live: simpler launches, Creator Slots, Proof Cards and the Earn page.
+
+built: weekly reward accounting, revenue per Muppet Key and optional reward reinvestment.
+
+staking and buybacks await activation.
+
+https://liquidmuppets.io/app/earn
+
+[STANDALONE 2: LAUNCH FLOW]
+
+create a Muppet in three stages:
+
+pet + name
+one vault job
+launch + fund
+
+Agent Key listing is optional after launch. vault shares represent deposited assets; Keys have their own separate market.
+
+https://liquidmuppets.io/app/create
+
+[STANDALONE 3: CREATOR SLOTS]
+
+Creator Slots are live in the app and API.
+
+15,000 $MUPPETS held = one slot. 30,000 = two.
+
+view used capacity, available slots and the next launch threshold. a balance drop preserves existing vault access and Key markets.
+
+https://liquidmuppets.io/app/create
+
+[STANDALONE 4: PROOF CARDS]
+
+Proof Cards turn recorded Muppet activity into shareable public URLs.
+
+launches, deposits, keeper actions, range changes and Key fills link to evidence. daily keeper summaries show why a check held without a transaction.
+
+https://liquidmuppets.io/app/proofs
+
+[STANDALONE 5: EARN]
+
+Earn is now the wallet rewards page.
+
+view bond timing, claimable WETH and reward history after activation. lifetime accounting separates wallet receipts from reinvested rewards.
+
+the page is public. staking and payouts remain inactive.
+
+https://liquidmuppets.io/app/earn
+
+[THREAD 1/7]
+
+1/7
+
+liquidmuppets build update: creation, public evidence and Earn.
+
+the mainnet beta has a simpler launch flow and clearer tracking. the reward implementation adds weekly accounting and optional reinvestment, with activation still pending.
+
+[THREAD 2/7]
+
+2/7
+
+launch in three stages: pet + name, one vault job, launch + fund.
+
+each 15,000 $MUPPETS held unlocks one Creator Slot in the app and API. tokens stay liquid. Agent Key listings are optional after launch; Keys cannot redeem vault assets.
+
+[THREAD 3/7]
+
+3/7
+
+public performance pages, creator profiles, System Pulse and Proof Cards expose recorded Muppet activity.
+
+watchlists and alerts stay in your browser. Market Radar shows route health and missing evidence. candidates still under review remain unavailable.
+
+[THREAD 4/7]
+
+4/7
+
+the Earn page brings bonds, claimable WETH, unlock dates and reward receipts together.
+
+lifetime totals distinguish WETH received from rewards reinvested. failed reads display unavailable.
+
+the page is live; staking and payouts await activation.
+
+[THREAD 5/7]
+
+5/7
+
+the pending router assigns fees to the week they arrive. completed weeks settle to their original eligible positions, even when routed later.
+
+V2 fees also retain the exact Muppet Key. legacy Key fees use global accounting. funding stays separate from revenue.
+
+[THREAD 6/7]
+
+6/7
+
+after activation, one Agent Bond unit requires 15,000 $MUPPETS + one unused, permanently bound Key.
+
+terms: 30d at 1x, 90d at 1.25x, 180d at 1.5x. positions mature for 7 days, then count only full eligible weeks.
+
+weights divide recorded revenue. no APY is promised.
+
+[THREAD 7/7]
+
+7/7
+
+optional reinvestment is built: claim WETH, buy MUPPETS and open a new bond in one transaction after reviewing a quote.
+
+staking, payouts, reinvestment and buybacks remain inactive pending verified deployment and configuration.
+
+https://liquidmuppets.io/app/earn
