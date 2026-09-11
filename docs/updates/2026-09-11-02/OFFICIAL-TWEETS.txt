@@ -1,0 +1,109 @@
+LIQUIDMUPPETS OFFICIAL UPDATE 02
+11 september 2026
+
+Copy below each label. These are current-state posts; purchase figures are cumulative.
+
+[RECOMMENDED UPDATE]
+
+liquidmuppets reserve update:
+
+4 recorded purchases. AAPL, AMD, AMZN and ASML Stock Tokens held across a 26-route system.
+
+0.0036 ETH in marketplace fees received. the initial 0.01 ETH developer funding is accounted separately.
+
+https://liquidmuppets.io
+
+[STANDALONE 2: PUBLIC PERFORMANCE]
+
+each Muppet has a public performance page.
+
+inspect vault assets, deployed and idle capital, exact route, tracked asset change and keeper records. Agent Keys have a separate market and cannot redeem the vault's assets.
+
+https://liquidmuppets.io/app
+
+[STANDALONE 3: KEEPER HOLDS]
+
+keeper holds are part of the public record.
+
+the app shows the reason a check took no action. Proof Cards group repeated holds into daily summaries and identify them as having no transaction.
+
+https://liquidmuppets.io/app/proofs
+
+[STANDALONE 4: RESERVE LIMITS]
+
+the Stock Token reserve uses 26 configured routes.
+
+each buy needs an eligible pool and oracle checks. cycles start at 0.0001 ETH, cap at 0.01 ETH and respect a 30-minute cooldown.
+
+current holdings: AAPL, AMD, AMZN and ASML Stock Tokens.
+
+https://liquidmuppets.io
+
+[STANDALONE 5: EARN STATUS]
+
+the Earn page is public, with accounting for bonds, reward receipts, wallet WETH and reinvested amounts.
+
+staking, payouts and reinvestment remain inactive until verified deployment and configuration.
+
+https://liquidmuppets.io/app/earn
+
+[THREAD 1/7]
+
+1/7
+
+liquidmuppets update: follow a Muppet after launch.
+
+vault performance, keeper records, Key markets and the Stock Token reserve are public. the latest reserve snapshot shows four recorded purchases and holdings in AAPL, AMD, AMZN and ASML Stock Tokens.
+
+[THREAD 2/7]
+
+2/7
+
+every 15,000 MUPPETS held unlocks one Creator Slot in the app and API.
+
+vault shares represent deposited assets. Agent Keys have their own market. the public Muppet page keeps vault accounting and Key prices separate.
+
+[THREAD 3/7]
+
+3/7
+
+tracked asset change adjusts for recorded deposits and withdrawals, starting at the first checkpoint.
+
+route health, observation times and keeper decisions provide context. a health label describes route checks and does not promise positive performance.
+
+[THREAD 4/7]
+
+4/7
+
+the current marketplace sends its 3% settled-trade fee to the reserve.
+
+recorded fees received: 0.0036 ETH.
+total spent: 0.0136 ETH, including 0.01 ETH initial developer funding.
+
+these cumulative amounts describe reserve activity, not holder payouts.
+
+[THREAD 5/7]
+
+5/7
+
+the reserve buys eligible Stock Tokens through USDG, subject to pool and oracle checks, a 0.01 ETH cycle cap and a 30-minute cooldown.
+
+Proof Cards and System Pulse expose recorded purchases and keeper holds. MUPPETS and Keys carry no reserve redemption right.
+
+[THREAD 6/7]
+
+6/7
+
+the next revenue implementation assigns fees to their receipt week and retains exact-Key attribution for V2 trades. Earn distinguishes claimed WETH from reinvested rewards.
+
+the page and code are public. staking, payouts and reinvestment await activation.
+
+[THREAD 7/7]
+
+7/7
+
+the remaining work includes FactoryV2 size reduction, independent review, verified deployment, Safe ownership and fee-route configuration. buybacks remain inactive.
+
+browse the current vaults, public records and Earn page:
+
+https://liquidmuppets.io

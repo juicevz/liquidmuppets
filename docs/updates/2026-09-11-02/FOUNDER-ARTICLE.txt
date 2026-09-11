@@ -1,0 +1,31 @@
+title: following the money in a muppet
+
+you should be able to come back to a Muppet a few days later and work out what happened without asking me. where the vault put its money, what the keeper did, why it waited and which transactions belong to the Key market. that's the part of liquidmuppets i want to make easy to follow.
+
+the current reserve is a useful example. it holds AAPL, AMD, AMZN and ASML Stock Tokens after four recorded purchases. the fee counter shows 0.0036 ETH received from the Key marketplace. total spending is 0.0136 ETH, which includes the initial 0.01 ETH i used to fund the first cycle. that developer funding stays outside the marketplace-fee counter.
+
+these are cumulative figures. the most recent purchase was on september 7. the balances are small enough to read without abbreviating anything.
+
+the route from a trade to a holding is visible. a settled Agent Key trade sends a 3% fee to the reserve. once the reserve has enough ETH, the keeper can convert an eligible amount through USDG and purchase the next usable Stock Token. there are 26 configured routes, each with pool and oracle checks. a cycle needs at least 0.0001 ETH, cannot spend more than 0.01 ETH and has a 30-minute cooldown.
+
+at the latest check, the reserve was below its purchase threshold. the keeper recorded a hold. no transaction was signed. that decision has a public record too, with repeated holds grouped into one daily card.
+
+the same idea applies inside a Muppet. its performance page shows vault assets, deployed and idle capital, the exact route and the latest keeper decision. deposits and withdrawals have receipts. tracked asset change adjusts for those cash flows and starts at the first recorded checkpoint. the time period stays visible alongside the number.
+
+a route's health label describes its checks. a vault can still lose value while those checks pass. keeping the route evidence next to the performance record helps explain what each number means.
+
+the Agent Key market sits in its own section. a Key price doesn't change the vault's assets, and a Key holder cannot redeem those assets. MUPPETS has another role: every 15,000 held unlocks one Creator Slot in the app and API. neither token gives its holder a redemption claim on the shared Stock Token reserve.
+
+Proof Cards make useful records shareable. a launch, first deposit, range change, Key fill or reserve purchase can have its own public URL. System Pulse brings the activity together. watchlists let you follow the Muppets you care about, with alerts stored in your browser. you can look through all of this without connecting a wallet.
+
+Earn applies that attention to the reward system being prepared. the implementation separates WETH claimed, WETH received in the wallet and WETH spent on reinvestment. fees stay associated with the week they reach the router, and V2 marketplace fees retain the exact Key behind the trade. a late distribution keeps the original eligible group. optional reinvestment uses a position's earned rewards to buy MUPPETS and open a fresh bond after the holder reviews a quote.
+
+the Earn page is public. staking, reward payouts, reinvestment and buybacks are still inactive. the current Key-market fees continue to go directly to the reserve.
+
+FactoryV2 needs its runtime reduced before deployment. independent review, source verification, Safe ownership and fee configuration are still ahead. the reward rule for weeks with no eligible positions also needs review: the current implementation leaves that week's reward share permanently unallocated, with no recovery route.
+
+for now, you can open a Muppet, inspect its position and follow the records through the app. the reserve snapshot and the full update are in the repo.
+
+https://liquidmuppets.io
+
+https://github.com/juicevz/liquidmuppets

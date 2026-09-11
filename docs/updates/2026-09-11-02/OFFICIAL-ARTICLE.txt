@@ -1,0 +1,25 @@
+title: liquidmuppets update: vaults, fees and public records
+
+liquidmuppets lets users follow an onchain vault after launch through its performance page, strategy evidence, keeper records and transaction receipts. the current mainnet beta also includes separate Agent Key markets and a shared Stock Token reserve funded by settled marketplace fees.
+
+the september 11 reserve snapshot shows four completed purchases and positive balances in AAPL, AMD, AMZN and ASML Stock Tokens. the reserve has received 0.0036 ETH in marketplace fees and spent 0.0136 ETH in total. that total includes the initial 0.01 ETH developer-funded cycle, which is excluded from the fee counter. these are cumulative figures; the latest purchase was recorded on september 7. they describe spending and holdings rather than current portfolio value or holder earnings.
+
+each settled Key trade sends its 3% marketplace fee to the reserve. an eligible keeper cycle converts ETH through USDG to a Stock Token using one of 26 configured routes. execution requires pool and oracle checks, a minimum of 0.0001 ETH and a maximum of 0.01 ETH per cycle, with a 30-minute cooldown. when conditions are not met, the keeper records a hold and its reason.
+
+Muppet performance pages show total assets, share price, deployed and idle capital, the exact strategy route and the latest recorded keeper decision. asset change is adjusted for observed deposits and withdrawals from the first tracking checkpoint. the displayed period and observation times remain visible. this measure is not annualized, and a passing route-health check does not establish that a position is profitable.
+
+Agent Key markets are displayed separately from vault accounting. vault shares represent deposited assets. Keys can trade and be permanently bound but cannot redeem a Muppet's vault assets. MUPPETS unlocks creator capacity at one slot per 15,000 held, currently enforced in the app and API. MUPPETS and Agent Keys do not provide a redemption claim on the shared reserve.
+
+Proof Cards provide public URLs for launches, first deposits, keeper actions, range changes, tracked milestones, Key fills and reserve purchases. transactions link to receipts. holds and performance checkpoints are explicitly identified as having no transaction. repeated keeper holds are grouped into daily summaries. System Pulse collects recorded activity, while browser-local watchlists and alerts help users follow selected Muppets.
+
+the Earn page is available for the pending reward system. its accounting separates total WETH claimed, WETH received in the wallet and rewards used for reinvestment. the Revenue Router implementation assigns fees to the week they arrive and keeps V2 Key fees attributed to the exact Key. delayed distributions retain the original week's eligible positions. the optional reinvestment flow uses a position's rewards to purchase MUPPETS and create a new bond after quote review.
+
+staking, reward payouts, reinvestment and buybacks remain inactive. the live revenue API reports activation pending, with the new Router, Agent Bond and buyback contracts undeployed. the current legacy Key-market fee route continues to send fees directly to the Stock Token reserve.
+
+remaining work includes reducing FactoryV2's deployment size, independent contract review, source verification, Safe ownership and fee-route configuration. review also covers the existing policy for a reward week with no eligible positions: its reward share remains permanently unallocated to that week, with no recovery mechanism. the existing vaults, markets and public records remain available in the mainnet beta.
+
+https://liquidmuppets.io
+
+https://liquidmuppets.io/docs
+
+https://github.com/juicevz/liquidmuppets
