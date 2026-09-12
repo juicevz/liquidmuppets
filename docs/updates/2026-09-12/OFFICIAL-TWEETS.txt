@@ -1,0 +1,112 @@
+LIQUIDMUPPETS OFFICIAL UPDATE
+12 september 2026
+
+Copy below each label. These posts describe the current beta and do not announce a new deployment.
+
+[RECOMMENDED UPDATE]
+
+liquidmuppets: from Creator Slot to funded vault.
+
+every 15,000 $MUPPETS held unlocks one slot in the app. choose a pet and vault job, confirm creation, then fund with USDG or WETH.
+
+Agent Key listings are optional after launch.
+
+https://liquidmuppets.io/app/create
+
+[STANDALONE 2: THREE ASSETS]
+
+three roles in liquidmuppets:
+
+MUPPETS unlocks creator capacity.
+vault shares represent a deposit.
+Agent Keys have a separate market and cannot redeem vault assets.
+
+the current Creator Slot rule is enforced in the app and API.
+
+https://liquidmuppets.io
+
+[STANDALONE 3: THREE JOBS]
+
+the creator offers three vault jobs:
+
+USDG into a fixed Morpho market.
+WETH into a bounded WETH/USDG range.
+WETH staged in an isolated launch reserve.
+
+the reserve has no yield or launch-token pool execution today.
+
+https://liquidmuppets.io/app/create
+
+[STANDALONE 4: CAPACITY]
+
+Creator Slots show unlocked, used and available capacity, plus the next launch threshold.
+
+every 15,000 MUPPETS supports one slot in the app. a lower balance pauses excess launches and featured placement while preserving existing vault access.
+
+https://liquidmuppets.io
+
+[STANDALONE 5: SEPARATE FUNDING]
+
+creation deploys a Muppet's vault and Agent Key.
+
+funding follows separately, with a share preview, task-asset approval and deposit. opening a Key listing is optional and uses its own approval and listing transaction.
+
+https://liquidmuppets.io/app/create
+
+[THREAD 1/7]
+
+1/7
+
+liquidmuppets update: the current creator experience.
+
+check Creator Slots, choose one vault job, confirm creation and fund the vault. public records follow the position, while Agent Key trading remains a separate choice.
+
+[THREAD 2/7]
+
+2/7
+
+one Creator Slot requires 15,000 MUPPETS held. the app shows unlocked capacity, used slots and the next launch threshold.
+
+30,000 MUPPETS with one existing Muppet leaves one available slot. tokens remain transferable. enforcement is currently in the app and API.
+
+[THREAD 3/7]
+
+3/7
+
+pet appearance is cosmetic. the selected job fixes the asset and route.
+
+the live choices allocate up to 90% of USDG to Morpho, up to 85% of WETH to a range, or up to 10% of WETH to an isolated reserve. the reserve currently generates no yield.
+
+[THREAD 4/7]
+
+4/7
+
+the factory creates the vault and Agent Key in one creation transaction. the deposit comes afterwards and mints vault shares.
+
+the app saves the creation receipt in the current browser for recovery. a Key listing needs separate approval and confirmation.
+
+[THREAD 5/7]
+
+5/7
+
+after launch, the command center provides funding controls, a share preview, estimated keeper timing and the public Muppet page.
+
+performance records show assets, strategy conditions and keeper decisions. share redemption is subject to realized assets and liquidity.
+
+[THREAD 6/7]
+
+6/7
+
+MUPPETS controls creator capacity in the app. vault shares carry the deposit claim. Agent Keys trade separately.
+
+settled Key trades currently send a 3% fee to the Stock Token reserve. neither MUPPETS nor Keys grants a redemption right over that reserve.
+
+[THREAD 7/7]
+
+7/7
+
+Earn and its accounting implementation are public. staking, reward payouts, reinvestment and buybacks remain inactive pending verified deployment and configuration.
+
+the existing mainnet beta remains available:
+
+https://liquidmuppets.io/app/create

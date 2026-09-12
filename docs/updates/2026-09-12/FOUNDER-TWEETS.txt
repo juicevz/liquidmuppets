@@ -1,0 +1,111 @@
+LIQUIDMUPPETS FOUNDER UPDATE
+12 september 2026
+
+Copy below each label. These posts describe the current beta and do not announce a new deployment.
+
+[RECOMMENDED UPDATE]
+
+muppets update.
+
+15k $MUPPETS unlocks one creator slot in the app.
+pick a pet, choose a vault job, launch and fund it.
+
+Key listings are optional. vault assets, strategy activity and keeper decisions are public.
+
+https://liquidmuppets.io/app/create
+
+[STANDALONE 2: WHAT THE TOKEN DOES]
+
+holding $MUPPETS gives creator capacity. the vault itself takes USDG or WETH, depending on its job.
+
+your deposit gets vault shares. the Agent Key has a separate market.
+
+that's the current muppet setup, before the pending reward activation.
+
+https://liquidmuppets.io
+
+[STANDALONE 3: CAPACITY EXAMPLE]
+
+30k $MUPPETS and one existing muppet means one creator slot still available.
+
+the app checks your balance and how many you've already created. tokens stay transferable; a balance drop leaves existing vault access intact.
+
+https://liquidmuppets.io/app/create
+
+[STANDALONE 4: AFTER CREATION]
+
+once your muppet is created, the app gives you the vault's share preview, funding controls, keeper timing and public performance link.
+
+opening a Key listing is a separate choice after launch.
+
+the pet still contributes mainly by being there.
+
+https://liquidmuppets.io
+
+[STANDALONE 5: RECOVERY]
+
+a wallet confirmation taking too long shouldn't mean guessing whether to launch another muppet.
+
+the app saves the creation transaction in this browser and checks its receipt when you resume. funding comes after creation.
+
+https://liquidmuppets.io/app/create
+
+[THREAD 1/7]
+
+1/7
+
+muppets update: what you can use today.
+
+the creator flow takes you from a MUPPETS balance to a vault with one job. funding and the optional Key listing happen separately. here's how those pieces fit together in the current beta.
+
+[THREAD 2/7]
+
+2/7
+
+every 15,000 $MUPPETS held unlocks one creator slot. the app subtracts the Muppets you've already launched to show what's available.
+
+tokens stay transferable. the current capacity rule lives in the app + API; FactoryV2 enforcement is still pending.
+
+[THREAD 3/7]
+
+3/7
+
+pick a pet and name, then choose the vault's job.
+
+USDG stable yield uses one Morpho market. WETH range uses a bounded WETH/USDG position. launch reserve stages WETH and currently earns no yield.
+
+the pet changes the appearance. the job fixes the route and limits.
+
+[THREAD 4/7]
+
+4/7
+
+creation makes the vault and Agent Key. funding is separate: review the share preview, approve the task asset and deposit it.
+
+the wallet receives vault shares. a Key listing is optional and has its own approval and transaction.
+
+[THREAD 5/7]
+
+5/7
+
+after funding, the public page shows deployed and idle assets, route evidence, keeper decisions and receipts.
+
+the creator or private keeper can request a strategy cycle within its policy limits. tracked performance keeps deposits and withdrawals accounted for.
+
+[THREAD 6/7]
+
+6/7
+
+if your MUPPETS balance falls below capacity, existing vaults and Key markets remain accessible. extra launches and excess featured placement pause.
+
+vault redemption still depends on the route's liquidity and the assets actually realized.
+
+[THREAD 7/7]
+
+7/7
+
+Earn is public. the weekly reward accounting and reinvestment flow are built, with staking and payouts still awaiting activation.
+
+today's mainnet beta is there to browse, create, fund and follow Muppets.
+
+https://liquidmuppets.io/app/create

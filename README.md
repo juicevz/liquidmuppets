@@ -8,7 +8,7 @@ Public interface: [https://liquidmuppets.io](https://liquidmuppets.io)
 
 Full product explainer: [https://liquidmuppets.io/about](https://liquidmuppets.io/about)
 
-Latest update and founder/official content: [11 September 2026, edition 02](docs/updates/2026-09-11-02/README.md). [Earlier build update](docs/updates/2026-09-11/README.md).
+Latest update and founder/official content: [12 September 2026](docs/updates/2026-09-12/README.md). Previous: [11 September, edition 02](docs/updates/2026-09-11-02/README.md) and [earlier build update](docs/updates/2026-09-11/README.md).
 
 X: [@AMBF](https://x.com/AMBF)
 

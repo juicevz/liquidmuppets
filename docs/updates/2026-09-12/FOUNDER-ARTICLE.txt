@@ -1,0 +1,29 @@
+title: what MUPPETS unlocks today
+
+the useful place to start with MUPPETS is what holding it lets you do in the app. every 15,000 tokens unlocks one Creator Slot. that capacity lets you launch a Muppet with its own vault, then choose whether to open a market for its Agent Key.
+
+a wallet holding 30,000 MUPPETS has two slots. if it has already created one Muppet, it has one slot left for another launch. the interface shows that calculation, including the balance needed for the next one. the tokens remain in the wallet and transferable. this rule is enforced in the app and API today; FactoryV2 is still waiting for deployment and activation.
+
+the vault needs its own funding. you choose a pet and name, give the vault one job, then review the asset and limits before creation. the pet is cosmetic. the job determines where the money can go.
+
+there are three choices in the live creator. the stable job accepts USDG and can supply up to 90% to one fixed Morpho Blue market. the range job accepts WETH and can allocate up to 85% to a WETH/USDG range through EZManager. the launch reserve can stage up to 10% of WETH in an isolated reserve. it currently has no approved launch-token pool and generates no yield.
+
+those percentages are limits. whether a cycle executes depends on the route, the current position and its checks. the smaller amount in the launch reserve reflects what that route can actually do today.
+
+creation makes the vault and the Agent Key. funding comes afterwards. the app shows a preview of the vault shares for your planned deposit, then you approve the task asset and deposit it. your wallet receives shares representing its claim on that vault. the preview can change as vault state changes before execution.
+
+opening a Key listing is optional. you choose a quantity, approve it and create the listing separately. the Key has its own orderbook and price. it doesn't let a buyer withdraw assets belonging to the vault's depositors.
+
+the part after launch has its own controls. you can fund the vault, see the share preview, check the estimated keeper timing and open the public performance page. that page shows deployed and idle assets, the route, recorded keeper decisions and receipts. a strategy cycle still has to fit the vault's policy. a keeper check can end with a hold and a reason.
+
+the creator also saves the submitted creation receipt in the current browser. if the flow is interrupted, resuming checks that record before attempting another creation. the saved receipt is tied to the wallet, chain and factory. it isn't a cross-device account backup.
+
+moving MUPPETS out of the wallet can reduce available capacity. extra launches and featured placements above that capacity pause. existing vault access and Key markets remain available. redeeming a vault still depends on its route's liquidity and the assets actually realized, rather than the MUPPETS balance.
+
+the latest revenue work sits alongside this flow. Earn is public, with the implementation for weekly receipt accounting, exact V2 Key attribution and optional reward reinvestment. staking, payouts, reinvestment and buybacks remain inactive. the current 3% fee on settled Key trades still goes directly to the Stock Token reserve.
+
+the beta remains on the same product build as yesterday. FactoryV2 size reduction, independent review, source verification and Safe configuration are still ahead. this update is a closer look at what you can use now. the creator and its three jobs are available in the app.
+
+https://liquidmuppets.io/app/create
+
+https://github.com/juicevz/liquidmuppets

@@ -1,0 +1,27 @@
+title: liquidmuppets update: from Creator Slot to funded vault
+
+liquidmuppets gives creators a way to launch a vault with one defined job, fund it and follow its public record. this update explains the current mainnet flow, including the role of MUPPETS, vault shares and Agent Keys. it reflects the existing product build and does not announce a new contract deployment.
+
+each 15,000 MUPPETS held unlocks one Creator Slot in the app and API. the interface calculates available capacity from the wallet balance and its existing Muppets, then displays the next launch threshold. for example, a wallet holding 30,000 MUPPETS with one existing Muppet has one available slot. MUPPETS remains transferable, and the current V1 factory does not enforce this capacity rule itself.
+
+creation has three stages: pet and name, vault job, then launch and funding. the pet is cosmetic. the job defines the deposit asset, strategy route and policy limits. only the three currently enabled jobs appear in the beginner creator.
+
+stable yield accepts USDG and can allocate up to 90% to one fixed Morpho Blue market, with a 10,000 USDG vault cap. the ETH range accepts WETH and can allocate up to 85% through EZManager into a WETH/USDG range, with a 1 WETH vault cap. the launch reserve accepts WETH and can stage up to 10% in an isolated reserve, with a 0.25 WETH vault cap. this final route currently has no launch-token pool execution and generates no yield. allocation limits describe permitted behavior rather than a promised return.
+
+the creation transaction deploys the Muppet's vault and Agent Key. funding follows separately. the interface provides a share preview before the depositor approves the task asset and sends it to the vault. the depositor receives transferable vault shares. the actual shares minted depend on vault state at execution.
+
+opening an Agent Key listing is optional after launch. it uses an approval for the selected Key quantity and a separate listing transaction. Keys have their own market and permanent-binding mechanism. they do not provide a claim on vault assets, and their market price does not determine vault share value.
+
+the post-launch command center brings together funding controls, share previews, estimated keeper timing and the public performance link. the creator or private keeper can request a strategy cycle, subject to the policy's authorization, route and limits. recorded performance shows deployed and idle assets, cash-flow-adjusted change, market evidence and keeper decisions. deposits, withdrawals and executed actions link to receipts.
+
+a lower MUPPETS balance affects additional launches and featured placement above current capacity. it leaves existing vault access and Key markets available. vault redemption remains subject to market conditions, liquidity and the assets realized by the route. submitted creation receipts are saved in the current browser so an interrupted flow can check the existing transaction before resuming.
+
+Earn remains public with the implementation for weekly reward accounting and optional reinvestment. the live revenue API still reports activation pending. staking, reward payouts, reinvestment and buybacks are inactive; current settled Key trades continue to send their 3% marketplace fee directly to the Stock Token reserve.
+
+the next activation work includes FactoryV2 size reduction, independent review, source verification, Safe ownership and fee-route configuration. the current mainnet beta is available for browsing, creation, vault funding and public tracking.
+
+https://liquidmuppets.io/app/create
+
+https://liquidmuppets.io/docs
+
+https://github.com/juicevz/liquidmuppets
