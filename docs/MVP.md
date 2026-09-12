@@ -152,6 +152,12 @@ Robinhood's official assets API returned 194 active Robinhood Chain assets on 20
 
 Stock Tokens are tokenized debt securities. They do not grant legal or beneficial ownership, voting rights, or shareholder rights in the underlying company. Chainlink prices already incorporate the Stock Token multiplier, so the reserve does not apply `uiMultiplier()` a second time.
 
+## Stock Drops
+
+The [Stock Drops package](STOCK_DROPS.md) introduces fully funded stock-token claims for $MUPPETS holders independently of FactoryV2. One full 15,000-MUPPETS wallet balance unit at a published block earns a proportional allocation from that drop's deposited budget. It needs no Agent Key, lock or MUPPETS approval. The publisher's public manifest includes all holder balances, exclusions, allocation math and Merkle proofs. The contract enforces the committed recipients and exact transfers, with no expiry or admin withdrawal route.
+
+Implementation: `MuppetStockDrops.sol`, `app.stock_drops_cli`, `GET /api/v1/stock-drops`, `/app/stock-drops`, and a complete local browser claim test. Initial allowlisted assets: AAPL, AMD, AMZN and ASML Stock Tokens. The source is published; the new frontend/API release and contract are not deployed to production in this update. No first snapshot or funded holder pot exists. Existing fee routing and FeeRwaReserve inventory are separate and untouched. The first launch needs independent review, verified Safe deployment, a published snapshot/exclusion policy and an explicitly approved stock-token budget.
+
 ## Revenue Engine and Agent Bonds
 
 The public `/app/revenue` page exposes both proposed revenue lanes, current Pons fee configuration, activation checks, deployed contract totals, wallet bond-position state and exact transaction receipts since tracking begins. Each public Muppet page also contains a separate Key revenue record. The Revenue Router, Agent Bond, KeyMarketplaceV2 and buyback vault are implemented and tested in the repository but are not deployed or active on mainnet. Until verified deployment receipts, Safe ownership, independent review and the required Pons configuration transactions agree, the pages say `activation pending` and report no rewards or buybacks.

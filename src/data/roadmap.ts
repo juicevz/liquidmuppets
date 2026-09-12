@@ -26,6 +26,7 @@ export const publicRoadmap: RoadmapPhase[] = [
       'Tested exact-Key revenue and completed-epoch Agent Bond package with 30, 90 and 180 day terms',
       'Optional claim-or-reinvest flow with atomic reward-funded buys and new bonds; activation pending',
       'Wallet-first Earn page with lifetime reward counters, receipt history and original receipt-week accounting; activation pending',
+      'Stock Drops contract, holder snapshot tooling and claim page published; first funded mainnet drop pending',
     ],
   },
   {
@@ -38,6 +39,7 @@ export const publicRoadmap: RoadmapPhase[] = [
       'Complete source verification',
       'Move protocol ownership to a verified Safe',
       'Commission an independent contract review',
+      'Review and deploy Stock Drops independently, publish its snapshot and fund its first stock-token pot',
       'Reduce FactoryV2 below the EIP-170 runtime-size limit and repeat migration simulation',
       'Deploy and verify the Revenue Router, Agent Bond, KeyMarketplaceV2 and buyback vault under the Safe',
       'Activate Pons buyback and point creator fees to the Revenue Router',

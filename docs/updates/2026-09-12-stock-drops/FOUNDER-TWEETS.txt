@@ -1,0 +1,122 @@
+LIQUIDMUPPETS FOUNDER UPDATE
+12 september 2026 · stock drops
+
+Copy below each label. Mainnet deployment and first funding remain pending.
+
+[RECOMMENDED UPDATE]
+
+built stock drops for $MUPPETS.
+
+15k at the snapshot = 1 unit.
+funded stock tokens, split by units, claimed to your wallet.
+
+no Key. no lock.
+
+code + tests pushed. first funded mainnet drop still pending.
+
+https://github.com/juicevz/liquidmuppets
+
+[STANDALONE 2: THE HOLDER BENEFIT]
+
+the next muppet feature has a very specific output: stock tokens in the holder's wallet.
+
+stock drops now has the contract, allocation tool and claim page in the repo. each pot must be fully funded before anyone can claim.
+
+first mainnet pot still pending.
+
+[STANDALONE 3: WHAT WE TESTED]
+
+tested the whole stock-drop flow locally.
+
+snapshot → funded pot → browser claim → exact stock-token balance in the wallet.
+
+15k $MUPPETS counts as one unit. no Key required.
+
+mainnet deployment and funding are the next steps.
+
+[STANDALONE 4: YOUR ALLOCATION]
+
+stock drops fixes your allocation at a published snapshot.
+
+once funded, that drop can't change your amount or redirect it. claiming later doesn't expire it.
+
+the code is pushed. the first mainnet snapshot and pot are still pending.
+
+[STANDALONE 5: THE POT]
+
+the useful number for stock drops is the size of the funded pot.
+
+each full 15k $MUPPETS at the snapshot gets one unit of its allocation. more units share the same budget.
+
+that's the mechanic we've built. first mainnet funding still needs to happen.
+
+[THREAD 1/7]
+
+1/7
+
+built a more direct holder feature for $MUPPETS: stock drops.
+
+a stock-token pot gets funded, an allocation gets published, and eligible holders claim to their wallets.
+
+the implementation is pushed. mainnet deployment and the first pot are pending.
+
+[THREAD 2/7]
+
+2/7
+
+one full 15,000 $MUPPETS in your wallet at the snapshot = one allocation unit.
+
+30k gives two units. partial units round down.
+
+the pot is split proportionally across the eligible total. no Agent Key or MUPPETS deposit is needed.
+
+[THREAD 3/7]
+
+3/7
+
+each drop needs its full stock-token budget deposited before claims exist.
+
+initial support covers AAPL, AMD, AMZN and ASML Stock Tokens, one asset per drop.
+
+the first budget is uncommitted. existing vault deposits and reserve balances stay separate.
+
+[THREAD 4/7]
+
+4/7
+
+the snapshot file includes holder balances, exclusions and the reason for each exclusion.
+
+the tool checks every balance at the chosen block and requires the full supply to reconcile before exclusions.
+
+pools and custodial accounts don't automatically count as yours.
+
+[THREAD 5/7]
+
+5/7
+
+once funded, the allocation is fixed. each claim pays its published wallet.
+
+no claim expiry or admin withdrawal route.
+
+the publisher still chooses the snapshot and exclusions. those decisions need to be visible alongside the funding.
+
+[THREAD 6/7]
+
+6/7
+
+the local browser test funded a synthetic pot and claimed it into a wallet. the exact stock-token balance matched.
+
+we also checked wrong networks, duplicate claims and missing allocation files.
+
+the little claim button has had a fairly long afternoon.
+
+[THREAD 7/7]
+
+7/7
+
+next: independent review, verified Safe deployment, a published snapshot and the first funded pot.
+
+stock drops can ship independently of FactoryV2. it doesn't activate the separate Agent Bond release.
+
+code, docs and tests:
+https://github.com/juicevz/liquidmuppets

@@ -1,0 +1,26 @@
+stock tokens in a muppet holder's wallet
+
+i wanted the next muppet update to give holders something concrete to use.
+
+we already have creator slots. holding 15,000 $MUPPETS gives you capacity to launch a muppet through the app. the reserve also has its own stock-token purchases and receipts. the missing piece was a direct holder claim.
+
+so i built stock drops.
+
+the flow is simple. a publisher funds a pot with stock tokens. a published snapshot determines which wallets receive an allocation. each full 15,000 $MUPPETS held at that block gives one unit, and the pot is divided across the eligible total. the holder opens the claim page and sends those stock tokens to their wallet.
+
+no Agent Key is required. you don't deposit your MUPPETS or approve them for spending. the allocation comes from the snapshot, so claiming doesn't require keeping the same balance afterward. buying after the snapshot doesn't add you to that drop.
+
+the code now includes the distributor, snapshot tooling, allocation files, API and claim page. the first supported assets are AAPL, AMD, AMZN and ASML Stock Tokens. each drop uses one asset.
+
+the money part needs to be explicit. every pot must be fully funded before claims exist. the first mainnet budget is still uncommitted. this release doesn't automatically pull fees, spend the existing reserve or use anyone's vault deposit. a small budget shared across many units will give small allocations.
+
+the publisher chooses the snapshot and excluded wallets. those choices are published with their reasons. the tool checks every historical balance and reconciles the full token supply before applying exclusions. the contract checks the committed allocation, rather than trying to read historical balances itself.
+
+once a drop is funded, its allocations are fixed. a claim can only pay the wallet in that allocation. there is no claim expiry or admin withdrawal function. stock-token issuer restrictions can still stop a transfer, and a failed transfer leaves the claim available.
+
+i tested the whole flow locally: a synthetic funded pot, the actual API, a browser wallet claim and the exact token balance arriving. the wrong-network and duplicate-claim cases were checked too. a separate mainnet-fork test exercised all four supported stock-token contracts with fork-only inventory.
+
+the implementation and tests are pushed. mainnet deployment, a reviewed snapshot, the first funded pot and the production page release are still ahead. stock drops can be deployed independently of FactoryV2, so it doesn't need to wait for the complete Agent Bond migration.
+
+code and mechanics:
+https://github.com/juicevz/liquidmuppets/blob/main/docs/STOCK_DROPS.md

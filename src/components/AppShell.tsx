@@ -21,6 +21,7 @@ import { MonitorPage } from '../pages/MonitorPage'
 import { ProofPage } from '../pages/ProofPage'
 import { ProofsPage } from '../pages/ProofsPage'
 import { RevenuePage } from '../pages/RevenuePage'
+import { StockDropsPage } from '../pages/StockDropsPage'
 
 interface AppShellProps {
   view: Exclude<View, 'landing'>
@@ -117,7 +118,7 @@ export function AppShell({ view, performanceAgentId, creatorAddress, proofId, on
           <button className={view === 'monitor' ? 'active' : ''} onClick={() => onNavigate('monitor')} type="button">
             Monitor
           </button>
-          <button className={view === 'revenue' ? 'active' : ''} onClick={() => onNavigate('revenue')} type="button">
+          <button className={view === 'revenue' || view === 'stockDrops' ? 'active' : ''} onClick={() => onNavigate('revenue')} type="button">
             Earn
           </button>
           <button className={view === 'portfolio' ? 'active' : ''} onClick={() => onNavigate('portfolio')} type="button">
@@ -169,13 +170,14 @@ export function AppShell({ view, performanceAgentId, creatorAddress, proofId, on
         {view === 'proof' && <ProofPage proofId={proofId} />}
         {view === 'monitor' && <MonitorPage />}
         {view === 'revenue' && <RevenuePage walletAddress={wallet.status === 'connected' ? wallet.address : undefined} onConnect={requestWallet} />}
+        {view === 'stockDrops' && <StockDropsPage walletAddress={wallet.status === 'connected' ? wallet.address : undefined} onConnect={requestWallet} />}
       </main>
 
       <nav className="mobile-app-nav" aria-label="Mobile app navigation">
         <button type="button" className={view === 'marketplace' || view === 'performance' || view === 'creator' ? 'active' : ''} onClick={() => onNavigate('marketplace')}>Market</button>
         <button type="button" className={view === 'pulse' || view === 'proofs' || view === 'proof' ? 'active' : ''} onClick={() => onNavigate('pulse')}>Pulse</button>
         <button type="button" className={view === 'monitor' ? 'active' : ''} onClick={() => onNavigate('monitor')}>Watch</button>
-        <button type="button" className={view === 'revenue' ? 'active' : ''} onClick={() => onNavigate('revenue')}>Earn</button>
+        <button type="button" className={view === 'revenue' || view === 'stockDrops' ? 'active' : ''} onClick={() => onNavigate('revenue')}>Earn</button>
         <button type="button" className={view === 'portfolio' ? 'active' : ''} onClick={() => onNavigate('portfolio')}>Portfolio</button>
         <button type="button" className={view === 'create' ? 'active' : ''} onClick={() => onNavigate('create')}>Launch</button>
         <button type="button" className={view === 'docs' ? 'active' : ''} onClick={() => onNavigate('docs')}>Docs</button>

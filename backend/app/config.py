@@ -37,6 +37,8 @@ class Settings:
     fee_rwa_reserve_address: str = getenv("FEE_RWA_RESERVE_ADDRESS", "")
     revenue_router_address: str = getenv("REVENUE_ROUTER_ADDRESS", "")
     agent_bond_address: str = getenv("AGENT_BOND_ADDRESS", "")
+    stock_drops_address: str = getenv("STOCK_DROPS_ADDRESS", "")
+    stock_drops_manifest_dir: Path = Path(getenv("STOCK_DROPS_MANIFEST_DIR", "/var/lib/liquidmuppets/stock-drops"))
     buyback_vault_address: str = getenv("BUYBACK_VAULT_ADDRESS", "")
     buyback_executor_address: str = getenv("BUYBACK_EXECUTOR_ADDRESS", "")
     universal_router_address: str = getenv(

@@ -8,7 +8,9 @@ Public interface: [https://liquidmuppets.io](https://liquidmuppets.io)
 
 Full product explainer: [https://liquidmuppets.io/about](https://liquidmuppets.io/about)
 
-Latest update and founder/official content: [12 September 2026](docs/updates/2026-09-12/README.md). Previous: [11 September, edition 02](docs/updates/2026-09-11-02/README.md) and [earlier build update](docs/updates/2026-09-11/README.md).
+Latest feature and founder/official content: [Stock Drops, 12 September 2026](docs/updates/2026-09-12-stock-drops/README.md). Previous: [creator update](docs/updates/2026-09-12/README.md), [reserve update](docs/updates/2026-09-11-02/README.md) and [earlier build update](docs/updates/2026-09-11/README.md).
+
+New in the repository: **Muppet Stock Drops**, a fully funded stock-token claim for $MUPPETS holders. Each full 15,000 tokens held at a published snapshot gives one allocation unit. The contract, allocation tooling, API and `/app/stock-drops` interface are implemented; mainnet deployment and the first funded drop are pending. The [mechanics and publisher runbook](docs/STOCK_DROPS.md) cover the budget, snapshot trust, claim flow and verification commands.
 
 X: [@AMBF](https://x.com/AMBF)
 
@@ -77,6 +79,8 @@ The live site publishes the work in four evidence-based phases. `Shipped` means 
 | 04 · Asset expansion | conditional | activate NVDA/USDG only after verified FactoryV2 activation; retain AAPL/USDG and SPY/USDG as disabled venue candidates; keep meme/WETH disabled until every route gate passes; expose new market evidence only when adapters source it |
 
 The sequence can change when evidence changes. The website and this repository use the same roadmap boundaries.
+
+Stock Drops is an independent release: the implementation is published in phase 01, with independent review, Safe deployment, an explicit snapshot and its first funded pot in phase 02. It does not require the FactoryV2 migration, and does not move existing fee-reserve assets or alter fee splits.
 
 ## Deployed contracts
 
@@ -172,6 +176,12 @@ Each route uses a direct USDG pool and a Robinhood Chain Chainlink feed. A cycle
 The first dev-funded cycle spent `0.01 ETH`, routed `24.587800 USDG`, and bought `0.076456289003050387 AAPL`. It is recorded separately from marketplace fees. Stock Tokens are tokenized debt securities and do not grant shareholder rights in the underlying company.
 
 ## Revenue Engine and Agent Bonds
+
+### Stock Drops
+
+`/app/stock-drops` is a sibling of Earn for stock-token allocations. It reads `GET /api/v1/stock-drops?wallet=0x...`; the full public file is at `/api/v1/stock-drops/{id}/manifest`. Set `STOCK_DROPS_ADDRESS` and `STOCK_DROPS_MANIFEST_DIR` only after reviewed deployment and publication. With no address, the page shows that its first funded drop is pending. Missing files, invalid allocations and failed funding reads disable the affected claim.
+
+Run `npm run qa:stock-drops` for the full local browser flow. It creates disposable synthetic tokens in Anvil, verifies a complete historical snapshot through Python, funds the Solidity contract, serves the actual API and claims through the browser. No mainnet asset or private key is used. See [Stock Drops](docs/STOCK_DROPS.md) for publisher and focused contract commands.
 
 `MuppetRevenueRouter` keeps two accounting lanes and records fee receipts in Unix seven-day buckets. Pons creator revenue and legacy Key fees use the 50/30/20 route: 50% WETH to eligible Agent Bond weight in that original receipt week, 30% to the Stock Token reserve and 20% to operations. Each KeyMarketplaceV2 fill records its exact Key, gross volume and fee in a separate Key/week bucket. Its 50/25/15/10 split remains unchanged. Only completed weeks can finalize. A late route cannot move older fees into a later holder cohort. Pons escrow exposes only aggregate claimed ETH, so its bucket identifies the router receipt week, not the original token-trade week. Direct funding remains separate from revenue.
 

@@ -9,6 +9,7 @@
     "preview": "vite preview --host 0.0.0.0",
     "qa:browser": "node qa/browser.mjs",
     "qa:earn": "node qa/earn.mjs",
+    "qa:stock-drops": "node qa/stock-drops.mjs",
     "qa:reinvestment": "node qa/reinvestment.mjs",
     "qa:fork": "node qa/mainnet-fork-e2e.mjs",
     "qa:testnet": "node qa/testnet-e2e.mjs",

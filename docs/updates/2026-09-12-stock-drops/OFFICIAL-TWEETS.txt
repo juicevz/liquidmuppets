@@ -1,0 +1,106 @@
+LIQUIDMUPPETS OFFICIAL UPDATE
+12 September 2026 · Stock Drops
+
+Copy below each label. Implementation announcement; mainnet deployment and first funding are pending.
+
+[RECOMMENDED UPDATE]
+
+Introducing Muppet Stock Drops.
+
+Each 15,000 $MUPPETS held at the snapshot gives one allocation unit. Funded stock tokens are split proportionally and claimed to your wallet.
+
+Code and tests published. First mainnet drop pending.
+
+https://github.com/juicevz/liquidmuppets
+
+[STANDALONE 2: DIRECT CLAIMS]
+
+Stock Drops adds a direct stock-token claim for eligible $MUPPETS holders.
+
+No Agent Key, token deposit or lock is required. Each drop must hold its entire published budget before claims exist.
+
+The implementation is published; mainnet activation is pending.
+
+[STANDALONE 3: ALLOCATION EVIDENCE]
+
+Every Stock Drop publishes its snapshot, excluded wallets, allocation amounts and claim proofs.
+
+The claim page checks that file against the funded contract before enabling a transaction.
+
+Code is published. The first mainnet snapshot and funding are pending.
+
+[STANDALONE 4: IMMUTABLE DROPS]
+
+Funded Stock Drop allocations cannot be replaced or redirected by the publisher. Claims have no expiry and always pay the committed recipient.
+
+The contract and wallet flow are implemented and tested. Mainnet deployment and the first funded drop remain pending.
+
+[STANDALONE 5: ASSET SUPPORT]
+
+Stock Drops initially supports AAPL, AMD, AMZN and ASML Stock Tokens, with one asset per funded drop.
+
+An enabled asset does not mean a funded reward. Each pot needs a separately approved budget.
+
+Implementation published. First mainnet funding pending.
+
+[THREAD 1/7]
+
+1/7
+
+Muppet Stock Drops is a new holder feature in the LiquidMuppets repository.
+
+It combines a fully funded stock-token distributor, historical balance snapshots, public allocations and a wallet claim page.
+
+Mainnet deployment and the first pot are pending.
+
+[THREAD 2/7]
+
+2/7
+
+Eligibility uses wallet balances at a published block. Each full 15,000 $MUPPETS gives one unit.
+
+The stock-token budget is divided proportionally across eligible units. Integer remainders are allocated deterministically so every funded raw token unit is assigned.
+
+[THREAD 3/7]
+
+3/7
+
+The publisher must deposit the entire reward budget when committing a drop.
+
+There is no automatic fee feed, fixed payout schedule or promised return. Existing vault deposits and FeeRwaReserve inventory remain separate from holder allocations.
+
+[THREAD 4/7]
+
+4/7
+
+The public allocation file contains the full holder snapshot and excluded wallets with reasons.
+
+Publisher tooling checks historical balances against archive RPC. The contract enforces the committed allocation; it does not verify past token balances itself.
+
+[THREAD 5/7]
+
+5/7
+
+Claiming sends the allocated stock tokens directly to the committed wallet.
+
+No Key, MUPPETS deposit or approval is required. Holders pay network gas in ETH.
+
+Claims have no expiry. Issuer transfer restrictions can still affect execution.
+
+[THREAD 6/7]
+
+6/7
+
+Validation covers funding, proofs, replay protection, duplicate claims, exact transfers and wallet/network changes.
+
+The complete browser flow passed on a local chain using synthetic assets. A separate mainnet-fork test passed for all four supported stock tokens.
+
+[THREAD 7/7]
+
+7/7
+
+Remaining launch steps: independent review, verified Safe deployment, snapshot publication, an approved funded pot and the production release.
+
+Stock Drops operates independently of FactoryV2 and the pending Agent Bond activation.
+
+https://github.com/juicevz/liquidmuppets

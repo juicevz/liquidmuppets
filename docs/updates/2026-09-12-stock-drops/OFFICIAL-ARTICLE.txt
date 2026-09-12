@@ -1,0 +1,40 @@
+Muppet Stock Drops: direct stock-token allocations for holders
+
+LiquidMuppets has published the implementation of Muppet Stock Drops, a funded stock-token distribution feature for $MUPPETS holders. The release includes the contract, historical snapshot tooling, public allocation manifests, read API, claim page and automated tests.
+
+Mainnet deployment, the first published snapshot, initial funding and the production frontend/API release remain pending. This announcement does not report an active holder payout.
+
+How allocations work
+
+Each full 15,000 $MUPPETS held in a wallet at the published snapshot block gives one allocation unit. The deposited stock-token budget is distributed proportionally across eligible units. Partial units round down, and integer remainders are assigned deterministically so allocations sum to the exact budget.
+
+Each drop contains one stock-token asset. The initial deployment supports canonical AAPL, AMD, AMZN and ASML Stock Tokens. An asset being supported does not mean a reward pot has been funded.
+
+Holders claim directly to their allocated wallet. No Agent Key, MUPPETS deposit, token approval or lock is required. Network gas is paid in ETH. A funded claim remains available without an expiry, subject to the reward token's transfer restrictions.
+
+Funding and accounting
+
+The publisher must transfer the entire budget into the distributor when creating a drop. The contract records that budget, its snapshot block and hash, the allocation root and the hash of the public file.
+
+This implementation has no automatic fee feed. The first stock-token budget is uncommitted, and future size or timing depends on actual funding. Existing vault deposits, FeeRwaReserve inventory, marketplace fee splits and the pending Agent Bond rewards remain separate.
+
+Snapshot evidence
+
+The publisher selects a historical block and lists excluded wallets with reasons. The CLI verifies each supplied holder balance at that block and requires the complete positive balances to reconcile with totalSupply before exclusions. Pool, exchange, wrapper and future bonded holdings are not automatically attributed to individual wallets.
+
+The public manifest contains the snapshot, exclusions, allocations and proofs. The contract enforces the committed allocation; historical balance accuracy and exclusion policy remain publisher responsibilities that can be audited from the published evidence.
+
+Claims and verification
+
+A claim is specific to one chain, contract, drop, index, recipient and amount. It cannot redirect tokens to the caller or use another drop's budget. The contract has no allocation replacement, admin withdrawal or upgrade path. A failed or inexact token transfer reverts without consuming the allocation.
+
+The interface checks contract identity and evidence, simulates a claim, checks the active wallet and network, and saves the submitted receipt before polling. Missing allocation files or unavailable funding evidence disable claims.
+
+The full local integration test passed from Python snapshot generation through Solidity funding, FastAPI reads and an actual browser wallet claim. Contract tests cover proof and replay failures, double claims, transfer failures, reentrancy and budget conservation. A separate mainnet-fork test passed against the four supported stock-token contracts using synthetic fork inventory. These checks are not an independent audit.
+
+Launch status
+
+The next steps are independent review, verified Safe deployment, a reviewed snapshot and exclusions, an approved and funded stock-token pot, and the production release. Stock Drops can deploy independently of FactoryV2. The separate Agent Bond activation remains pending.
+
+Implementation and publisher runbook:
+https://github.com/juicevz/liquidmuppets/blob/main/docs/STOCK_DROPS.md

@@ -23,6 +23,7 @@ type DocsVisualKind = 'loop' | 'pets' | 'route' | 'rwa' | 'vault' | 'policy' | '
 
 interface DocsSection {
   number: string
+  anchor?: string
   title: string
   body: string
   details?: string[]
@@ -275,6 +276,24 @@ const docsSections: DocsSection[] = [
       'deployment block 52653314',
     ],
   },
+  {
+    number: '23',
+    anchor: 'stock-drops',
+    title: 'Stock Drops for $MUPPETS holders',
+    body: 'Stock Drops adds a direct stock-token claim for holders. The contract, complete-snapshot publisher tooling, read API and claim page are implemented in this repository. Mainnet deployment, the first snapshot and first funded pot are pending. Each full 15,000 $MUPPETS held in a wallet at the chosen snapshot gives one allocation unit. Each drop distributes one stock-token budget in proportion to the eligible units.',
+    details: [
+      'no Agent Key, token deposit, approval or lock is needed; the wallet pays network gas for its claim',
+      'the initial supported assets are AAPL, AMD, AMZN and ASML Stock Tokens; support is not a funded allocation',
+      'the publisher must deposit the full budget before claims exist; there is no automatic fee feed or promised schedule',
+      'the snapshot file includes the full holder balances and explicit exclusions; balances must sum to totalSupply before exclusions',
+      'the publisher chooses the snapshot and exclusions; Merkle proofs enforce the committed allocation, not historical balances by themselves',
+      'each funded allocation is immutable, has no expiry and always pays its committed wallet; claims remain callable independently of the publisher',
+      'stock-token issuer restrictions can prevent a transfer; a failed transfer does not consume the allocation',
+      'this snapshot policy counts wallet balances only; pools, exchanges and future bonded positions do not automatically count as individual holdings',
+      'existing vault deposits, the FeeRwaReserve balance, fee splits and the separate Agent Bond package are unchanged',
+    ],
+    link: { label: 'Open Stock Drops', href: '/app/stock-drops' },
+  },
 ]
 
 function VisualFrame({ title, status, children, className = '' }: { title: string; status: string; children: ReactNode; className?: string }) {
@@ -455,7 +474,7 @@ export function DocsPage() {
       <div className="docs-layout">
         <aside aria-label="Documentation sections">
           {docsSections.map((section) => (
-            <a href={`#docs-${section.number}`} key={section.number}>
+            <a href={`#${section.anchor ?? `docs-${section.number}`}`} key={section.number}>
               <span>{section.number}</span>
               {section.title}
             </a>
@@ -464,7 +483,7 @@ export function DocsPage() {
 
         <article>
           {docsSections.map((section) => (
-            <section id={`docs-${section.number}`} key={section.number}>
+            <section id={section.anchor ?? `docs-${section.number}`} key={section.number}>
               <span>{section.number}</span>
               <div className="docs-section-copy">
                 <h2>{section.title}</h2>

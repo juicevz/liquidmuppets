@@ -22,6 +22,7 @@ from app.routers import (
     public,
     radar,
     revenue,
+    stock_drops,
     strategies,
     system,
 )
@@ -31,6 +32,7 @@ from app.services.performance import PerformanceService
 from app.services.proofs import PROOF_BOUNDARY, ProofService
 from app.services.public_data import PublicDataService
 from app.services.revenue import RevenueService
+from app.services.stock_drops import StockDropService
 from app.services.token_gate import TokenGateService
 
 logger = logging.getLogger(__name__)
@@ -45,6 +47,7 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
     public_data_service = PublicDataService(app_settings, database, activity_service, token_gate)
     proof_service = ProofService(app_settings, database, activity_service, chain)
     revenue_service = RevenueService(app_settings, chain.web3)
+    stock_drop_service = StockDropService(app_settings, chain.web3)
 
     @asynccontextmanager
     async def lifespan(live_app: FastAPI) -> AsyncIterator[None]:
@@ -103,6 +106,7 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
     app.state.proofs = proof_service
     app.state.proofs_boundary = PROOF_BOUNDARY
     app.state.revenue = revenue_service
+    app.state.stock_drops = stock_drop_service
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(app_settings.cors_origins),
@@ -120,6 +124,7 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
     app.include_router(radar.router, prefix="/api/v1")
     app.include_router(public.router, prefix="/api/v1")
     app.include_router(revenue.router, prefix="/api/v1")
+    app.include_router(stock_drops.router, prefix="/api/v1")
     app.include_router(proofs.api_router, prefix="/api/v1")
     app.include_router(proofs.share_router)
     return app

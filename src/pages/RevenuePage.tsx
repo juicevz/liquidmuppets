@@ -122,6 +122,7 @@ export function RevenuePage({ walletAddress, onConnect }: RevenuePageProps) {
 
   return (
     <div className="app-page revenue-page">
+      <nav className="earn-tabs" aria-label="Earn features"><a href="/app/earn" aria-current="page">Agent Bonds</a><a href="/app/stock-drops">Stock Drops</a></nav>
       <header className="revenue-hero">
         <div>
           <span className="revenue-kicker"><i aria-hidden="true" />your wallet and rewards</span>
